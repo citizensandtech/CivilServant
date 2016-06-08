@@ -1,25 +1,12 @@
 import reddit.connection
 import simplejson as json
 import copy
+import reddit.praw_utils as praw_utils
+import reddit.queries
 
-r = reddit.connection.connect()
-
-posts = []
-sub = r.get_subreddit("science")
-for post in sub.get_new(limit=100):
-  p = copy.copy(post.__dict__)
-
-  p['author'] = copy.copy(p['author'].__dict__)
-  p['author']['reddit_session'] = None
-
-  p['subreddit'] = copy.copy(p['subreddit'].__dict__)
-  p['subreddit']['reddit_session']=None
-  if "approved_by" in p.keys() and p['approved_by']:    
-    p['approved_by'] = copy.copy(p['approved_by'].__dict__)
-    p['approved_by']['reddit_session']=None
-
-  p['reddit_session'] = None
+def get_posts():
+  r = reddit.connection.connect()
+  print(json.dumps(reddit.queries.get_new_as_dict(r, "science")))
   
-  posts.append(p)
-
-print(json.dumps(posts))
+if __name__ == "__main__":
+  get_posts()
