@@ -1,7 +1,9 @@
 #CivilServant Ignore
 config/*.pickle
+config/*.json
 praw.ini
 *.swp
+alembic.ini
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

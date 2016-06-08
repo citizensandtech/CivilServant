@@ -1,0 +1,18 @@
+## THE ALEMBIC MIGRATIONS ARE NOW KEYED
+## TO THE CONTENTS OF CS_ENV VARIABLE
+##     options: development, test, production
+export CS_ENV=development 
+
+## MIGRATING WITH ALEMBIC
+
+alembic upgrade head
+
+alembic upgrade +2
+
+alembic downgrade -1
+
+## AUTO-GENERATE ALEMBIC MIGRATION:
+# before running this command, you should run
+# export CS_ENV = all
+alembic revision --autogenerate -m "MESSAGE"
+

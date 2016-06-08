@@ -10,7 +10,7 @@ import pickle
 import sys
 import os
 
-env =  os.environ['CS_ENVIRONMENT']
+env =  os.environ['CS_ENV']
 
 r = praw.Reddit(user_agent="Test version of CivilServant by u/natematias")
 url = r.get_authorize_url('uniqueKey', 'identity read', True)

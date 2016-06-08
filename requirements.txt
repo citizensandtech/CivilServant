@@ -3,3 +3,8 @@ pytest
 pyyaml
 mock
 simplejson
+redis
+rq
+mysqlclient
+sqlalchemy
+alembic

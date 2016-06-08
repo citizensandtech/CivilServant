@@ -1,0 +1,8 @@
+CREATE DATABASE civilservant_development;
+CREATE DATABASE civilservant_test;
+CREATE DATABASE civilservant_production;
+CREATE USER civilservant@localhost IDENTIFIED BY '';
+GRANT ALL PRIVILEGES ON civilservant_development.* to civilservant@localhost IDENTIFIED BY '';
+GRANT ALL PRIVILEGES ON civilservant_test.* to civilservant@localhost IDENTIFIED BY '';
+GRANT ALL PRIVILEGES ON civilservant_production.* to civilservant@localhost IDENTIFIED BY '';
+flush privileges;
