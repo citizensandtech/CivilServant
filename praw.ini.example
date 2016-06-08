@@ -1,0 +1,14 @@
+[DEFAULT]
+#user = 
+#pswd = 
+
+user_agent = CivilServant test script by u/natematias
+
+oauth_client_id = 
+oauth_client_secret = 
+oauth_redirect_uri = http://127.0.0.1:65010
+
+log_requests = 1
+default_content_limit = 1000
+domain = www.reddit.com
+ssl_domain =  www.reddit.com
