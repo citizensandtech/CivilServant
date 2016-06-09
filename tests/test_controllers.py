@@ -5,7 +5,8 @@ import simplejson as json
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import glob, datetime
-import app.front_page_controller
+import app.controllers.front_page_controller
+from utils.common import PageType
 
 ### LOAD THE CLASSES TO TEST
 from app.models import Base, FrontPage
@@ -51,10 +52,10 @@ def test_front_page_controller(mock_reddit):
   
   assert len(db_session.query(FrontPage).all()) == 0
   
-  app.front_page_controller.archive_reddit_front_page(r,db_session)
+  app.front_page_controller.archive_reddit_front_page(r,db_session, PageType.TOP)
+  app.front_page_controller.archive_reddit_front_page(r,db_session, PageType.CONTR)
 
   all_pages = db_session.query(FrontPage).all()
-  assert len(all_pages) == 1
-    
-    
+  assert len(all_pages) == 2
+  # mmou TODO: write more assertions
   

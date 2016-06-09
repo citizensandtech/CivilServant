@@ -13,6 +13,6 @@ alembic downgrade -1
 
 ## AUTO-GENERATE ALEMBIC MIGRATION:
 # before running this command, you should run
-# export CS_ENV = all
+# export CS_ENV=all
 alembic revision --autogenerate -m "MESSAGE"
 
