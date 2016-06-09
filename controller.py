@@ -1,5 +1,7 @@
 import inspect, os, sys
 import simplejson as json
+import reddit.connection
+import app.front_page_controller
 
 ### LOAD ENVIRONMENT VARIABLES
 BASE_DIR = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
@@ -21,3 +23,19 @@ db_engine = create_engine("mysql://{user}:{password}@{host}/{database}".format(
 Base.metadata.bind = db_engine
 DBSession = sessionmaker(bind=db_engine)
 db_session = DBSession()
+
+### PROCESS POSSIBLE ACTIONS
+### OPTIONS INCLUDE:
+###    reddit_front: archive redditfront page
+###    subreddit top: archive subreddit front page
+##
+##
+## (TODO: process argv data more intelligently)
+action = sys.argv[1]
+
+if(action == "reddit_front"):
+  r = reddit.connection.connect()
+  app.front_page_controller.archive_reddit_front_page(r, db_session)
+  ## TODO: log & monitor actions like this when they occur
+  
+
