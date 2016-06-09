@@ -11,8 +11,8 @@ def prepare_post_for_json(post):
         praw_dict = post.__dict__
         praw_dict['author'] = copy.copy(praw_dict['author'].__dict__)
         praw_dict['author']['reddit_session'] = None
-      
-        praw_dict['subreddit'] = praw_dict['subreddit']['display_name']
+        #import pdb;pdb.set_trace()
+        praw_dict['subreddit'] = praw_dict['subreddit'].display_name
         #praw_dict['subreddit'] = copy.copy(praw_dict['subreddit'].__dict__)
         #praw_dict['subreddit']['reddit_session']=None
         if "approved_by" in praw_dict.keys() and praw_dict['approved_by']:    
