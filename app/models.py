@@ -22,7 +22,7 @@ class FrontPage(Base):
     __tablename__ = 'front_page'
     id = Column(Integer, primary_key = True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    page_type = Column(Integer) # 1 or 2
+    page_type = Column(Integer) # see utils/common.py
     page_data = Column(MEDIUMTEXT)
 
 class Subreddit(Base):
@@ -34,7 +34,7 @@ class SubredditPage(Base):
     __tablename__ = 'subreddit_page'
     id = Column(Integer, primary_key = True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    page_type = Column(Integer) # 1 or 2
+    page_type = Column(Integer) # see utils/common.py
     page_data = Column(MEDIUMTEXT)
 
 class Post(Base):
