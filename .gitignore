@@ -1,4 +1,4 @@
-*/.DS_Store
+.DS_Store
 
 #CivilServant Ignore
 config/*.pickle
