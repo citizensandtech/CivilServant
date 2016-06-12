@@ -9,10 +9,12 @@ import app.front_page_controller
 
 ### LOAD THE CLASSES TO TEST
 from app.models import Base, FrontPage
+import app.cs_logger
 
 ## SET UP THE DATABASE ENGINE
 ## TODO: IN FUTURE, SET UP A TEST-WIDE DB SESSION
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
+BASE_DIR  = os.path.join(TEST_DIR, "../")
 ENV = os.environ['CS_ENV'] ="test"
 with open(os.path.join(TEST_DIR, "../", "config") + "/{env}.json".format(env=ENV), "r") as config:
   DBCONFIG = json.loads(config.read())
@@ -45,13 +47,16 @@ def teardown_function(function):
 @patch('praw.Reddit', autospec=True)
 def test_front_page_controller(mock_reddit):
   r = mock_reddit.return_value
+  log = app.cs_logger.get_logger(ENV, BASE_DIR)
   with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
     mock_reddit.get_new.return_value = json.loads(f.read())
   patch('praw.')
   
   assert len(db_session.query(FrontPage).all()) == 0
+
   
-  app.front_page_controller.archive_reddit_front_page(r,db_session)
+  fp = app.front_page_controller.FrontPageController(db_session, r, log)
+  fp.archive_reddit_front_page()
 
   all_pages = db_session.query(FrontPage).all()
   assert len(all_pages) == 1

@@ -1,0 +1,8 @@
+# configuration settings for errbit
+export AIRBRAKE_API_KEY=
+export AIRBRAKE_PROJECT_ID=
+export AIRBRAKE_ENVIRONMENT=
+export AIRBRAKE_BASE_URL=
+
+# configuration settings for CivilServant
+export CS_ENV=development

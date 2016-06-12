@@ -1,7 +1,8 @@
 import inspect, os, sys
 import simplejson as json
 import reddit.connection
-import app.front_page_controller
+import app.front_page_controller as front_page_controller
+import app.cs_logger
 
 ### LOAD ENVIRONMENT VARIABLES
 BASE_DIR = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
@@ -24,6 +25,10 @@ Base.metadata.bind = db_engine
 DBSession = sessionmaker(bind=db_engine)
 db_session = DBSession()
 
+## LOAD LOGGER
+
+log = app.cs_logger.get_logger(ENV, BASE_DIR)
+
 ### PROCESS POSSIBLE ACTIONS
 ### OPTIONS INCLUDE:
 ###    reddit_front: archive redditfront page
@@ -35,7 +40,8 @@ action = sys.argv[1]
 
 if(action == "reddit_front"):
   r = reddit.connection.connect()
-  app.front_page_controller.archive_reddit_front_page(r, db_session)
+  fp = front_page_controller.FrontPageController(db_session, r, log)
+  fp.archive_reddit_front_page()
   ## TODO: log & monitor actions like this when they occur
   
 

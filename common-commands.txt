@@ -16,3 +16,5 @@ alembic downgrade -1
 # export CS_ENV = all
 alembic revision --autogenerate -m "MESSAGE"
 
+# Load logging environment variables
+source config/environment_variables.sh
