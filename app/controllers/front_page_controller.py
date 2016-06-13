@@ -18,7 +18,9 @@ def fetch_reddit_front_page(r, pg_type, limit=100):
         fetched = r.get_top(limit=limit)
     elif pg_type==PageType.CONTR:
         fetched = r.get_controversial(limit=limit)
-    
+    elif pg_type==PageType.NEW:
+        fetched = r.get_new(limit=limit)        
+
     for post in fetched:
         if("json_dict" in dir(post)):
             posts.append(post.json_dict)

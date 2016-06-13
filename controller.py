@@ -45,6 +45,11 @@ if(action == "reddit_front_controversial"):
   app.controllers.front_page_controller.archive_reddit_front_page(r, db_session, PageType.CONTR)
   ## TODO: log & monitor actions like this when they occur
 
+if(action == "reddit_front_new"):
+  r = reddit.connection.connect()
+  app.controllers.front_page_controller.archive_reddit_front_page(r, db_session, PageType.NEW)
+  ## TODO: log & monitor actions like this when they occur
+
 
 if(action == "subreddit_top"):
   subname = sys.argv[2]
@@ -56,4 +61,10 @@ if(action == "subreddit_controversial"):
   subname = sys.argv[2]
   r = reddit.connection.connect()
   app.controllers.subreddit_controller.archive_subreddit_page(r, db_session, subname, PageType.CONTR)
+  ## TODO: log & monitor actions like this when they occur
+
+if(action == "subreddit_new"):
+  subname = sys.argv[2]
+  r = reddit.connection.connect()
+  app.controllers.subreddit_controller.archive_subreddit_page(r, db_session, subname, PageType.NEW)
   ## TODO: log & monitor actions like this when they occur

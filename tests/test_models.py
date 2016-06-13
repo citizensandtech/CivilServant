@@ -5,6 +5,7 @@ import simplejson as json
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import glob, datetime
+from utils.common import PageType
 
 ### LOAD THE CLASSES TO TEST
 from app.models import Base, FrontPage
@@ -45,8 +46,9 @@ def populate_front_pages():
         with open(fn) as front_page_file:
           front_page_data = json.loads(front_page_file.read())['data']['children']
           first_item_timestamp = datetime.datetime.fromtimestamp(front_page_data[0]['data']['created'])
-          
+          print(type(FrontPage.page_type))
           front_page = FrontPage(created_at = first_item_timestamp,
+                                 page_type = PageType.TOP.value,
                                  page_data = json.dumps(front_page_data))
           db_session.add(front_page)
         counter += 1

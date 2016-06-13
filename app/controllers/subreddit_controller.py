@@ -23,7 +23,9 @@ def fetch_subreddit_page(r, db_session, subname, pg_type, limit=100):
         fetched = sub.get_top(limit=limit)
     elif pg_type==PageType.CONTR:
         fetched = sub.get_controversial(limit=limit)
-    
+    elif pg_type==PageType.NEW:
+        fetched = sub.get_new(limit=limit)    
+
     for post in fetched:
         new_post = post.json_dict if("json_dict" in dir(post)) else post ### TO HANDLE TEST FIXTURES
         posts.append(new_post)

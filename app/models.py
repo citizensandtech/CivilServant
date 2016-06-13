@@ -11,13 +11,6 @@ import datetime
 
 Base = declarative_base()
 
-"""
-page_type: 
-	1 = "top"
-	2 = "controversial"
-
-"""
-
 class FrontPage(Base):
     __tablename__ = 'front_page'
     id = Column(Integer, primary_key = True)
