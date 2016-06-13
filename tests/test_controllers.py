@@ -55,14 +55,6 @@ def test_front_page_controller(mock_reddit):
   
   assert len(db_session.query(FrontPage).all()) == 0
   
-<<<<<<< 60764f4b373f1b8efe04a977ca1a60ef8c6d6831
-  app.front_page_controller.archive_reddit_front_page(r,db_session, PageType.TOP)
-  app.front_page_controller.archive_reddit_front_page(r,db_session, PageType.CONTR)
-
-  all_pages = db_session.query(FrontPage).all()
-  assert len(all_pages) == 2
-  # mmou TODO: write more assertions
-=======
   ## NOW START THE TEST for top and controversial
   app.controllers.front_page_controller.archive_reddit_front_page(r,db_session, PageType.TOP)
   app.controllers.front_page_controller.archive_reddit_front_page(r,db_session, PageType.CONTR)
