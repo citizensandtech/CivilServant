@@ -29,7 +29,7 @@ def fetch_subreddit_page(r, db_session, subname, pg_type, limit=100):
     for post in fetched:
         new_post = post.json_dict if("json_dict" in dir(post)) else post ### TO HANDLE TEST FIXTURES
         posts.append(new_post)
-        archive_post(r, db_session, post)
+        archive_post(r, db_session, new_post)
     return posts
 
 def archive_subreddit_page(r, db_session, subname, pg_type=PageType.TOP):
@@ -53,15 +53,15 @@ def archive_subreddit(r, db_session, sub):
     # else don't add it to subreddit table
 
 def archive_post(r, db_session, post):
-    post_count = db_session.query(Post).filter(Post.id == post.id).count()
+    post_count = db_session.query(Post).filter(Post.id == post['id']).count()
 
     # if sub not in table, add it
     if post_count == 0:
         new_post = Post(
-                id = post.id,
-                subreddit_id = post.subreddit_id.strip("t5_"), # janky
-                created = datetime.datetime.fromtimestamp(post.created),        
-                post_data = json.dumps(post.json_dict if "json_dict" in dir(post) else post)) ### else is TO HANDLE TEST FIXTURES
+                id = post['id'],
+                subreddit_id = post['subreddit_id'].strip("t5_"), # janky
+                created = datetime.datetime.fromtimestamp(post['created']),        
+                post_data = json.dumps(post))
         db_session.add(new_post)
         db_session.commit()
     # else don't add it to post table
