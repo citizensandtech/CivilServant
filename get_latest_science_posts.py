@@ -5,7 +5,8 @@ import reddit.praw_utils as praw_utils
 import reddit.queries
 
 def get_posts():
-  r = reddit.connection.connect()
+  conn = reddit.connection.Connect()
+  r = conn.connect(controller="GetTopScience")
   print(json.dumps(reddit.queries.get_new_as_dict(r, "science")))
   
 if __name__ == "__main__":
