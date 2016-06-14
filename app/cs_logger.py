@@ -21,7 +21,7 @@ def get_logger(ENV, BASE_DIR):
     log.addHandler(stdoutHandler)
 
   logfile = os.path.abspath(BASE_DIR + "/logs/CivilServant_" + ENV + ".log")
-  print(BASE_DIR + "/cs_" + ENV + ".log")
+  print("Logging to " + BASE_DIR + "/logs/CivilServant_" + ENV + ".log")
   formatter = logging.Formatter('%(asctime)s - %(name)s({env}) - %(levelname)s - %(message)s'.format(env=ENV))
 
   rotateHandler = ConcurrentRotatingFileHandler(logfile, "a", 32 * 1000 * 1024, 5)

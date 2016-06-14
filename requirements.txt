@@ -4,6 +4,8 @@ mock
 simplejson
 redis
 rq
+rq-scheduler
+rq-dashboard
 mysqlclient
 sqlalchemy
 alembic

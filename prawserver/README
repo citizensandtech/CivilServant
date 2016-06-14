@@ -1,8 +1,0 @@
-TO START THE PRAW MULTIPROCESS SERVER:
-
-1. Replace the file ./run with a symlink to praw-multiprocess, which is likely in VENV/bin/praw-multiprocess
-2. change the permissions of the ./run file:
-chmod 755 run
-3. install daemontools
-4. from the base project directory, run: 
-supervise prawserver

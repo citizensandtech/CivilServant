@@ -1,0 +1,18 @@
+####################################
+### SYSTEMS MANAGED BY supervise ###
+####################################
+
+- praw-multiprocess
+- rqdashboard
+- rqscheduler
+
+TO KEEP A PROCESS RUNNING:
+
+1. Replace the file ./supervise/FOLDER/run with a symlink to the binary, which is likely in VENV/bin/
+2. change the permissions of the ./run file:
+chmod 755 run
+3. install daemontools
+4. from the base project directory, pass the name of the folder to supervise: 
+supervise supervise/FOLDER
+
+

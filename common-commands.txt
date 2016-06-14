@@ -25,6 +25,9 @@ supervise prawserver
 ## (remember to set the above environment variables)
 rq worker <<development, production>>
 
+## Scheduling is handled with rqscheduler
+## which needs to be kept running
+rqscheduler
 
 ##### DEVELOPMENT PROCESS #####
 
@@ -46,3 +49,15 @@ alembic downgrade -1
 # export CS_ENV = all
 alembic revision --autogenerate -m "MESSAGE"
 
+
+
+##### MONITORING STATUS #####
+
+## Monitoring the redis-queue
+rq-dashboard
+
+## Monitoring errors
+civilservant-error-handler.herokuapp.com
+
+## Monitoring errors and info, locally
+./logs

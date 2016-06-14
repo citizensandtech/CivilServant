@@ -5,7 +5,7 @@ import app.front_page_controller as front_page_controller
 import app.cs_logger
 
 ### LOAD ENVIRONMENT VARIABLES
-BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), "../")
+BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), "..")
 ENV = os.environ['CS_ENV']
 
 with open(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV), "r") as config:
