@@ -1,6 +1,32 @@
-## CivilServant REQUIRES PRAW MULTIPROCESS
-praw-multiprocess
+############################################
+## COMMON SHELL COMMANDS FOR CivilServant ##
+############################################
 
+##### ENVIRONMENT VARIABLES #####
+
+# Load logging environment variables
+# (run this as a matter of course)
+source config/environment_variables.sh
+
+# set the environment
+export CS_ENV=development
+
+##### RUNNING SERVICES #####
+
+## Reddit API queries:
+## CivilServant requires praw-multiprocess
+## which is kept up via supervise
+supervise prawserver
+
+## Job Queue:
+## CivilServant requires redis, which should be
+## run in the background. It also requires redis-queue
+## which can be run with the following set of commands
+## (remember to set the above environment variables)
+rq worker <<development, production>>
+
+
+##### DEVELOPMENT PROCESS #####
 
 ## THE ALEMBIC MIGRATIONS ARE NOW KEYED
 ## TO THE CONTENTS OF CS_ENV VARIABLE
@@ -19,7 +45,4 @@ alembic downgrade -1
 # before running this command, you should run
 # export CS_ENV = all
 alembic revision --autogenerate -m "MESSAGE"
-
-# Load logging environment variables
-source config/environment_variables.sh
 

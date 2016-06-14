@@ -5,7 +5,7 @@ import app.front_page_controller as front_page_controller
 import app.cs_logger
 
 ### LOAD ENVIRONMENT VARIABLES
-BASE_DIR = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), "../")
 ENV = os.environ['CS_ENV']
 
 with open(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV), "r") as config:
@@ -26,22 +26,15 @@ DBSession = sessionmaker(bind=db_engine)
 db_session = DBSession()
 
 ## LOAD LOGGER
-
 log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
-### PROCESS POSSIBLE ACTIONS
-### OPTIONS INCLUDE:
-###    reddit_front: archive redditfront page
-###    subreddit top: archive subreddit front page
-##
-##
-## (TODO: process argv data more intelligently)
-action = sys.argv[1]
+##########################
+## METHODS FOR FETCHING ##
+##########################
 
-if(action == "reddit_front"):
-  r = reddit.connection.connect()
+## Fetch Front Page of reddit
+def fetch_reddit_front():
+  conn = reddit.connection.Connect()
+  r = conn.connect(controller="RedditFront")
   fp = front_page_controller.FrontPageController(db_session, r, log)
   fp.archive_reddit_front_page()
-  ## TODO: log & monitor actions like this when they occur
-  
-
