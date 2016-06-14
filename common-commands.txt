@@ -1,3 +1,7 @@
+## CivilServant REQUIRES PRAW MULTIPROCESS
+praw-multiprocess
+
+
 ## THE ALEMBIC MIGRATIONS ARE NOW KEYED
 ## TO THE CONTENTS OF CS_ENV VARIABLE
 ##     options: development, test, production
@@ -18,3 +22,4 @@ alembic revision --autogenerate -m "MESSAGE"
 
 # Load logging environment variables
 source config/environment_variables.sh
+
