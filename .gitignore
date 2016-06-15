@@ -3,9 +3,13 @@
 #CivilServant Ignore
 config/*.pickle
 config/*.json
+config/*.sh
 praw.ini
 *.swp
 alembic.ini
+logs/*
+prawserver/supervise
+prawserver/run
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

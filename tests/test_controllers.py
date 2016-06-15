@@ -11,10 +11,12 @@ from utils.common import PageType
 
 ### LOAD THE CLASSES TO TEST
 from app.models import Base, FrontPage, SubredditPage, Subreddit, Post
+import app.cs_logger
 
 ## SET UP THE DATABASE ENGINE
 ## TODO: IN FUTURE, SET UP A TEST-WIDE DB SESSION
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
+BASE_DIR  = os.path.join(TEST_DIR, "../")
 ENV = os.environ['CS_ENV'] ="test"
 with open(os.path.join(TEST_DIR, "../", "config") + "/{env}.json".format(env=ENV), "r") as config:
   DBCONFIG = json.loads(config.read())
@@ -59,19 +61,13 @@ def teardown_function(function):
     clear_posts()
     clear_subreddits()
 
-
-
-def foo():
-  print("HIT THE RETURN VALUE")
-  return "ajdkfljasl;kdjfasldkjfl;"
-
 ### TEST THE MOCK SETUP AND MAKE SURE IT WORKS
 ## TODO: I should not be mocking SQLAlchemy
 ## I should just be mocking the reddit API
 @patch('praw.Reddit', autospec=True)
 def test_front_page_controller(mock_reddit):
   r = mock_reddit.return_value
-
+  log = app.cs_logger.get_logger(ENV, BASE_DIR)
   with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
     sub_data = json.loads(f.read())
   r.get_top.return_value = sub_data
@@ -82,9 +78,10 @@ def test_front_page_controller(mock_reddit):
   assert len(db_session.query(FrontPage).all()) == 0
   
   ## NOW START THE TEST for top, controversial, new
-  app.controllers.front_page_controller.archive_reddit_front_page(r,db_session, PageType.TOP)
-  app.controllers.front_page_controller.archive_reddit_front_page(r,db_session, PageType.CONTR)
-  app.controllers.front_page_controller.archive_reddit_front_page(r,db_session, PageType.NEW)
+  fp = app.controllers.front_page_controller.FrontPageController(db_session, r, log)
+  fp.archive_reddit_front_page(PageType.TOP)
+  fp.archive_reddit_front_page(PageType.CONTR)
+  fp.archive_reddit_front_page(PageType.NEW)
 
   all_pages = db_session.query(FrontPage).all()
   assert len(all_pages) == 3
@@ -107,8 +104,8 @@ def test_subreddit_controller(mock_subreddit, mock_reddit):
   test_subreddit_name = "science"
   test_subreddit_id = "mouw"
 
-
   r = mock_reddit.return_value
+  log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
   with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
     sub_data = json.loads(f.read())
@@ -122,11 +119,11 @@ def test_subreddit_controller(mock_subreddit, mock_reddit):
   r.get_subreddit.return_value = mock_subreddit    
 
   assert len(db_session.query(SubredditPage).all()) == 0
-  
+  sp = app.controllers.subreddit_controller.SubredditPageController(test_subreddit_name, db_session, r, log)  
   ## NOW START THE TEST for top, controversial, new  
-  app.controllers.subreddit_controller.archive_subreddit_page(r,db_session, test_subreddit_name, PageType.TOP)
-  app.controllers.subreddit_controller.archive_subreddit_page(r,db_session, test_subreddit_name, PageType.CONTR)
-  app.controllers.subreddit_controller.archive_subreddit_page(r,db_session, test_subreddit_name, PageType.NEW)  
+  sp.archive_subreddit_page(PageType.TOP)
+  sp.archive_subreddit_page(PageType.CONTR)
+  sp.archive_subreddit_page(PageType.NEW)
 
   all_pages = db_session.query(SubredditPage).all()
   assert len(all_pages) == 3

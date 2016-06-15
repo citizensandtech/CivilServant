@@ -1,10 +1,12 @@
 praw
 pytest
-pyyaml
 mock
 simplejson
 redis
 rq
+rq-scheduler
+rq-dashboard
 mysqlclient
 sqlalchemy
 alembic
+ConcurrentLogHandler

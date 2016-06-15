@@ -6,9 +6,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import glob, datetime
 from utils.common import PageType
+import socket
 
 ### LOAD THE CLASSES TO TEST
-from app.models import Base, FrontPage
+from app.models import Base, FrontPage, PrawKey
 
 ## SET UP THE DATABASE ENGINE
 ## TODO: IN FUTURE, SET UP A TEST-WIDE DB SESSION
@@ -62,6 +63,7 @@ def test_front_page(populate_front_pages):
     assert len(all_pages) == 3
     assert len(json.loads(all_pages[0].page_data)) == 100
     
-    
-    
+def test_get_praw_id():
+    hostname = socket.gethostname()
+    assert PrawKey.get_praw_id(ENV, "DummyController") == "{0}:test:DummyController".format(hostname)    
   
