@@ -12,8 +12,9 @@ scheduler = Scheduler(queue_name = os.environ['CS_ENV'], connection=Redis())
 scheduler.schedule(
     scheduled_time=datetime.utcnow(),
     func=app.controllers.fetch_reddit_front,
-    interval=20,
-    repeat=None)
+    interval=60,
+    repeat=None,
+    result_ttl=0)
 
 #scheduler.schedule(
 #    scheduled_time=datetime.utcnow(),
