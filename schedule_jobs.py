@@ -16,7 +16,7 @@ def main():
                         help="The subreddit to query (or all for the frontpage)")
 
     parser.add_argument("pagetype",
-                        choices=["new", "top", "contr"],
+                        choices=["new", "top", "contr", "hot"],
                         help="For front pages, what page to query")
     parser.add_argument("interval",
                         default = 120, # default 2 minutes

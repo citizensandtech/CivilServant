@@ -28,6 +28,8 @@ class SubredditPageController:
               fetched = sub.get_controversial(limit=limit)
           elif pg_type==PageType.NEW:
               fetched = sub.get_new(limit=limit)   
+          elif pg_type==PageType.HOT:
+              fetched = sub.get_hot(limit=limit)   
       except:
           self.log.error("Error querying /r/{0} {1} page".format(self.subname, pg_type.name), extra=sys.exc_info()[0] )
           print(sys.exc.info()[0])
@@ -53,7 +55,7 @@ class SubredditPageController:
               
       return posts
 
-  def archive_subreddit_page(self, pg_type=PageType.TOP):
+  def archive_subreddit_page(self, pg_type=PageType.HOT):
       posts = self.fetch_subreddit_page(pg_type)
       subreddit_page = SubredditPage(created_at = datetime.datetime.now(),
                              page_type = pg_type.value, 

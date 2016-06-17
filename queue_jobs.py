@@ -11,7 +11,7 @@ def main():
     parser.add_argument("sub",
                       help="The subreddit to query (or all for the frontpage)")
     parser.add_argument("pagetype",
-                        choices=["new", "top", "contr"])
+                        choices=["new", "top", "contr", "hot"])
     parser.add_argument("-e", '--env',
                       choices=['development', 'test', 'production'],
                       help="Run within a specific environment. Otherwise run under the environment defined in the environment variable CS_ENV")

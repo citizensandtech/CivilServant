@@ -124,9 +124,10 @@ def test_subreddit_controller(mock_subreddit, mock_reddit):
   sp.archive_subreddit_page(PageType.TOP)
   sp.archive_subreddit_page(PageType.CONTR)
   sp.archive_subreddit_page(PageType.NEW)
+  sp.archive_subreddit_page(PageType.HOT)
 
   all_pages = db_session.query(SubredditPage).all()
-  assert len(all_pages) == 3
+  assert len(all_pages) == 4
 
   top_pages_count = db_session.query(SubredditPage).filter(SubredditPage.page_type == PageType.TOP.value).count()
   assert top_pages_count == 1
@@ -136,3 +137,6 @@ def test_subreddit_controller(mock_subreddit, mock_reddit):
 
   new_pages_count = db_session.query(SubredditPage).filter(SubredditPage.page_type == PageType.NEW.value).count()
   assert new_pages_count == 1
+
+  hot_pages_count = db_session.query(SubredditPage).filter(SubredditPage.page_type == PageType.HOT.value).count()
+  assert hot_pages_count == 1

@@ -4,3 +4,4 @@ class PageType(Enum):
     TOP = 1
     CONTR = 2 # controversial
     NEW = 3
+    HOT = 4
