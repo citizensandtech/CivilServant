@@ -18,7 +18,6 @@ class SubredditPageController:
   def fetch_subreddit_page(self, pg_type, limit=100):
       posts = []
       fetched = []
-
       sub = self.r.get_subreddit(self.subname)
 
       # fetch subreddit posts from reddit
@@ -48,9 +47,9 @@ class SubredditPageController:
               new_post = post.json_dict if("json_dict" in dir(post)) else post ### TO HANDLE TEST FIXTURES
               posts.append(new_post)
               self.archive_post(new_post)
-          self.log.info("Saved {0} posts from /r/{1} {2} page.".format(len(fetched), self.subname, pg_type.name))
+          self.log.info("Saved posts from /r/{0} {1} page.".format(self.subname, pg_type.name))
       except:
-          self.log.error("Error Saving {0} posts from /r/{1} {2} page".format(len(fetched), self.subname, pg_type.name), extra=sys.exc_info()[0] )
+          self.log.error("Error Saving posts from /r/{0} {1} page".format(self.subname, pg_type.name), extra=sys.exc_info()[0] )
               
       return posts
 

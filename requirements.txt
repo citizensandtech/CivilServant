@@ -10,3 +10,4 @@ mysqlclient
 sqlalchemy
 alembic
 ConcurrentLogHandler
+airbrake

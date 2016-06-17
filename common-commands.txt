@@ -17,6 +17,8 @@ export CS_ENV=development
 ## CivilServant requires praw-multiprocess
 ## which is kept up via supervise
 supervise prawserver
+## or alternatively
+praw-multiprocess
 
 ## Job Queue:
 ## CivilServant requires redis, which should be

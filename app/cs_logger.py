@@ -5,8 +5,8 @@ from time import sleep
 
 def get_logger(ENV, BASE_DIR):
 
-  # skip airbrake if the environment is test
-  if(ENV!="test"):
+  # use Airbrake in production
+  if(ENV=="production"):
     log = airbrake.getLogger()
     log.setLevel(logging.INFO)
   else:
