@@ -62,19 +62,25 @@ def teardown_function(function):
     clear_subreddits()
 
 @patch('praw.Reddit', autospec=True)
-def test_archive_reddit_front_page(mock_reddit):
+@patch('praw.objects.Subreddit', autospec=True)    
+def test_archive_reddit_front_page(mock_subreddit, mock_reddit):
   ### TEST THE MOCK SETUP AND MAKE SURE IT WORKS
   ## TODO: I should not be mocking SQLAlchemy
   ## I should just be mocking the reddit API
 
   r = mock_reddit.return_value
   log = app.cs_logger.get_logger(ENV, BASE_DIR)
+
   with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
     sub_data = json.loads(f.read())
-  r.get_top.return_value = sub_data
-  r.get_controversial.return_value = sub_data #[  ]
-  r.get_new.return_value = sub_data #[  ]
+  mock_subreddit.get_top.return_value = sub_data
+  mock_subreddit.get_controversial.return_value = sub_data
+  mock_subreddit.get_new.return_value = sub_data
+  mock_subreddit.get_hot.return_value = sub_data  
   patch('praw.')
+
+  r.get_subreddit.return_value = mock_subreddit   
+
   
   assert len(db_session.query(FrontPage).all()) == 0
   
@@ -83,9 +89,10 @@ def test_archive_reddit_front_page(mock_reddit):
   fp.archive_reddit_front_page(PageType.TOP)
   fp.archive_reddit_front_page(PageType.CONTR)
   fp.archive_reddit_front_page(PageType.NEW)
+  fp.archive_reddit_front_page(PageType.HOT)  
 
   all_pages = db_session.query(FrontPage).all()
-  assert len(all_pages) == 3
+  assert len(all_pages) == 4
 
   top_pages = db_session.query(FrontPage).filter(FrontPage.page_type == PageType.TOP.value)
   assert top_pages.count() == 1
@@ -95,6 +102,9 @@ def test_archive_reddit_front_page(mock_reddit):
 
   new_pages = db_session.query(FrontPage).filter(FrontPage.page_type == PageType.NEW.value)
   assert new_pages.count() == 1
+
+  new_pages = db_session.query(FrontPage).filter(FrontPage.page_type == PageType.HOT.value)
+  assert new_pages.count() == 1  
 
 
 """
@@ -115,8 +125,9 @@ def test_archive_subreddit_page(mock_subreddit, mock_reddit):
   with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
     sub_data = json.loads(f.read())
   mock_subreddit.get_top.return_value = sub_data
-  mock_subreddit.get_controversial.return_value = sub_data #[  ]
-  mock_subreddit.get_new.return_value = sub_data #[  ]
+  mock_subreddit.get_controversial.return_value = sub_data
+  mock_subreddit.get_new.return_value = sub_data
+  mock_subreddit.get_hot.return_value = sub_data  
   patch('praw.')
 
   mock_subreddit.display_name = test_subreddit_name
@@ -180,7 +191,8 @@ def test_archive_subreddit(mock_subreddit, mock_reddit):
 @patch('praw.Reddit', autospec=True)
 def test_archive_post(mock_reddit):
 
-  # dummy post just to pass the test. TODO: carefully describe what the types of these 'archive' method args should be...
+  # dummy post just to pass the test. 
+  # TODO: carefully describe what the types of these 'archive' method args should be...
   post = {
       'id': 1, 
       'subreddit_id': 't5_mouw', 
