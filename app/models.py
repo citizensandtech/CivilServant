@@ -1,7 +1,7 @@
 # example taken from http://pythoncentral.io/introductory-tutorial-python-sqlalchemy/
 import os
 import sys
-from sqlalchemy import Column, ForeignKey, Integer, String, Text, DateTime
+from sqlalchemy import Column, Integer, String, Text, DateTime
 from sqlalchemy.dialects.mysql import MEDIUMTEXT
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -34,7 +34,7 @@ class SubredditPage(Base):
 class Post(Base):
     __tablename__ = 'posts'
     id = Column(String(32), primary_key = True, unique=True, autoincrement=False)	# reddit's id "id"
-    subreddit_id = Column(String(32), ForeignKey('subreddits.id'))	# "subreddit_id"
+    subreddit_id = Column(String(32))	# "subreddit_id"
     created = Column(DateTime) # "created"
     post_data = Column(MEDIUMTEXT)	# "json_dict"
 

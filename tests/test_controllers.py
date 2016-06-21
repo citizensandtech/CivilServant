@@ -61,11 +61,12 @@ def teardown_function(function):
     clear_posts()
     clear_subreddits()
 
-### TEST THE MOCK SETUP AND MAKE SURE IT WORKS
-## TODO: I should not be mocking SQLAlchemy
-## I should just be mocking the reddit API
 @patch('praw.Reddit', autospec=True)
-def test_front_page_controller(mock_reddit):
+def test_archive_reddit_front_page(mock_reddit):
+  ### TEST THE MOCK SETUP AND MAKE SURE IT WORKS
+  ## TODO: I should not be mocking SQLAlchemy
+  ## I should just be mocking the reddit API
+
   r = mock_reddit.return_value
   log = app.cs_logger.get_logger(ENV, BASE_DIR)
   with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
@@ -96,10 +97,14 @@ def test_front_page_controller(mock_reddit):
   assert new_pages.count() == 1
 
 
-### TEST THE MOCK SETUP WITH AN ACTUAL QUERY
+"""
+  basic test for method archive_subreddit_page to insert timestamped pages to subreddit_pages table.
+  analogous to test_archive_reddit_front_page.
+"""
 @patch('praw.Reddit', autospec=True)
 @patch('praw.objects.Subreddit', autospec=True)    
-def test_subreddit_controller(mock_subreddit, mock_reddit):
+def test_archive_subreddit_page(mock_subreddit, mock_reddit):
+  ### TODO: TEST THE MOCK SETUP WITH AN ACTUAL QUERY
 
   test_subreddit_name = "science"
   test_subreddit_id = "mouw"
@@ -120,6 +125,7 @@ def test_subreddit_controller(mock_subreddit, mock_reddit):
 
   assert len(db_session.query(SubredditPage).all()) == 0
   sp = app.controllers.subreddit_controller.SubredditPageController(test_subreddit_name, db_session, r, log)  
+
   ## NOW START THE TEST for top, controversial, new  
   sp.archive_subreddit_page(PageType.TOP)
   sp.archive_subreddit_page(PageType.CONTR)
@@ -140,3 +146,63 @@ def test_subreddit_controller(mock_subreddit, mock_reddit):
 
   hot_pages_count = db_session.query(SubredditPage).filter(SubredditPage.page_type == PageType.HOT.value).count()
   assert hot_pages_count == 1
+
+
+@patch('praw.Reddit', autospec=True)
+@patch('praw.objects.Subreddit', autospec=True)    
+def test_archive_subreddit(mock_subreddit, mock_reddit):
+  test_subreddit_name = "science"
+  test_subreddit_id = "mouw"
+
+  r = mock_reddit.return_value
+  log = app.cs_logger.get_logger(ENV, BASE_DIR)
+
+  mock_subreddit.display_name = test_subreddit_name
+  mock_subreddit.id = test_subreddit_id  
+  patch('praw.')
+
+  assert len(db_session.query(Subreddit).all()) == 0
+  sp = app.controllers.subreddit_controller.SubredditPageController(test_subreddit_name, db_session, r, log)  
+
+  ## NOW START THE TEST
+  # TODO: should you even be allowed to archive a different subreddit than the one sp was made for?  
+  sp.archive_subreddit(mock_subreddit)
+
+  all_subs = db_session.query(Subreddit).all()
+  assert len(all_subs) == 1
+
+  ## trying to archive it again should do nothing (don't throw errors, don't edit db)
+  sp.archive_subreddit(mock_subreddit)
+
+  all_subs = db_session.query(Subreddit).all()
+  assert len(all_subs) == 1
+
+@patch('praw.Reddit', autospec=True)
+def test_archive_post(mock_reddit):
+
+  # dummy post just to pass the test. TODO: carefully describe what the types of these 'archive' method args should be...
+  post = {
+      'id': 1, 
+      'subreddit_id': 't5_mouw', 
+      'created': 1356244946.0
+  }
+
+  r = mock_reddit.return_value
+  test_subreddit_name = "science"
+  log = app.cs_logger.get_logger(ENV, BASE_DIR)
+  patch('praw.')
+
+  assert len(db_session.query(Post).all()) == 0
+  sp = app.controllers.subreddit_controller.SubredditPageController(test_subreddit_name, db_session, r, log)  
+
+  ## NOW START THE TEST
+  sp.archive_post(post)
+
+  all_posts = db_session.query(Post).all()
+  assert len(all_posts) == 1
+
+  ## trying to archive it again should do nothing (don't throw errors, don't edit db)
+  sp.archive_post(post)
+
+  all_posts = db_session.query(Post).all()
+  assert len(all_posts) == 1
