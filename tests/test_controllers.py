@@ -13,7 +13,7 @@ import app.controllers.moderator_controller
 from utils.common import PageType
 
 ### LOAD THE CLASSES TO TEST
-from app.models import Base, FrontPage, SubredditPage, Subreddit, Post, ModAction, Comment
+from app.models import Base, FrontPage, SubredditPage, Subreddit, Post, ModAction, Comment, User
 import app.cs_logger
 
 ## SET UP THE DATABASE ENGINE
@@ -34,45 +34,26 @@ Base.metadata.bind = db_engine
 DBSession = sessionmaker(bind=db_engine)
 db_session = DBSession()
 
-def clear_front_pages():
-    db_session.query(FrontPage).delete()
-    db_session.commit()
-
-def clear_subreddit_pages():
-    db_session.query(SubredditPage).delete()
-    db_session.commit()    
-
-def clear_subreddits():
-    db_session.query(Subreddit).delete()
-    db_session.commit()    
-
-def clear_posts():
-    db_session.query(Post).delete()
-    db_session.commit()    
-
-def clear_comments():
-    db_session.query(Comment).delete()
-    db_session.commit()    
-
-def clear_mod_actions():
-    db_session.query(ModAction).delete()
-    db_session.commit()
 
 def setup_function(function):
-    clear_front_pages()
-    clear_subreddit_pages()
-    clear_posts() 
-    clear_subreddits()
-    clear_mod_actions()
-    clear_comments()
+    db_session.query(FrontPage).delete()
+    db_session.query(SubredditPage).delete()
+    db_session.query(Subreddit).delete()
+    db_session.query(Post).delete()
+    db_session.query(User).delete()
+    db_session.query(Comment).delete()
+    db_session.query(ModAction).delete()        
+    db_session.commit()    
 
 def teardown_function(function):
-    clear_front_pages()
-    clear_subreddit_pages()
-    clear_posts()
-    clear_subreddits()
-    clear_mod_actions()
-    clear_comments()
+    db_session.query(FrontPage).delete()
+    db_session.query(SubredditPage).delete()
+    db_session.query(Subreddit).delete()
+    db_session.query(Post).delete()
+    db_session.query(User).delete()  
+    db_session.query(Comment).delete()
+    db_session.query(ModAction).delete()      
+    db_session.commit()
 
 
 @patch('praw.Reddit', autospec=True)
@@ -86,7 +67,7 @@ def test_archive_reddit_front_page(mock_subreddit, mock_reddit):
     log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
     with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
-        sub_data = json.loads(f.read())
+        sub_data = json.loads(f.read())['data']['children']
     mock_subreddit.get_top.return_value = sub_data
     mock_subreddit.get_controversial.return_value = sub_data
     mock_subreddit.get_new.return_value = sub_data
@@ -137,7 +118,7 @@ def test_archive_subreddit_page(mock_subreddit, mock_reddit):
     log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
     with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
-        sub_data = json.loads(f.read())
+        sub_data = json.loads(f.read())['data']['children']
     mock_subreddit.get_top.return_value = sub_data
     mock_subreddit.get_controversial.return_value = sub_data
     mock_subreddit.get_new.return_value = sub_data
@@ -465,3 +446,37 @@ def test_archive_mod_action_page(mock_reddit):
     last_action_id = mac.archive_mod_action_page(after_id = mod_action_fixtures[0][-1]['id'])
     assert db_session.query(ModAction).count() == len(mod_action_fixtures[0]) + len(mod_action_fixtures[1])
     assert last_action_id == mod_action_fixtures[1][-1]['id']
+
+
+@patch('praw.Reddit', autospec=True)
+def test_archive_user(mock_reddit):
+
+  username = "merrymou"
+  seen_at = datetime.datetime.now()
+
+  r = mock_reddit.return_value
+  test_subreddit_name = "science"
+  log = app.cs_logger.get_logger(ENV, BASE_DIR)
+  patch('praw.')
+
+  assert len(db_session.query(User).all()) == 0
+  sp = app.controllers.subreddit_controller.SubredditPageController(test_subreddit_name, db_session, r, log)  
+
+  ## NOW START THE TEST
+  sp.archive_user(username, seen_at)
+
+  all_users = db_session.query(User).all()
+  assert len(all_users) == 1
+
+  user = db_session.query(User).first()  
+  old_last_seen = user.last_seen
+
+  ## trying to archive it again should update last_seen field
+  sp.archive_user(username, seen_at)
+
+  all_users = db_session.query(User).all()
+  assert len(all_users) == 1  
+
+  user = db_session.query(User).first()  
+  new_last_seen = user.last_seen
+  assert(old_last_seen <= new_last_seen)

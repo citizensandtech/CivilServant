@@ -38,7 +38,7 @@ class FrontPageController:
           if("json_dict" in dir(post)):
               posts.append(post.json_dict)
           else:
-              posts.append(post) ### TO HANDLE TEST FIXTURES
+              posts.append(post['data']) ### TO HANDLE TEST FIXTURES
 
       self.log.info("Queried reddit {0} page".format(pg_type.name))
       return posts

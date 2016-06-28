@@ -21,7 +21,8 @@ class FrontPage(Base):
 
 class Subreddit(Base):
     __tablename__ = 'subreddits'
-    id = Column(String(32), primary_key = True, unique=True, autoincrement=False) # reddit's id
+    id = Column(String(32), primary_key = True, unique=True, autoincrement=False) # subreddit id
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
     name = Column(String(32)) # display_name
 
 class SubredditPage(Base):
@@ -33,7 +34,8 @@ class SubredditPage(Base):
 
 class Post(Base):
     __tablename__ = 'posts'
-    id = Column(String(32), primary_key = True, unique=True, autoincrement=False)	# reddit's id "id"
+    id = Column(String(32), primary_key = True, unique=True, autoincrement=False)	# post id
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
     subreddit_id = Column(String(32))	# "subreddit_id"
     created = Column(DateTime) # "created"
     #when this record was created:
@@ -63,6 +65,16 @@ class Comment(Base):
     post_id = Column(String(32), index=True)
     user_id = Column(String(64), index=True)
     comment_data = Column(MEDIUMTEXT)
+
+class User(Base):
+    __tablename__ = 'users'
+    name = Column(String(32), primary_key = True, unique=True, autoincrement=False)   # redditor's name
+    id = Column(String(32)) # "redditor's id"
+    created = Column(DateTime) # "created"
+    first_seen = Column(DateTime)
+    last_seen = Column(DateTime)
+    user_data = Column(MEDIUMTEXT)
+
 
 class PrawKey(Base):
     __tablename__ = 'praw_keys'

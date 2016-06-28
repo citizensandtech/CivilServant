@@ -49,10 +49,9 @@ def test_mock_setup(mock_subreddit, mock_reddit):
     r = mock_reddit.return_value
     mock_subreddit.display_name = "science"
     with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
-        mock_subreddit.get_new.return_value = json.loads(f.read())
-    patch('praw.')
-
+        mock_subreddit.get_new.return_value = json.loads(f.read())['data']['children']
     r.get_subreddit.return_value = mock_subreddit    
+    patch('praw.')
 
     ## NOW START THE TEST
     sub = r.get_subreddit("science")
@@ -69,10 +68,9 @@ def test_get_new_as_dict(mock_subreddit, mock_reddit):
     r = mock_reddit.return_value
     mock_subreddit.display_name = "science"
     with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
-        mock_subreddit.get_new.return_value = json.loads(f.read())
-
-    patch('praw.')
+        mock_subreddit.get_new.return_value = json.loads(f.read())['data']['children']
     r.get_subreddit.return_value = mock_subreddit    
+    patch('praw.')
 
     ## NOW START THE TEST
     d = reddit.queries.get_new_as_dict(r, "subreddit")
