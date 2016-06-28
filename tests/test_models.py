@@ -66,4 +66,3 @@ def test_front_page(populate_front_pages):
 def test_get_praw_id():
     hostname = socket.gethostname()
     assert PrawKey.get_praw_id(ENV, "DummyController") == "{0}:test:DummyController".format(hostname)    
-  
