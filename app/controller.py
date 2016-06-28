@@ -32,33 +32,6 @@ log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
 conn = reddit.connection.Connect()
 
-# if(action == "reddit_front_top"):
-#   fp = controllers.front_page_controller.FrontPageController(db_session, r, log)
-#   fp.archive_reddit_front_page(PageType.TOP)
-  
-# if(action == "reddit_front_controversial"):
-#   fp = controllers.front_page_controller.FrontPageController(db_session, r, log)
-#   fp.archive_reddit_front_page(PageType.CONTR)
-
-# if(action == "reddit_front_new"):
-#   fp = controllers.front_page_controller.FrontPageController(db_session, r, log)
-#   fp.archive_reddit_front_page(PageType.NEW)
-
-# if(action == "subreddit_top"):
-#   subname = sys.argv[2]
-#   sp = controllers.subreddit_controller.SubredditPageController(subname, db_session, r, log)
-#   sp.archive_subreddit_page(PageType.TOP)
-  
-# if(action == "subreddit_controversial"):
-#   subname = sys.argv[2]
-#   sp = controllers.subreddit_controller.SubredditPageController(subname, db_session, r, log)
-#   sp.archive_subreddit_page(PageType.CONTR)
-
-# if(action == "subreddit_new"):
-#   subname = sys.argv[2]
-#   sp = controllers.subreddit_controller.SubredditPageController(subname, db_session, r, log)
-#   sp.archive_subreddit_page(PageType.NEW)
-
 def fetch_reddit_front(page_type=PageType.TOP):
   r = conn.connect(controller="FetchRedditFront")
   fp = app.controllers.front_page_controller.FrontPageController(db_session, r, log)

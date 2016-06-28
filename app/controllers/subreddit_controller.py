@@ -65,6 +65,7 @@ class SubredditPageController:
 
 
   def archive_subreddit(self, sub):
+      # TODO: should you even be allowed to archive a different subreddit than the one sp was made for?  
       sub_count = self.db_session.query(Subreddit).filter(Subreddit.id == sub.id).count()
 
       # if sub not in table, add it
@@ -76,6 +77,8 @@ class SubredditPageController:
       # else don't add it to subreddit table
 
   def archive_post(self, post):
+      # note that 'post' is of type dictionary (has already been initially processed in fetch_subreddit_page)
+      # TODO: carefully describe what the types of these 'archive' method args should be...
       post_count = self.db_session.query(Post).filter(Post.id == post['id']).count()
 
       # if sub not in table, add it
