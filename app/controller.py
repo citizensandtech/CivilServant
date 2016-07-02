@@ -48,3 +48,7 @@ def fetch_post_comments(post_id):
     cc = app.controllers.comment_controller.CommentController(db_session, r, log)
     cc.archive_missing_post_comments(post_id)
 
+def fetch_missing_subreddit_post_comments(subreddit_id):
+    r = conn.connect(controller="FetchComments")
+    cc = app.controllers.comment_controller.CommentController(db_session, r, log)
+    cc.archive_all_missing_subreddit_post_comments(subreddit_id)
