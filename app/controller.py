@@ -83,4 +83,3 @@ def fetch_last_thousand_comments(subreddit_name):
     r = conn.connect(controller="FetchComments")
     cc = app.controllers.comment_controller.CommentController(db_session, r, log)
     cc.archive_last_thousand_comments(subreddit_name)
-        

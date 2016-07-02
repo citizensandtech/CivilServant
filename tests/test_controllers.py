@@ -447,6 +447,105 @@ def test_archive_mod_action_page(mock_reddit):
     assert db_session.query(ModAction).count() == len(mod_action_fixtures[0]) + len(mod_action_fixtures[1])
     assert last_action_id == mod_action_fixtures[1][-1]['id']
 
+@patch('praw.Reddit', autospec=True)
+@patch('praw.objects.Submission', autospec=True)    
+def test_fetch_post_comments(mock_submission, mock_reddit):
+    with open("{script_dir}/fixture_data/post2.json".format(script_dir=TEST_DIR)) as f:
+        post = json.loads(f.read())
+    with open("{script_dir}/fixture_data/post2_comments.json".format(script_dir=TEST_DIR)) as f:
+        post_comments = json.loads(f.read())
+    
+    r = mock_reddit.return_value
+    mock_submission.comments = post_comments
+    mock_submission.num_comments = len(post_comments)
+    r.get_submission.return_value = mock_submission
+    log = app.cs_logger.get_logger(ENV, BASE_DIR)
+    patch('praw.')
+
+    ## ADD THE FIXTURE POST TO THE DATABASE
+    assert len(db_session.query(Post).all()) == 0
+    test_subreddit_name = "science"
+    sp = app.controllers.subreddit_controller.SubredditPageController(test_subreddit_name, db_session, r, log)  
+    sp.archive_post(post)
+    all_posts = db_session.query(Post).all()
+    assert len(all_posts) == 1    
+
+    db_session.commit()
+    dbpost = db_session.query(Post).filter(Post.id == post['id']).first()
+    assert dbpost.comment_data == None
+    assert dbpost.comments_queried_at == None
+
+    ## NOW TEST FETCHING COMMENTS
+    cc = app.controllers.comment_controller.CommentController(db_session, r, log)
+    cc.archive_missing_post_comments(post['id'])
+
+    db_session.commit()
+    dbpost = db_session.query(Post).filter(Post.id == post['id']).first()
+    assert dbpost.comment_data != None
+    assert dbpost.comments_queried_at != None
+
+
+@patch('praw.Reddit', autospec=True)
+@patch('praw.objects.Submission', autospec=True)    
+def test_archive_all_missing_subreddit_post_comments(mock_submission, mock_reddit):
+
+    ## SET UP MOCKS 
+    r = mock_reddit.return_value
+    log = app.cs_logger.get_logger(ENV, BASE_DIR)
+
+    ## TO START, LOAD POST FIXTURES
+    post_fixture_names = ["post.json", "post2.json"]
+    post_comment_fixture_names = ["post_comments.json", "post2_comments.json"]
+
+    test_post_index = 0
+    test_post_subreddit = None
+    post_fixtures = []
+    post_fixture_comments = []
+
+    for i in range(len(post_fixture_names)):
+        post_fixture_name = post_fixture_names[i]
+        post_comment_fixture_name = post_comment_fixture_names[i]
+
+        with open("{script_dir}/fixture_data/{file}".format(script_dir=TEST_DIR, file=post_fixture_name)) as f:
+            post = json.loads(f.read())   
+            post_fixtures.append(post)
+
+        if(i == test_post_index):
+            with open("{script_dir}/fixture_data/{file}".format(script_dir=TEST_DIR, file=post_comment_fixture_name)) as f:
+                post_comments = json.loads(f.read())
+                mock_submission.comments = post_comments
+                mock_submission.num_comments = len(post_comments)
+            test_post_subreddit = post['subreddit_id']
+            post_fixture_comments.append(post_comments)
+        else:
+            post_fixture_comments.append(None)
+
+        sp = app.controllers.subreddit_controller.SubredditPageController(post['subreddit_id'], db_session, r, log)  
+        sp.archive_post(post)
+    db_session.commit()
+
+    r.get_submission.return_value = mock_submission
+    patch('praw.')
+
+    ## NOW RUN THE TEST
+    db_session.commit()
+    dbpost = db_session.query(Post).filter(Post.id == post_fixtures[test_post_index]['id']).first()
+    assert dbpost != None
+    assert dbpost.comment_data == None
+    assert dbpost.comments_queried_at == None
+
+    cc = app.controllers.comment_controller.CommentController(db_session, r, log)
+    cc.archive_all_missing_subreddit_post_comments(test_post_subreddit)
+    db_session.commit()
+    # CHECK THAT THE COMMENTS WERE ADDED
+    dbpost = db_session.query(Post).filter(Post.id == dbpost.id).first()
+    assert dbpost.comment_data != None
+    assert dbpost.comments_queried_at != None
+
+    # CHECK THE ONE FROM A DIFFERENT SUBREDDIT
+    dbpost = db_session.query(Post).filter(Post.id == post_fixtures[test_post_index+1]['id']).first()
+    assert dbpost.comment_data == None
+    assert dbpost.comments_queried_at == None
 
 @patch('praw.Reddit', autospec=True)
 def test_archive_user(mock_reddit):

@@ -114,8 +114,3 @@ class CommentController:
             subreddit_name = subreddit.name,
             num_comments = len(db_comments)
         ))
-
-            
-        
-
-
