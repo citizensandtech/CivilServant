@@ -3,6 +3,7 @@ import simplejson as json
 import reddit.connection
 import app.controllers.front_page_controller
 import app.controllers.subreddit_controller
+import app.controllers.comment_controller
 from utils.common import PageType
 import app.cs_logger
 
@@ -11,7 +12,7 @@ BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.
 ENV = os.environ['CS_ENV']
 
 with open(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV), "r") as config:
-  DBCONFIG = json.loads(config.read())
+    DBCONFIG = json.loads(config.read())
 
 ### LOAD SQLALCHEMY SESSION
 from sqlalchemy import create_engine
@@ -33,11 +34,17 @@ log = app.cs_logger.get_logger(ENV, BASE_DIR)
 conn = reddit.connection.Connect()
 
 def fetch_reddit_front(page_type=PageType.TOP):
-  r = conn.connect(controller="FetchRedditFront")
-  fp = app.controllers.front_page_controller.FrontPageController(db_session, r, log)
-  fp.archive_reddit_front_page(page_type)
+    r = conn.connect(controller="FetchRedditFront")
+    fp = app.controllers.front_page_controller.FrontPageController(db_session, r, log)
+    fp.archive_reddit_front_page(page_type)
 
 def fetch_subreddit_front(sub_name, page_type = PageType.TOP):
-  r = conn.connect(controller="FetchSubredditFront")
-  sp = app.controllers.subreddit_controller.SubredditPageController(sub_name, db_session, r, log)
-  sp.archive_subreddit_page(pg_type = page_type)
+    r = conn.connect(controller="FetchSubredditFront")
+    sp = app.controllers.subreddit_controller.SubredditPageController(sub_name, db_session, r, log)
+    sp.archive_subreddit_page(pg_type = page_type)
+
+def fetch_post_comments(post_id):
+    r = conn.connect(controller="FetchComments")
+    cc = app.controllers.comment_controller.CommentController(db_session, r, log)
+    cc.archive_missing_post_comments(post_id)
+

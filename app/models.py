@@ -2,7 +2,7 @@
 import os
 import sys
 from sqlalchemy import Column, Integer, String, Text, DateTime
-from sqlalchemy.dialects.mysql import MEDIUMTEXT
+from sqlalchemy.dialects.mysql import MEDIUMTEXT, LONGTEXT
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy import create_engine
@@ -36,7 +36,11 @@ class Post(Base):
     id = Column(String(32), primary_key = True, unique=True, autoincrement=False)	# reddit's id "id"
     subreddit_id = Column(String(32))	# "subreddit_id"
     created = Column(DateTime) # "created"
+    #when this record was created:
+    created_at = Column(DateTime, default=datetime.datetime.utcnow) 
     post_data = Column(MEDIUMTEXT)	# "json_dict"
+    comment_data = Column(LONGTEXT)
+    comments_queried_at = Column(DateTime, default=None)        
 
 class PrawKey(Base):
     __tablename__ = 'praw_keys'
