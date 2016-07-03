@@ -4,8 +4,10 @@ import reddit.connection
 import app.controllers.front_page_controller
 import app.controllers.subreddit_controller
 import app.controllers.comment_controller
+import app.controllers.moderator_controller
 from utils.common import PageType
 import app.cs_logger
+from app.models import Base, SubredditPage, Subreddit, Post, ModAction
 
 ### LOAD ENVIRONMENT VARIABLES
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), "..")
@@ -47,4 +49,31 @@ def fetch_post_comments(post_id):
     r = conn.connect(controller="FetchComments")
     cc = app.controllers.comment_controller.CommentController(db_session, r, log)
     cc.archive_missing_post_comments(post_id)
+
+def fetch_mod_action_history(subreddit, after_id = None):
+    r = conn.connect(controller="ModLog")
+    mac = app.controllers.moderator_controller.ModeratorController(subreddit, db_session, r, log)
+    subreddit_id = db_session.query(Subreddit).filter(Subreddit.name == subreddit).first().id
+
+    first_action_count = db_session.query(ModAction).filter(ModAction.subreddit_id == subreddit_id).count()
+    log.info("Fetching Moderation Action History for {subreddit}. {n} actions are currently in the archive.".format(
+        subreddit = subreddit,
+        n = first_action_count))
+    after_id = mac.archive_mod_action_page(after_id)
+    db_session.commit()
+    num_actions_stored = db_session.query(ModAction).filter(ModAction.subreddit_id == subreddit_id).count() - first_action_count
+
+    while(num_actions_stored > 0):
+        pre_action_count = db_session.query(ModAction).filter(ModAction.subreddit_id == subreddit_id).count()
+        after_id = mac.archive_mod_action_page(after_id)
+        db_session.commit()
+        num_actions_stored = db_session.query(ModAction).filter(ModAction.subreddit_id == subreddit_id).count() - pre_action_count
+   
+    log.info("Finished Fetching Moderation Action History for {subreddit}. {stored} actions were stored, with a total of {total}.".format(
+        subreddit = subreddit,
+        stored = pre_action_count - first_action_count,
+        total = pre_action_count))
+    
+
+
 

@@ -40,7 +40,19 @@ class Post(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow) 
     post_data = Column(MEDIUMTEXT)	# "json_dict"
     comment_data = Column(LONGTEXT)
-    comments_queried_at = Column(DateTime, default=None)        
+    comments_queried_at = Column(DateTime, default=None)  
+
+class ModAction(Base):
+    __tablename__ = "mod_actions"
+    id = Column(String(256), primary_key = True, unique=True, autoincrement=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)  
+    created_utc = Column(DateTime)
+    subreddit_id = Column(String(32), index=True)
+    mod = Column(String(64))
+    target_author = Column(String(64), index=True)
+    action = Column(String(256))
+    target_fullname = Column(String(256))
+    action_data = Column(MEDIUMTEXT) # json_dict
 
 class PrawKey(Base):
     __tablename__ = 'praw_keys'
