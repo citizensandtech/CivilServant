@@ -2,16 +2,18 @@ import pytest
 import os
 from mock import Mock, patch
 import simplejson as json
+import sqlalchemy
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import glob, datetime
 import app.controllers.front_page_controller
 import app.controllers.subreddit_controller
 import app.controllers.comment_controller
+import app.controllers.moderator_controller
 from utils.common import PageType
 
 ### LOAD THE CLASSES TO TEST
-from app.models import Base, FrontPage, SubredditPage, Subreddit, Post
+from app.models import Base, FrontPage, SubredditPage, Subreddit, Post, ModAction
 import app.cs_logger
 
 ## SET UP THE DATABASE ENGINE
@@ -48,19 +50,24 @@ def clear_posts():
     db_session.query(Post).delete()
     db_session.commit()    
 
+def clear_mod_actions():
+    db_session.query(ModAction).delete()
+    db_session.commit()
 
 def setup_function(function):
     clear_front_pages()
     clear_subreddit_pages()
     clear_posts() 
     clear_subreddits()
-
+    clear_mod_actions()
 
 def teardown_function(function):
     clear_front_pages()
     clear_subreddit_pages()
     clear_posts()
     clear_subreddits()
+    clear_mod_actions()
+
 
 @patch('praw.Reddit', autospec=True)
 @patch('praw.objects.Subreddit', autospec=True)    
@@ -322,4 +329,58 @@ def test_archive_all_missing_subreddit_post_comments(mock_submission, mock_reddi
     assert dbpost.comments_queried_at == None
 
 
-       
+@patch('praw.Reddit', autospec=True)
+def test_archive_mod_action_page(mock_reddit):
+    r = mock_reddit.return_value
+    log = app.cs_logger.get_logger(ENV, BASE_DIR)
+
+    ## TO START, LOAD MOD ACTION FIXTURES
+    mod_action_fixtures = []
+    for filename in glob.glob("{script_dir}/fixture_data/mod_action*".format(script_dir=TEST_DIR)):
+        f = open(filename, "r")
+        mod_action_fixtures.append(json.loads(f.read()))
+        f.close()
+
+    subreddit = mod_action_fixtures[0][0]['sr_id36']
+
+    r.get_mod_log.return_value = mod_action_fixtures[0]
+    patch('praw.')
+
+    mac = app.controllers.moderator_controller.ModeratorController(
+        subreddit=subreddit, db_session=db_session, r=r, log=log
+    )
+
+    assert db_session.query(ModAction).count() == 0
+    last_action_id = mac.archive_mod_action_page()
+    db_session.commit()
+    assert db_session.query(ModAction).count() == len(mod_action_fixtures[0])
+    assert last_action_id == mod_action_fixtures[0][-1]['id']
+
+    # makes sure all the properties were assigned
+    action = mod_action_fixtures[0][0]
+    db_action = db_session.query(ModAction).filter(ModAction.id == action['id']).first()
+
+    assert db_action.id == action['id']
+    assert db_action.created_utc == datetime.datetime.fromtimestamp(action['created_utc'])
+    assert db_action.subreddit_id == action['sr_id36']
+    assert db_action.mod == action['mod']
+    assert db_action.target_author == action['target_author']
+    assert db_action.action == action['action']
+    assert db_action.target_fullname == action['target_fullname']
+    assert db_action.action_data != None
+    assert len(db_action.action_data) > 0
+
+    
+    # NOW TRY TO ADD DUPLICATES
+    # AND ASSERT THAT NO DUPLICATES WERE ADDED
+    mac.archive_mod_action_page()
+    db_session.commit()
+    assert db_session.query(ModAction).count() == len(mod_action_fixtures[0])
+
+    # NOW ADD A NEW PAGE
+    r.get_mod_log.return_value = mod_action_fixtures[1]
+    patch('praw.')
+    last_action_id = mac.archive_mod_action_page(after_id = mod_action_fixtures[0][-1]['id'])
+    assert db_session.query(ModAction).count() == len(mod_action_fixtures[0]) + len(mod_action_fixtures[1])
+    assert last_action_id == mod_action_fixtures[1][-1]['id']
+
