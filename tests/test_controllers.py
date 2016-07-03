@@ -34,8 +34,7 @@ Base.metadata.bind = db_engine
 DBSession = sessionmaker(bind=db_engine)
 db_session = DBSession()
 
-
-def setup_function(function):
+def clear_all_tables():
     db_session.query(FrontPage).delete()
     db_session.query(SubredditPage).delete()
     db_session.query(Subreddit).delete()
@@ -45,16 +44,11 @@ def setup_function(function):
     db_session.query(ModAction).delete()        
     db_session.commit()    
 
-def teardown_function(function):
-    db_session.query(FrontPage).delete()
-    db_session.query(SubredditPage).delete()
-    db_session.query(Subreddit).delete()
-    db_session.query(Post).delete()
-    db_session.query(User).delete()  
-    db_session.query(Comment).delete()
-    db_session.query(ModAction).delete()      
-    db_session.commit()
+def setup_function(function):
+    clear_all_tables()
 
+def teardown_function(function):
+    clear_all_tables()
 
 @patch('praw.Reddit', autospec=True)
 @patch('praw.objects.Subreddit', autospec=True)    
@@ -575,7 +569,61 @@ def test_archive_user(mock_reddit):
 
   all_users = db_session.query(User).all()
   assert len(all_users) == 1  
-
   user = db_session.query(User).first()  
   new_last_seen = user.last_seen
   assert(old_last_seen <= new_last_seen)
+
+@patch('praw.Reddit', autospec=True)
+def test_archive_mod_action_page(mock_reddit):
+    r = mock_reddit.return_value
+    log = app.cs_logger.get_logger(ENV, BASE_DIR)
+
+    ## TO START, LOAD MOD ACTION FIXTURES
+    mod_action_fixtures = []
+    for filename in glob.glob("{script_dir}/fixture_data/mod_action*".format(script_dir=TEST_DIR)):
+        f = open(filename, "r")
+        mod_action_fixtures.append(json.loads(f.read()))
+        f.close()
+
+    subreddit = mod_action_fixtures[0][0]['sr_id36']
+
+    r.get_mod_log.return_value = mod_action_fixtures[0]
+    patch('praw.')
+
+    mac = app.controllers.moderator_controller.ModeratorController(
+        subreddit=subreddit, db_session=db_session, r=r, log=log
+    )
+
+    assert db_session.query(ModAction).count() == 0
+    last_action_id = mac.archive_mod_action_page()
+    db_session.commit()
+    assert db_session.query(ModAction).count() == len(mod_action_fixtures[0])
+    assert last_action_id == mod_action_fixtures[0][-1]['id']
+
+    # makes sure all the properties were assigned
+    action = mod_action_fixtures[0][0]
+    db_action = db_session.query(ModAction).filter(ModAction.id == action['id']).first()
+
+    assert db_action.id == action['id']
+    assert db_action.created_utc == datetime.datetime.fromtimestamp(action['created_utc'])
+    assert db_action.subreddit_id == action['sr_id36']
+    assert db_action.mod == action['mod']
+    assert db_action.target_author == action['target_author']
+    assert db_action.action == action['action']
+    assert db_action.target_fullname == action['target_fullname']
+    assert db_action.action_data != None
+    assert len(db_action.action_data) > 0
+
+    
+    # NOW TRY TO ADD DUPLICATES
+    # AND ASSERT THAT NO DUPLICATES WERE ADDED
+    mac.archive_mod_action_page()
+    db_session.commit()
+    assert db_session.query(ModAction).count() == len(mod_action_fixtures[0])
+
+    # NOW ADD A NEW PAGE
+    r.get_mod_log.return_value = mod_action_fixtures[1]
+    patch('praw.')
+    last_action_id = mac.archive_mod_action_page(after_id = mod_action_fixtures[0][-1]['id'])
+    assert db_session.query(ModAction).count() == len(mod_action_fixtures[0]) + len(mod_action_fixtures[1])
+    assert last_action_id == mod_action_fixtures[1][-1]['id']
