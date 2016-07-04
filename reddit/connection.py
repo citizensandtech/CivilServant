@@ -17,9 +17,14 @@ class Connect:
   # and if it doesn't exist, initializes one
   # this may become a pattern that we should break out
   # into its own class eventually
-  def __init__(self, db_session = None):
+  def __init__(self, db_session = None, base_dir="", env=None):
+    self.base_dir = base_dir
+    if(env):
+      self.env = env
+    else:
+      self.env = ENV
     ## LOAD DATABASE OBJECT
-    with open("config/{env}.json".format(env=ENV), "r") as config:
+    with open(os.path.join(self.base_dir, "config","{env}.json".format(env=self.env)), "r") as config:
       DBCONFIG = json.loads(config.read())
     
     if db_session is None:
@@ -43,14 +48,14 @@ class Connect:
     handler = MultiprocessHandler()
 
     # Check the Database for a Stored Praw Key
-    db_praw_id = PrawKey.get_praw_id(ENV, controller)
+    db_praw_id = PrawKey.get_praw_id(self.env, controller)
     pk = self.db_session.query(PrawKey).filter_by(id=db_praw_id).first()
     r = praw.Reddit(user_agent="Test version of CivilServant by u/natematias", handler=handler)
     
     access_information = {}
     
     if(pk is None):
-      with open("config/access_information_{environment}.pickle".format(environment=ENV), "rb") as fp:
+      with open(os.path.join(self.base_dir, "config","access_information_{environment}.pickle".format(environment=self.env)), "rb") as fp:
           access_information = pickle.load(fp)
     else:
       access_information['access_token'] = pk.access_token
