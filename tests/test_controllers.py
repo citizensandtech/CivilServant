@@ -204,7 +204,8 @@ def test_archive_post(mock_reddit):
     post = {
         'id': 1, 
         'subreddit_id': 't5_mouw', 
-        'created': 1356244946.0
+        'created': 1467348033.0,
+        'created_utc': 1467319233.0
     }
 
     r = mock_reddit.return_value
@@ -220,6 +221,9 @@ def test_archive_post(mock_reddit):
 
     all_posts = db_session.query(Post).all()
     assert len(all_posts) == 1
+
+    dbpost = db_session.query(Post).filter(Post.id==post['id']).first()
+    assert dbpost.created == datetime.datetime.fromtimestamp(post['created_utc'])
 
     ## trying to archive it again should do nothing (don't throw errors, don't edit db)
     sp.archive_post(post)

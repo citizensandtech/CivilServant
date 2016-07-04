@@ -86,7 +86,7 @@ class SubredditPageController:
           new_post = Post(
                   id = post['id'],
                   subreddit_id = post['subreddit_id'].strip("t5_"), # janky
-                  created = datetime.datetime.fromtimestamp(post['created']),        
+                  created = datetime.datetime.fromtimestamp(post['created_utc']),
                   post_data = json.dumps(post))
           self.db_session.add(new_post)
           self.db_session.commit()
