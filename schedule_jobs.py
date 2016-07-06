@@ -43,6 +43,7 @@ def main():
         ttl = int(args.interval) + 3600
 
     if(args.sub =="all"):
+        page_type = getattr(PageType, args.pagetype.upper())
         scheduler.schedule(
                 scheduled_time=datetime.utcnow(),
                 func=app.controller.fetch_reddit_front,
