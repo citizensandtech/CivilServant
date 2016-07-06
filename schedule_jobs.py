@@ -16,7 +16,7 @@ def main():
                         help="The subreddit to query (or all for the frontpage)")
 
     parser.add_argument("pagetype",
-                        choices=["new", "top", "contr", "hot"],
+                        choices=["new", "top", "contr", "hot", "comments", "modactions"],
                         help="For front pages, what page to query")
     parser.add_argument("interval",
                         default = 120, # default 2 minutes
@@ -35,7 +35,8 @@ def main():
     queue_name = os.environ['CS_ENV']
     scheduler = Scheduler(queue_name = os.environ['CS_ENV'], connection=Redis())
 
-    page_type = getattr(PageType, args.pagetype.upper())
+
+    page_type = args.pagetype.lower()
 
     ttl = 172800 ## two days in seconds
     if(ttl <= int(args.interval) + 3600):
@@ -53,14 +54,32 @@ def main():
                 ## we set the result_ttl to longer than the interval
                 ## so the job gets rescheduled
     else:
-        scheduler.schedule(
-                scheduled_time=datetime.utcnow(),
-                func=app.controller.fetch_subreddit_front,
-                args=[args.sub, page_type],
-                interval=int(args.interval),
-                repeat=None,
-                result_ttl = ttl)
-#                result_ttl=int(args.interval)+10)
+        if(page_type == "comments"):
+            scheduler.schedule(
+                    scheduled_time=datetime.utcnow(),
+                    func=app.controller.fetch_last_thousand_comments,
+                    args=[args.sub],
+                    interval=int(args.interval),
+                    repeat=None,
+                    result_ttl = ttl)
+        elif(page_type == "modactions"):
+            scheduler.schedule(
+                    scheduled_time=datetime.utcnow(),
+                    func=app.controller.fetch_mod_action_history,
+                    args=[args.sub],
+                    interval=int(args.interval),
+                    repeat=None,
+                    result_ttl = ttl)
+        else:
+            page_type = getattr(PageType, args.pagetype.upper())
+            scheduler.schedule(
+                    scheduled_time=datetime.utcnow(),
+                    func=app.controller.fetch_subreddit_front,
+                    args=[args.sub, page_type],
+                    interval=int(args.interval),
+                    repeat=None,
+                    result_ttl = ttl)
+    #                result_ttl=int(args.interval)+10)
 
 if __name__ == '__main__':
     main()

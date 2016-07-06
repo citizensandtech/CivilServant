@@ -6,8 +6,10 @@ import reddit.connection
 import reddit.praw_utils as praw_utils
 import reddit.queries
 from utils.common import PageType
-from app.models import Base, SubredditPage, Subreddit, Post
+from app.models import Base, SubredditPage, Subreddit, Post, Comment
 from sqlalchemy import and_
+from sqlalchemy import text
+import sqlalchemy
 
 class CommentController:
     def __init__(self, db_session, r, log):
@@ -60,6 +62,59 @@ class CommentController:
         ))
         for post in posts_without_comments:
             self.archive_missing_post_comments(post.id)
+
+    def archive_last_thousand_comments(self, subreddit_name):
+        # fetch the subreddit ID
+        subreddit = self.db_session.query(Subreddit).filter(Subreddit.name == subreddit_name).first()
+
+        # fetch the last thousand comment IDs
+        comment_ids = [x['id'] for x in self.db_session.execute(text("select id from comments WHERE subreddit_id='{0}' ORDER BY created_utc DESC LIMIT 1000;".format(subreddit.id)))]
+
+        # fetch comments from reddit
+        comments = []
+        try:
+            limit_found = False
+            after_id = None
+            while(limit_found == False):
+                comment_result = self.r.get_comments(subreddit = subreddit_name, params={"after":after_id}, limit=100)
+                comments_returned = 0
+                for comment in comment_result:
+                    comments_returned += 1
+                    if(os.environ['CS_ENV'] !='test'):
+                        comment = comment.json_dict
+                    if(comment['id'] in comment_ids):
+                        limit_found = True
+                    else:
+                        comments.append(comment)
+                    after_id = "t1_" + comment['id']
+                if(comment_result is None or comments_returned == 0 ):
+                    limit_found = True
+        except praw.errors.APIException:
+            self.log.error("Error querying latest {subreddit_name} comments from reddit API. Immediate attention needed.".format(subreddit_name=subreddit_name))
+            sys.exit(1)
+            
+        db_comments = []
+        for comment in comments:
+            if((comment['id'] in comment_ids) != True):
+                db_comment = Comment(
+                    id = comment['id'],
+                    subreddit_id = subreddit.id,
+                    created_utc = datetime.datetime.utcfromtimestamp(comment['created_utc']),
+                    post_id = comment['link_id'].replace("t3_" ,""),
+                    user_id = comment['author'],
+                    comment_data = json.dumps(comment)
+                )
+                db_comments.append(db_comment)
+        try:
+            self.db_session.add_all(db_comments)
+            self.db_session.commit()
+        except sqlalchemy.exc.DBAPIError as e:
+            self.log.error("Error saving {0} comments to database. Immediate attention needed. Error: {1}".format(len(db_comments)),str(e))
+        self.log.info("Fetching up to the last thousand comments in {subreddit_name}. Total comments archived: {num_comments}".format(
+            subreddit_name = subreddit.name,
+            num_comments = len(db_comments)
+        ))
+
             
         
 

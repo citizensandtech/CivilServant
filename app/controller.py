@@ -78,3 +78,9 @@ def fetch_mod_action_history(subreddit, after_id = None):
         subreddit = subreddit,
         stored = pre_action_count - first_action_count,
         total = pre_action_count))
+
+def fetch_last_thousand_comments(subreddit_name):
+    r = conn.connect(controller="FetchComments")
+    cc = app.controllers.comment_controller.CommentController(db_session, r, log)
+    cc.archive_last_thousand_comments(subreddit_name)
+        
