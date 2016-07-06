@@ -39,9 +39,9 @@ def clear_all_tables():
     db_session.query(SubredditPage).delete()
     db_session.query(Subreddit).delete()
     db_session.query(Post).delete()
-    db_session.query(User).delete()
-    db_session.query(Comment).delete()
-    db_session.query(ModAction).delete()        
+    db_session.query(User).delete()  
+    db_session.query(ModAction).delete()    
+    db_session.query(Comment).delete()      
     db_session.commit()    
 
 def setup_function(function):
@@ -572,6 +572,79 @@ def test_archive_user(mock_reddit):
   user = db_session.query(User).first()  
   new_last_seen = user.last_seen
   assert(old_last_seen <= new_last_seen)
+
+@patch('praw.Reddit', autospec=True)
+def test_archive_last_thousand_comments(mock_reddit):
+    r = mock_reddit.return_value
+    log = app.cs_logger.get_logger(ENV, BASE_DIR)
+
+    
+    subreddit_name = "science"
+    subreddit_id = "mouw"
+
+    comment_fixtures = []
+    for filename in glob.glob("{script_dir}/fixture_data/comments*".format(script_dir=TEST_DIR)):
+        f = open(filename, "r")
+        comment_fixtures.append(json.loads(f.read()))
+        f.close()
+
+
+
+    m = Mock()
+    m.side_effect = [comment_fixtures[0][0:100],
+                     comment_fixtures[0][100:200],
+                     comment_fixtures[0][200:300],
+                     comment_fixtures[0][300:400],
+                     comment_fixtures[0][400:500],
+                     comment_fixtures[0][500:600],
+                     comment_fixtures[0][600:700],
+                     comment_fixtures[0][700:800],
+                     comment_fixtures[0][800:900],
+                     comment_fixtures[0][900:],
+                     []]
+
+    r.get_comments = m
+    patch('praw.')
+
+    ## add science subreddit
+    db_session.add(Subreddit(
+        id = subreddit_id, 
+        name = subreddit_name))
+    db_session.commit()
+
+    cc = app.controllers.comment_controller.CommentController(db_session, r, log)
+
+    assert db_session.query(Comment).count() == 0
+    cc.archive_last_thousand_comments(subreddit_name)
+    assert db_session.query(Comment).count() == 1000
+
+    db_comment = db_session.query(Comment).order_by(app.models.Comment.created_utc.asc()).first()
+    assert db_comment.subreddit_id == subreddit_id
+    assert db_comment.post_id == comment_fixtures[0][-1]['link_id'].replace("t3_","")
+    assert db_comment.user_id == comment_fixtures[0][-1]['author']
+    assert len(db_comment.comment_data) > 0 
+
+    ## NOW TEST THAT NO OVERLAPPING IDS ARE ADDED
+    first_ids = [x['id'] for x in comment_fixtures[0]]
+    second_ids = [x['id'] for x in comment_fixtures[1] if (x['id'] in first_ids)!=True]
+
+    m = Mock()
+    m.side_effect = [comment_fixtures[1][0:100],
+                     comment_fixtures[1][100:200],
+                     comment_fixtures[1][200:300],
+                     comment_fixtures[1][300:400],
+                     comment_fixtures[1][400:500],
+                     comment_fixtures[1][500:600],
+                     comment_fixtures[1][600:700],
+                     comment_fixtures[1][700:800],
+                     comment_fixtures[1][800:900],
+                     comment_fixtures[1][900:],
+                     []]
+    r.get_comments = m
+    patch('praw.')
+    cc.archive_last_thousand_comments(subreddit_name)
+    db_session.commit()
+    assert db_session.query(Comment).count() == len(first_ids) + len(second_ids)
 
 @patch('praw.Reddit', autospec=True)
 def test_archive_mod_action_page(mock_reddit):
