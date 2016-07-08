@@ -46,7 +46,6 @@ class SubredditPageController:
 
       # save subreddit posts to database
 
-      self.log.info(json.dumps(fetched))
       try:
           for post in fetched:
               new_post = post.json_dict if("json_dict" in dir(post)) else post['data'] ### TO HANDLE TEST FIXTURES

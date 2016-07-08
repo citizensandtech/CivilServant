@@ -48,7 +48,7 @@ class ModeratorController:
                 self.db_session.commit()
             except (sqlalchemy.orm.exc.FlushError, sqlalchemy.exc.IntegrityError) as err:
                 self.db_session.rollback()
-                if("conflicts with" in err.__str__()):
+                if("conflicts with" in err.__str__() or "Duplicate" in err.__str__()):
                     self.log.info("Some Moderator actions were already in the database. Not saving. Error: {}".format(err.__str__()))
                     print("Some Moderator actions were already in the database. Not saving.")
                 else:
