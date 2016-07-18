@@ -14,7 +14,7 @@ class SubredditPageController:
     self.db_session = db_session
     self.log = log
     self.r = r    
-
+  
 
   def fetch_subreddit_page(self, pg_type, limit=100):
       posts = []
@@ -49,7 +49,15 @@ class SubredditPageController:
       try:
           for post in fetched:
               new_post = post.json_dict if("json_dict" in dir(post)) else post['data'] ### TO HANDLE TEST FIXTURES
-              posts.append(new_post)
+              pruned_post = {
+                'id': new_post['id'],
+                'author': new_post['author'],
+                'num_comments': new_post['num_comments'],
+                'downs': new_post['downs'],
+                'ups': new_post['ups'], 
+                'score': new_post['score']                                             
+                }
+              posts.append(pruned_post)
               is_new_post = self.archive_post(new_post)
               is_new_user = self.archive_user(new_post['author'], datetime.datetime.fromtimestamp(new_post['created']))
           self.log.info("Saved posts from /r/{0} {1} page.".format(self.subname, pg_type.name))
