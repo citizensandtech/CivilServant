@@ -5,7 +5,7 @@ import app.controllers.front_page_controller
 import app.controllers.subreddit_controller
 import app.controllers.comment_controller
 import app.controllers.moderator_controller
-from utils.common import PageType
+from utils.common import PageType, DbEngine
 import app.cs_logger
 from app.models import Base, SubredditPage, Subreddit, Post, ModAction
 
@@ -13,24 +13,10 @@ from app.models import Base, SubredditPage, Subreddit, Post, ModAction
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), "..")
 ENV = os.environ['CS_ENV']
 
-with open(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV), "r") as config:
-    DBCONFIG = json.loads(config.read())
-
 ### LOAD SQLALCHEMY SESSION
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from app.models import Base
-db_engine = create_engine("mysql://{user}:{password}@{host}/{database}".format(
-    host = DBCONFIG['host'],
-    user = DBCONFIG['user'],
-    password = DBCONFIG['password'],
-    database = DBCONFIG['database']))
+db_session = DbEngine(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV)).new_session()
 
-Base.metadata.bind = db_engine
-DBSession = sessionmaker(bind=db_engine)
-db_session = DBSession()
-
-## LOAD LOGGER
+# LOAD LOGGER
 log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
 conn = reddit.connection.Connect()
