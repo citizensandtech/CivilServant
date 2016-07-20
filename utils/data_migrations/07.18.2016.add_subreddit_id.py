@@ -6,15 +6,9 @@ from app.models import SubredditPage, FrontPage
 
 
 """
-ONE-TIME UPDATE OF page_data to only contain the following fields
-
-id
-author
-num_comments
-downs
-ups
-score
-
+ONE-TIME UPDATE for post-filling in subreddit id for rows in subreddit_pages. 
+apply this migration after alembic upgrading to 2957ac0e11b6_add_subreddit_id_field_to_subreddit_.py.
+subreddit id should be 'mouw' (for r/science) (note that we strip the prefix 't5_')
 """
 
 ### LOAD SQLALCHEMY SESSION
@@ -38,15 +32,12 @@ db_session = DBSession()
 
 
 ### START UPDATES
-tables = [FrontPage, SubredditPage]
+rscience_id = "mow"
 
-for table in tables:
-    print("Testing {0} {1} pages...".format(db_session.query(table).count(), table.__tablename__))
-    updated_pages = 0 
-    for page in db_session.query(table).all():
-        posts = json.loads(page.page_data)
-        pruned = [{'id': post['id'], 'author': post['author'], 'num_comments': post['num_comments'], 'downs': post['downs'], 'ups': post['ups'], 'score': post['score']} for post in posts]
-        page.page_data = json.dumps(pruned)
-        updated_pages += 1
-    print("Updating page_data for {0} {1} pages".format(updated_pages, table.__tablename__))
-    db_session.commit()
+print("Testing {0} pages...".format(db_session.query(SubredditPage).count()))
+updated_pages = 0
+for page in db_session.query(SubredditPage).all():
+    page.subreddit_id = rscience_id
+    updated_pages += 1
+print("Updating subreddit_id for {0} pages".format(updated_pages))
+db_session.commit()

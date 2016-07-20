@@ -29,6 +29,7 @@ class SubredditPage(Base):
     __tablename__ = 'subreddit_pages'
     id = Column(Integer, primary_key = True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    subreddit_id = Column(String(32))
     page_type = Column(Integer) # see utils/common.py
     page_data = Column(MEDIUMTEXT)
 
