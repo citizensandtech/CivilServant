@@ -8,6 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.models import Base
 import sqlalchemy
+from utils.common import DbEngine
 
 ENV =  os.environ['CS_ENV']
 
@@ -24,22 +25,10 @@ class Connect:
     else:
       self.env = ENV
     ## LOAD DATABASE OBJECT
-    with open(os.path.join(self.base_dir, "config","{env}.json".format(env=self.env)), "r") as config:
-      DBCONFIG = json.loads(config.read())
-    
+
     if db_session is None:
       ### LOAD SQLALCHEMY SESSION
-      db_engine = create_engine("mysql://{user}:{password}@{host}/{database}".format(
-          host = DBCONFIG['host'],
-          user = DBCONFIG['user'],
-          password = DBCONFIG['password'],
-          database = DBCONFIG['database']))
-
-      Base.metadata.bind = db_engine
-      DBSession = sessionmaker(bind=db_engine)
-
-      # set database session
-      self.db_session = DBSession()
+      self.db_session = DbEngine(os.path.join(self.base_dir, "config","{env}.json".format(env=self.env))).new_session()
     else:
       self.db_session = db_session
     

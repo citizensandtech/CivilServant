@@ -8,7 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import glob, datetime
 from app.models import Base, PrawKey
-
+from utils.common import DbEngine
 
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -18,19 +18,8 @@ os.environ['CS_ENV'] ="test"
 ## TODO: IN FUTURE, SET UP A TEST-WIDE DB SESSION
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 ENV = os.environ['CS_ENV'] ="test"
-with open(os.path.join(TEST_DIR, "../", "config") + "/{env}.json".format(env=ENV), "r") as config:
-  DBCONFIG = json.loads(config.read())
 
-
-db_engine = create_engine("mysql://{user}:{password}@{host}/{database}".format(
-    host = DBCONFIG['host'],
-    user = DBCONFIG['user'],
-    password = DBCONFIG['password'],
-    database = DBCONFIG['database']))
-    
-Base.metadata.bind = db_engine
-DBSession = sessionmaker(bind=db_engine)
-db_session = DBSession()
+db_session = DbEngine(os.path.join(TEST_DIR, "../", "config") + "/{env}.json".format(env=ENV)).new_session()
 
 def clear_praw_keys():
     db_session.query(PrawKey).delete()
