@@ -37,10 +37,7 @@ DBSession = sessionmaker(bind=db_engine)
 db_session = DBSession()
 
 
-
 ### START UPDATES
-
-
 tables = [FrontPage, SubredditPage]
 
 for table in tables:

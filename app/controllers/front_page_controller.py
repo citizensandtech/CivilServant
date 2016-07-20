@@ -35,11 +35,16 @@ class FrontPageController:
         return []
 
       for post in fetched:
-          if("json_dict" in dir(post)):
-              posts.append(post.json_dict)
-          else:
-              posts.append(post['data']) ### TO HANDLE TEST FIXTURES
-
+          new_post = post.json_dict if("json_dict" in dir(post)) else post['data'] ### TO HANDLE TEST FIXTURES
+          pruned_post = {
+            'id': new_post['id'],
+            'author': new_post['author'],
+            'num_comments': new_post['num_comments'],
+            'downs': new_post['downs'],
+            'ups': new_post['ups'], 
+            'score': new_post['score']                                             
+            }
+          posts.append(pruned_post)
       self.log.info("Queried reddit {0} page".format(pg_type.name))
       return posts
 
