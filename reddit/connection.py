@@ -61,7 +61,9 @@ class Connect:
       pk = PrawKey(id=db_praw_id,
                    access_token = r.access_token,
                    refresh_token = r.refresh_token,
-                   scope = json.dumps(list(r._authentication)))
+                   scope = json.dumps(list(r._authentication)),
+                   authorized_username = r.user.json_dict['name'],
+                   authorized_user_id = r.user.json_dict['id'])
       self.db_session.add(pk)
 
     elif(access_information['access_token'] != r.access_token or
