@@ -1,0 +1,18 @@
+development:
+  subreddit: natematias
+  subreddit_id: 3940b
+  comment_text: This is a sticky comment
+  username: CivilServantBot
+  controller: StickyCommentExperimentController
+  start_time: 07/28/2016 00:00:00 UTC
+  end_time: 12/30/2016 23:59:59 UTC
+
+test:
+  subreddit: natematias
+  subreddit_id: 3940b
+  comment_text: This is a sticky comment
+  username: CivilServantBot
+  controller: StickyCommentExperimentController
+  username: CivilServantBot
+  start_time: 07/22/2016 00:00:00 UTC
+  end_time: 07/23/2016 23:59:59 UTC

@@ -10,7 +10,7 @@ import app.controllers.front_page_controller
 import app.controllers.subreddit_controller
 import app.controllers.comment_controller
 import app.controllers.moderator_controller
-from utils.common import PageType, DbEngine
+from utils.common import PageType, DbEngine, json2obj
 
 ### LOAD THE CLASSES TO TEST
 from app.models import Base, FrontPage, SubredditPage, Subreddit, Post, ModAction, Comment, User
@@ -101,8 +101,17 @@ def test_archive_subreddit_page(mock_subreddit, mock_reddit):
     r = mock_reddit.return_value
     log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
+    # with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
+    #     sub_data = json.loads(f.read())['data']['children']
+
+    sub_data = []
     with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
-        sub_data = json.loads(f.read())['data']['children']
+        fixture = [x['data'] for x in json.loads(f.read())['data']['children']]
+        for post in fixture:
+            json_dump = json.dumps(post)
+            postobj = json2obj(json_dump)
+            sub_data.append(postobj)
+
     mock_subreddit.get_top.return_value = sub_data
     mock_subreddit.get_controversial.return_value = sub_data
     mock_subreddit.get_new.return_value = sub_data

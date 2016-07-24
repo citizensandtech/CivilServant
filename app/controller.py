@@ -5,9 +5,11 @@ import app.controllers.front_page_controller
 import app.controllers.subreddit_controller
 import app.controllers.comment_controller
 import app.controllers.moderator_controller
+import app.controllers.sticky_comment_experiment_controller
 from utils.common import PageType, DbEngine
 import app.cs_logger
 from app.models import Base, SubredditPage, Subreddit, Post, ModAction
+
 
 ### LOAD ENVIRONMENT VARIABLES
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), "..")
@@ -69,3 +71,13 @@ def fetch_last_thousand_comments(subreddit_name):
     r = conn.connect(controller="FetchComments")
     cc = app.controllers.comment_controller.CommentController(db_session, r, log)
     cc.archive_last_thousand_comments(subreddit_name)
+
+def conduct_sticky_comment_experiment(experiment_name):
+    r = conn.connect(controller=experiment_name)    
+    sce = app.controllers.sticky_comment_experiment_controller.StickyCommentExperimentController(
+        experiment_name = experiment_name,
+        db_session = db_session,
+        r = r,
+        log = log
+    )
+    sce.make_sticky_post("4u8rz9")    

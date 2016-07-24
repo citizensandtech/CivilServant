@@ -1,5 +1,7 @@
 from enum import Enum
 import simplejson as json
+from collections import namedtuple
+
 
 class PageType(Enum):
     TOP = 1
@@ -7,6 +9,11 @@ class PageType(Enum):
     NEW = 3
     HOT = 4
 
+class ThingType(Enum):
+	SUBMISSION = 1
+	COMMENT = 2
+	SUBREDDIT = 3
+	USER = 4
 
 class DbEngine:
 	def __init__(self, config_path):
@@ -29,3 +36,10 @@ class DbEngine:
 		DBSession = sessionmaker(bind=db_engine)
 		db_session = DBSession()
 		return db_session  
+
+def _json_object_hook(d):
+	d['json_dict'] = d.copy()
+	return namedtuple('X', d.keys(), rename=True)(*d.values())
+
+def json2obj(data):
+	return json.loads(data, object_hook=_json_object_hook)

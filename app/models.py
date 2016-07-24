@@ -97,3 +97,40 @@ class PrawKey(Base):
     def get_praw_id(cls, env, controller):
         host = socket.gethostname()
         return "{0}:{1}:{2}".format(host,env,controller)
+
+class Experiment(Base):
+    __tablename__ = 'experiments'
+    id                  = Column(Integer, primary_key = True)
+    created_at          = Column(DateTime, default=datetime.datetime.utcnow)
+    name                = Column(String(256), nullable=False, index=True)
+    controller          = Column(String(256), nullable=False)
+    start_time          = Column(DateTime)
+    end_time            = Column(DateTime)
+    settings_json       = Column(MEDIUMTEXT)
+
+class ExperimentThing(Base):
+    __tablename__ = 'experiment_things'
+    id                  = Column(String(256), primary_key = True)
+    created_at          = Column(DateTime, default = datetime.datetime.utcnow)
+    object_type         = Column(Integer)
+    experiment_id       = Column(Integer, index = True)
+    object_created      = Column(DateTime)
+    metadata_json       = Column(MEDIUMTEXT)
+
+class ExperimentAction(Base):
+    __tablename__ = 'experiment_actions'
+    id                  = Column(Integer, primary_key = True)
+    created_at          = Column(DateTime, default = datetime.datetime.utcnow)
+    experiment_id       = Column(Integer, index = True)
+    praw_key_id         = Column(String(256), index = True)
+    action              = Column(String(64), index = True)
+    action_subject_type = Column(String(64))
+    action_subject_id   = Column(String(256), index=True)
+    action_object_type  = Column(String(64))
+    action_object_id    = Column(String(256), index=True)
+    metadata_json       = Column(MEDIUMTEXT)
+
+    
+
+
+
