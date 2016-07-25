@@ -1,4 +1,4 @@
-development:
+production:
   subreddit: natematias
   subreddit_id: 3940b
   comment_text: This is a sticky comment

@@ -108,7 +108,7 @@ class StickyCommentExperimentController:
             ExperimentAction.action_object_type == ThingType.SUBMISSION.value,
             ExperimentAction.action_object_id   == submission.id,
             ExperimentAction.action             == "Intervention")).count() > 0):
-                self.log.error("Experiment {0} post {1} already has an Intervention recorded".format(
+                self.log.info("Experiment {0} post {1} already has an Intervention recorded".format(
                     self.experiment_name, 
                     submission.id))            
                 return False
@@ -116,7 +116,7 @@ class StickyCommentExperimentController:
         ## Avoid Acting if an identical sticky comment already exists
         for comment in submission.comments:
             if comment.stickied and comment.body == self.comment_text:
-                self.log.error("Experiment {0} post {1} already has a sticky comment {2}".format(
+                self.log.info("Experiment {0} post {1} already has a sticky comment {2}".format(
                     self.experiment_name, 
                     submission.id,
                     comment.id))
@@ -125,7 +125,7 @@ class StickyCommentExperimentController:
         ## Avoid Acting if the submission is not recent enough
         curtime = time.time()
         if((curtime - submission.created_utc) > self.max_eligibility_age):
-            self.log.error("Submission created_utc {0} is {1} seconds greater than current time {2}, exceeding the max eligibility age of {3}. Declining to Add to the Experiment".format(
+            self.log.info("Submission created_utc {0} is {1} seconds greater than current time {2}, exceeding the max eligibility age of {3}. Declining to Add to the Experiment".format(
                 submission.created_utc,
                 curtime - submission.created_utc,
                 curtime,
