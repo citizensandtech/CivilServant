@@ -10,7 +10,7 @@ from dateutil import parser
 from utils.common import *
 from app.models import Base, SubredditPage, Subreddit, Post, ModAction, PrawKey
 from app.models import Experiment, ExperimentThing, ExperimentAction
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 from app.controllers.subreddit_controller import SubredditPageController
 import numpy as np
 
@@ -75,24 +75,32 @@ class StickyCommentExperimentController:
         ## LOAD SUBREDDIT PAGE CONTROLLER
         self.subreddit_page_controller = SubredditPageController(self.subreddit,self.db_session, self.r, self.log)
 
-
     ## main scheduled job
+    ## TODO: TEST THIS METHOD IN UNIT TESTS
     def update_experiment(self):
-        eligible_posts = self.get_eligible_objects()
-        #for condition in self.assign_randomized_conditions(eligible_posts):
-            #if(#TRUE):
-            #    apply_treatment
-            #else:
-            #    do_nothing
-            #pass
+        eligible_submissions = {}
+        for submission in self.get_eligible_objects():
+            eligible_submissions[submission.id] = submission
+        
+        rvals = []
+        for experiment_thing in self.assign_randomized_conditions(eligible_submissions.values()):
+            condition = json.loads(experiment_thing.metadata_json)['condition']
+            if(condition == 1):
+                rval = self.make_sticky_post(eligible_submissions[experiment_thing.id])
+            elif(condition == 0):
+                rval = self.make_control_nonaction(eligible_submissions[experiment_thing.id])
+            if(rval is not None):
+                rvals.append(rval)
+        return rvals
 
-    def make_sticky_post(self, submission):
-        previously_stickied = False
 
+    ## TODO: some of this code should be refactored
+    ## into the code for get_eligible_objects
+    def submission_acceptable(self, submission):
         if(submission is None):
             ## TODO: Determine what to do if you can't find the post
             self.log.error("Can't find experiment {0} post {1}".format(self.subreddit, submission.id))
-            sys.exit(1)            
+            return False            
 
         ## Avoid Acting if the Intervention has already been recorded
         if(self.db_session.query(ExperimentAction).filter(and_(
@@ -103,7 +111,7 @@ class StickyCommentExperimentController:
                 self.log.error("Experiment {0} post {1} already has an Intervention recorded".format(
                     self.experiment_name, 
                     submission.id))            
-                return None
+                return False
 
         ## Avoid Acting if an identical sticky comment already exists
         for comment in submission.comments:
@@ -112,7 +120,7 @@ class StickyCommentExperimentController:
                     self.experiment_name, 
                     submission.id,
                     comment.id))
-                return None
+                return False
 
         ## Avoid Acting if the submission is not recent enough
         curtime = time.time()
@@ -129,8 +137,32 @@ class StickyCommentExperimentController:
                 action_object_type = ThingType.SUBMISSION.value,
                 action_object_id = submission.id
             )
-            return None
+            return False
+        
+        return True
 
+    def make_control_nonaction(self, submission):
+        if(self.submission_acceptable(submission) == False):
+            return None
+        experiment_action = ExperimentAction(
+            experiment_id = self.experiment.id,
+            praw_key_id = PrawKey.get_praw_id(ENV, self.experiment_name),
+            action = "Intervention",
+            action_object_type = ThingType.SUBMISSION.value,
+            action_object_id = submission.id,
+            metadata_json = json.dumps({"group":"control"})
+        )
+        self.db_session.add(experiment_action)
+        self.db_session.commit()
+        self.log.info("Experiment {0} applied control condition to post {1}".format(
+            self.experiment_name, 
+            submission.id
+        ))
+        return experiment_action.id
+        
+    def make_sticky_post(self, submission):
+        if(self.submission_acceptable(submission) == False):
+            return None
 
         comment = submission.add_comment(self.comment_text)
         distinguish_results = comment.distinguish(sticky=True)
@@ -147,32 +179,50 @@ class StickyCommentExperimentController:
             action_subject_id = comment.id,
             action = "Intervention",
             action_object_type = ThingType.SUBMISSION.value,
-            action_object_id = submission.id
+            action_object_id = submission.id,
+            metadata_json = json.dumps({"group":"treatment", 
+                "action_object_created_utc":comment.created_utc})
         )
         self.db_session.add(experiment_action)
         self.db_session.commit()
         return distinguish_results
 
+    ## TODO: REDUCE THE NUMBER OF API CALLS INVOLVED
     def get_eligible_objects(self):
-        submissions = self.subreddit_page_controller.fetch_subreddit_page(PageType.NEW, return_praw_object=True)
+        submissions = {}
+        for submission in self.subreddit_page_controller.fetch_subreddit_page(PageType.NEW, return_praw_object=True):
+            submissions[submission.id] = submission
         
-        submission_ids = [submission.id for submission in submissions]
-
         already_processed_ids = [thing.id for thing in 
             self.db_session.query(ExperimentThing).filter(and_(
                 ExperimentThing.object_type==ThingType.SUBMISSION.value, 
-                ExperimentThing.id.in_(submission_ids))).all()]
+                ExperimentThing.id.in_(submissions.keys()))).all()]
 
-        eligible_submissions = [submission for submission in submissions if submission.id not in already_processed_ids]
-        self.log.info("Experiment {0} Discovered eligible submissions: {01}".format(
+        eligible_submissions = []
+        eligible_submission_ids = []
+        for id, submission in submissions.items():
+            if id in already_processed_ids:
+                continue
+            ### TODO: rule out eligibility based on age at this stage
+            ### For now, we rule it out at the point of intervention
+            ### Since it's easier to mock single objects in the tests
+            ### Rather than a whole page of posts
+            # if(self.submission_acceptable(submission) == False):
+            #     continue
+            eligible_submissions.append(submission)
+            eligible_submission_ids.append(id)
+
+        self.log.info("Experiment {0} Discovered eligible submissions: {1}".format(
             self.experiment_name,
-            json.dumps([submission.id for submission in eligible_submissions])))
+            json.dumps(eligible_submission_ids)))
 
         return eligible_submissions
 
     ## SEED CAN BE PASSED TO THE METHOD, TO AID IN UNIT TESTING
     def assign_randomized_conditions(self, submissions, seed = None):
-        
+        if(submissions is None or len(submissions)==0):
+            return []
+
         ## FIRST STEP: SET AND ARCHIVE THE RANDOM SEED
         if(seed is None):
             seed = time.time()
@@ -183,12 +233,15 @@ class StickyCommentExperimentController:
             metadata_json = json.dumps({"seed":seed})
         )
         self.db_session.add(experiment_action)
-        self.log.info("Experment {0}: set the random seed to {1}".format(self.experiment.id,seed))
+        self.log.info("Experiment {0}: set the random seed to {1}".format(self.experiment.id,seed))
 
         ## Assign experiment condition to objects
         experiment_things = []
+        conditions = np.random.randint(0,2, len(submissions))
+        i = 0
         for submission in submissions:
-            condition = bool(np.random.randint(0,2))
+            condition = int(conditions[i])
+            i += 1
             experiment_thing = ExperimentThing(
                 id             = submission.id,
                 object_type    = ThingType.SUBMISSION.value,
@@ -198,7 +251,7 @@ class StickyCommentExperimentController:
             )
             self.db_session.add(experiment_thing)
             experiment_things.append(experiment_thing)
-        self.log.info("Experment {0}: assigned conditions to {1} submissions".format(self.experiment.id,len(experiment_things)))
+        self.log.info("Experiment {0}: assigned conditions to {1} submissions".format(self.experiment.id,len(experiment_things)))
         self.db_session.commit()
         return experiment_things
 

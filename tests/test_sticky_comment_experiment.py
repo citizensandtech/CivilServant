@@ -75,6 +75,7 @@ def test_get_eligible_objects(mock_subreddit, mock_reddit):
             json_dump = json.dumps(post)
             postobj = json2obj(json_dump)
             sub_data.append(postobj)
+
     mock_subreddit.get_new.return_value = sub_data
     mock_subreddit.display_name = experiment_settings['subreddit']
     mock_subreddit.name = experiment_settings['subreddit']
@@ -136,13 +137,13 @@ def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
     scec = StickyCommentExperimentController(experiment_name, db_session, r, log)
     eligible_objects = scec.get_eligible_objects()
 
-    experiment_action_count = len(db_session.query(ExperimentAction).all())
+    experiment_action_count = db_session.query(ExperimentAction).count()
 
-    assert len(db_session.query(ExperimentThing).all()) == 0
+    assert db_session.query(ExperimentThing).count() == 0
     scec.assign_randomized_conditions(eligible_objects)
-    assert len(db_session.query(ExperimentThing).all()) == 100
-    assert len(db_session.query(ExperimentAction).all()) == experiment_action_count + 1
-    assert len(db_session.query(ExperimentAction).filter(ExperimentAction.action=="SetRandomSeed").all()) == experiment_action_count + 1
+    assert db_session.query(ExperimentThing).count() == 100
+    assert db_session.query(ExperimentAction).count() == experiment_action_count + 1
+    assert db_session.query(ExperimentAction).filter(ExperimentAction.action=="SetRandomSeed").count() == experiment_action_count + 1
 
     for experiment_thing in db_session.query(ExperimentThing).all():
         assert experiment_thing.id != None
@@ -150,6 +151,11 @@ def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
         assert experiment_thing.experiment_id == scec.experiment.id
         assert "condition" in json.loads(experiment_thing.metadata_json).keys()
     
+    ## make sure that no actions are taken if the list is empty
+    experiment_action_count = db_session.query(ExperimentAction).count()
+    scec.assign_randomized_conditions([])
+    assert db_session.query(ExperimentAction).count() == experiment_action_count
+
 
 @patch('praw.Reddit', autospec=True)
 @patch('praw.objects.Submission', autospec=True)
@@ -173,7 +179,8 @@ def test_make_sticky_post(mock_comment, mock_submission, mock_reddit):
 
     with open("{script_dir}/fixture_data/submission_0_treatment.json".format(script_dir=TEST_DIR)) as f:
         treatment = json2obj(f.read())
-        mock_comment.id = treatment.id 
+        mock_comment.id = treatment.id
+        mock_comment.created_utc = treatment.created_utc
         mock_submission.add_comment.return_value = mock_comment
 
     with open("{script_dir}/fixture_data/submission_0_treatment_distinguish.json".format(script_dir=TEST_DIR)) as f:
@@ -186,24 +193,48 @@ def test_make_sticky_post(mock_comment, mock_submission, mock_reddit):
 
     ## First, try to intervene on a submission with an old timestamp
     ## which should return None and take no action
-    assert len(db_session.query(ExperimentAction).all()) == 0
+    assert db_session.query(ExperimentAction).count() == 0
     mock_submission.created_utc = int(time.time()) - 1000
     sticky_result = scec.make_sticky_post(mock_submission)
     assert sticky_result is None
-    assert len(db_session.query(ExperimentAction).all()) == 0
+    assert db_session.query(ExperimentAction).count() == 0
 
     ## Now try to intervene on a more recent post
     mock_submission.created_utc = int(time.time())
     sticky_result = scec.make_sticky_post(mock_submission)
-    assert len(db_session.query(ExperimentAction).all()) == 1
+    assert db_session.query(ExperimentAction).count() == 1
     assert sticky_result is not None
 
     ## make sure it aborts the call if we try a second time
     sticky_result = scec.make_sticky_post(mock_submission)
-    assert len(db_session.query(ExperimentAction).all()) == 1
+    assert db_session.query(ExperimentAction).count() == 1
     assert sticky_result is None
 
 
+@patch('praw.Reddit', autospec=True)
+@patch('praw.objects.Submission', autospec=True)
+@patch('praw.objects.Comment', autospec=True)
+def test_make_control_nonaction(mock_comment, mock_submission, mock_reddit):
+    r = mock_reddit.return_value
+    experiment_name = "sticky_comment_0"
 
+    with open(os.path.join(BASE_DIR, "config", "experiments") + "/"+ experiment_name + ".yml", "r") as f:
+        experiment_settings = yaml.load(f.read())['test']
 
+    with open("{script_dir}/fixture_data/submission_0.json".format(script_dir=TEST_DIR)) as f:
+        submission_json = json.loads(f.read())
+        ## setting the submission time to be recent enough
+        submission = json2obj(json.dumps(submission_json))
+        mock_submission.id = submission.id    
 
+    scec = StickyCommentExperimentController(experiment_name, db_session, r, log)
+    mock_submission.created_utc = int(time.time())
+    sticky_result = scec.make_control_nonaction(mock_submission)
+    assert db_session.query(ExperimentAction).count() == 1
+    assert sticky_result is not None
+
+    ## make sure it aborts the call if we try a second time
+    sticky_result = scec.make_control_nonaction(mock_submission)
+    assert db_session.query(ExperimentAction).count() == 1
+    assert sticky_result is None
+    

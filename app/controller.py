@@ -80,4 +80,4 @@ def conduct_sticky_comment_experiment(experiment_name):
         r = r,
         log = log
     )
-    sce.make_sticky_post("4u8rz9")    
+    sce.update_experiment()

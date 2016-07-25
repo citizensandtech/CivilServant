@@ -60,7 +60,7 @@ class SubredditPageController:
                 posts.append(post)
                 json_posts.append(new_post)
                 is_new_post = self.archive_post(post.json_dict)
-                is_new_user = self.archive_user(post.author, datetime.datetime.fromtimestamp(post.created))
+                is_new_user = self.archive_user(pruned_post['author'], datetime.datetime.fromtimestamp(post.created))
             self.log.info("Saved posts from /r/{0} {1} page.".format(self.subname, pg_type.name))
         except:
             self.log.error("Error Saving posts from /r/{0} {1} page".format(self.subname, pg_type.name), extra=sys.exc_info()[0] )
