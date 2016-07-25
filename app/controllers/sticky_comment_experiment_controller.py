@@ -8,7 +8,7 @@ import reddit.queries
 import sqlalchemy
 from dateutil import parser
 from utils.common import *
-from app.models import Base, SubredditPage, Subreddit, Post, ModAction
+from app.models import Base, SubredditPage, Subreddit, Post, ModAction, PrawKey
 from app.models import Experiment, ExperimentThing, ExperimentAction
 from sqlalchemy import and_
 from app.controllers.subreddit_controller import SubredditPageController
@@ -17,12 +17,6 @@ import numpy as np
 ### LOAD ENVIRONMENT VARIABLES
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), "..","..")
 ENV = os.environ['CS_ENV']
-
-#class StickyCommentExperiment(Experiment):
-    ## settings include:
-    ## posting_user
-    ## posting_praw_key
-    ## 
 
 class StickyCommentExperimentController:
     def __init__(self, experiment_name, db_session, r, log):
@@ -37,7 +31,7 @@ class StickyCommentExperimentController:
             try:
                 experiment_config_all = yaml.load(f)
             except yaml.YAMLError as exc:
-                log.error("Failure loading experiment yaml {0}".format(experiment_file_path), str(exc))
+                self.log.error("Failure loading experiment yaml {0}".format(experiment_file_path), str(exc))
                 sys.exit(1)
         if(ENV not in experiment_config_all.keys()):
             log.error("Cannot find experiment settings for {0} in {1}".format(ENV, experiment_file_path))
@@ -46,7 +40,7 @@ class StickyCommentExperimentController:
         experiment_config = experiment_config_all[ENV]
         for key in required_keys:
             if key not in experiment_config.keys():
-                log.error("Value missing from {0}: {1}".format(experiment_file_path, key))
+                self.log.error("Value missing from {0}: {1}".format(experiment_file_path, key))
                 sys.exit(1)
 
         experiment = self.db_session.query(Experiment).filter(Experiment.name == experiment_name).first()
@@ -54,7 +48,8 @@ class StickyCommentExperimentController:
             settings = {
                 "comment_text": experiment_config['comment_text'],
                 "username": experiment_config['username'],
-                "subreddit": experiment_config['subreddit']
+                "subreddit": experiment_config['subreddit'],
+                "max_eligibility_age": experiment_config['max_eligibility_age']
             }
             experiment = Experiment(
                 name = experiment_name,
@@ -74,6 +69,7 @@ class StickyCommentExperimentController:
         self.subreddit = experiment_config['subreddit']
         self.username = experiment_config['username']
         self.comment_text = experiment_config['comment_text']
+        self.max_eligibility_age = experiment_config['max_eligibility_age']
         self.r = r
 
         ## LOAD SUBREDDIT PAGE CONTROLLER
@@ -90,40 +86,67 @@ class StickyCommentExperimentController:
             #    do_nothing
             #pass
 
-    def make_sticky_post(self, submission_id):
+    def make_sticky_post(self, submission):
         previously_stickied = False
 
-        submission = self.r.get_submission(submission_id = submission_id)
         if(submission is None):
             ## TODO: Determine what to do if you can't find the post
-            log.error("Can't find experiment {0} post {1}".format(self.subreddit, submission_id))
-            sys.exit(1)
+            self.log.error("Can't find experiment {0} post {1}".format(self.subreddit, submission.id))
+            sys.exit(1)            
 
-        ##  TODO: search the database
-        ##  - get all comments
-        for comment in submission.comments:
-            if comment.stickied:
-                ## TODO: Determine what to do if the intervention is a duplicate
-                log.error("Experiment {0} post {1} already has a sticky comment {2}".format(
+        ## Avoid Acting if the Intervention has already been recorded
+        if(self.db_session.query(ExperimentAction).filter(and_(
+            ExperimentAction.experiment_id      == self.experiment.id,
+            ExperimentAction.action_object_type == ThingType.SUBMISSION.value,
+            ExperimentAction.action_object_id   == submission.id,
+            ExperimentAction.action             == "Intervention")).count() > 0):
+                self.log.error("Experiment {0} post {1} already has an Intervention recorded".format(
                     self.experiment_name, 
-                    submission_id,
+                    submission.id))            
+                return None
+
+        ## Avoid Acting if an identical sticky comment already exists
+        for comment in submission.comments:
+            if comment.stickied and comment.body == self.comment_text:
+                self.log.error("Experiment {0} post {1} already has a sticky comment {2}".format(
+                    self.experiment_name, 
+                    submission.id,
                     comment.id))
-                sys.exit(1)
+                return None
+
+        ## Avoid Acting if the submission is not recent enough
+        curtime = time.time()
+        if((curtime - submission.created_utc) > self.max_eligibility_age):
+            self.log.error("Submission created_utc {0} is {1} seconds greater than current time {2}, exceeding the max eligibility age of {3}. Declining to Add to the Experiment".format(
+                submission.created_utc,
+                curtime - submission.created_utc,
+                curtime,
+                self.max_eligibility_age))
+            experiment_action = ExperimentAction(
+                experiment_id = self.experiment.id,
+                praw_key_id = PrawKey.get_praw_id(ENV, self.experiment_name),
+                action = "NonIntervention:MaxAgeExceeded",
+                action_object_type = ThingType.SUBMISSION.value,
+                action_object_id = submission.id
+            )
+            return None
+
+
         comment = submission.add_comment(self.comment_text)
         distinguish_results = comment.distinguish(sticky=True)
-        self.log("Experiment {0} applied treatment to post {1}. Result: {2}".format(
+        self.log.info("Experiment {0} applied treatment to post {1}. Result: {2}".format(
             self.experiment_name, 
-            submission_id,
+            submission.id,
             str(distinguish_results)
         ))
 
         experiment_action = ExperimentAction(
             experiment_id = self.experiment.id,
             praw_key_id = PrawKey.get_praw_id(ENV, self.experiment_name),
-            action_subject_type = ThingType.COMMENT,
+            action_subject_type = ThingType.COMMENT.value,
             action_subject_id = comment.id,
             action = "Intervention",
-            action_object_type = ThingType.POST,
+            action_object_type = ThingType.SUBMISSION.value,
             action_object_id = submission.id
         )
         self.db_session.add(experiment_action)

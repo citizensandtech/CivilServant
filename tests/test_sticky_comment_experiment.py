@@ -5,7 +5,7 @@ import simplejson as json
 import sqlalchemy
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-import glob, datetime
+import glob, datetime, time
 from app.controllers.sticky_comment_experiment_controller import StickyCommentExperimentController
 from utils.common import *
 from dateutil import parser
@@ -15,7 +15,6 @@ from app.models import *
 import app.cs_logger
 
 ## SET UP THE DATABASE ENGINE
-## TODO: IN FUTURE, SET UP A TEST-WIDE DB SESSION
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 BASE_DIR  = os.path.join(TEST_DIR, "../")
 ENV = os.environ['CS_ENV'] ="test"
@@ -151,6 +150,59 @@ def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
         assert experiment_thing.experiment_id == scec.experiment.id
         assert "condition" in json.loads(experiment_thing.metadata_json).keys()
     
+
+@patch('praw.Reddit', autospec=True)
+@patch('praw.objects.Submission', autospec=True)
+@patch('praw.objects.Comment', autospec=True)
+def test_make_sticky_post(mock_comment, mock_submission, mock_reddit):
+    r = mock_reddit.return_value
+    experiment_name = "sticky_comment_0"
+
+    with open(os.path.join(BASE_DIR, "config", "experiments") + "/"+ experiment_name + ".yml", "r") as f:
+        experiment_settings = yaml.load(f.read())['test']
+
+    with open("{script_dir}/fixture_data/submission_0.json".format(script_dir=TEST_DIR)) as f:
+        submission_json = json.loads(f.read())
+        ## setting the submission time to be recent enough
+        submission = json2obj(json.dumps(submission_json))
+        mock_submission.id = submission.id
+    
+    with open("{script_dir}/fixture_data/submission_0_comments.json".format(script_dir=TEST_DIR)) as f:
+        comments = json2obj(f.read())
+        mock_submission.comments.return_value = comments
+
+    with open("{script_dir}/fixture_data/submission_0_treatment.json".format(script_dir=TEST_DIR)) as f:
+        treatment = json2obj(f.read())
+        mock_comment.id = treatment.id 
+        mock_submission.add_comment.return_value = mock_comment
+
+    with open("{script_dir}/fixture_data/submission_0_treatment_distinguish.json".format(script_dir=TEST_DIR)) as f:
+        distinguish = json.loads(f.read())
+        mock_comment.distinguish.return_value = distinguish
+
+    patch('praw.')
+
+    scec = StickyCommentExperimentController(experiment_name, db_session, r, log)
+
+    ## First, try to intervene on a submission with an old timestamp
+    ## which should return None and take no action
+    assert len(db_session.query(ExperimentAction).all()) == 0
+    mock_submission.created_utc = int(time.time()) - 1000
+    sticky_result = scec.make_sticky_post(mock_submission)
+    assert sticky_result is None
+    assert len(db_session.query(ExperimentAction).all()) == 0
+
+    ## Now try to intervene on a more recent post
+    mock_submission.created_utc = int(time.time())
+    sticky_result = scec.make_sticky_post(mock_submission)
+    assert len(db_session.query(ExperimentAction).all()) == 1
+    assert sticky_result is not None
+
+    ## make sure it aborts the call if we try a second time
+    sticky_result = scec.make_sticky_post(mock_submission)
+    assert len(db_session.query(ExperimentAction).all()) == 1
+    assert sticky_result is None
+
 
 
 

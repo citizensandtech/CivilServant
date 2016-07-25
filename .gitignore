@@ -10,6 +10,7 @@ alembic.ini
 logs/*
 prawserver/supervise
 prawserver/run
+dump.rdb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
