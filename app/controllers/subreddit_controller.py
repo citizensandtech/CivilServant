@@ -13,24 +13,25 @@ class SubredditPageController:
         self.subname = subname
         self.db_session = db_session
         self.log = log
-        self.r = r    
+        self.r = r
+        self.sub = self.r.get_subreddit(self.subname)
   
 
     def fetch_subreddit_page(self, pg_type, limit=100, return_praw_object=False):
         posts = []
+        json_posts = []
         fetched = []
-        sub = self.r.get_subreddit(self.subname)
 
         # fetch subreddit posts from reddit
         try:
             if pg_type==PageType.TOP:
-                fetched = sub.get_top(limit=limit)
+                fetched = self.sub.get_top(limit=limit)
             elif pg_type==PageType.CONTR:
-                fetched = sub.get_controversial(limit=limit)
+                fetched = self.sub.get_controversial(limit=limit)
             elif pg_type==PageType.NEW:
-                fetched = sub.get_new(limit=limit)   
+                fetched = self.sub.get_new(limit=limit)   
             elif pg_type==PageType.HOT:
-                fetched = sub.get_hot(limit=limit)   
+                fetched = self.sub.get_hot(limit=limit)   
         except:
             self.log.error("Error querying /r/{0} {1} page".format(self.subname, pg_type.name), extra=sys.exc_info()[0] )
             print(sys.exc.info()[0])
@@ -38,7 +39,7 @@ class SubredditPageController:
         self.log.info("Queried /r/{0} {1} page".format(self.subname, pg_type.name))
         # add sub to subreddit table if not already there
         try:
-            if self.archive_subreddit(sub):
+            if self.archive_subreddit():
                 self.log.info("Saved new record for subreddit /r/{0}".format(self.subname))
         except:
             self.log.error("Failed to save new record for subreddit /r/{0}".format(self.subname))
@@ -51,6 +52,7 @@ class SubredditPageController:
                 new_post = post.json_dict #if("json_dict" in dir(post)) else post['data'] ### TO HANDLE TEST FIXTURES
                 pruned_post = {
                     'id': new_post['id'],
+                    'created_utc': new_post['created_utc'],
                     'author': new_post['author'],
                     'num_comments': new_post['num_comments'],
                     'downs': new_post['downs'],
@@ -58,7 +60,7 @@ class SubredditPageController:
                     'score': new_post['score']                                             
                 }
                 posts.append(post)
-                json_posts.append(new_post)
+                json_posts.append(pruned_post) # only store pruned post
                 is_new_post = self.archive_post(post.json_dict)
                 is_new_user = self.archive_user(pruned_post['author'], datetime.datetime.fromtimestamp(post.created))
             self.log.info("Saved posts from /r/{0} {1} page.".format(self.subname, pg_type.name))
@@ -72,7 +74,10 @@ class SubredditPageController:
 
     def archive_subreddit_page(self, pg_type=PageType.HOT):
         posts = self.fetch_subreddit_page(pg_type, return_praw_object=False)
-        subreddit_page = SubredditPage(created_at = datetime.datetime.now(),
+        self.log.info(posts)
+        subreddit_page = SubredditPage(
+                                created_at = datetime.datetime.now(),
+                                subreddit_id = self.sub.id,
                                 page_type = pg_type.value, 
                                 page_data = json.dumps(posts))
         self.db_session.add(subreddit_page)
@@ -83,13 +88,13 @@ class SubredditPageController:
         returns True if it archives a new subreddit. 
         returns False if the subreddit does not need to be archived.
     """
-    def archive_subreddit(self, sub):
-        queried_sub = self.db_session.query(Subreddit).filter(Subreddit.id == sub.id).first()
+    def archive_subreddit(self):
+        queried_sub = self.db_session.query(Subreddit).filter(Subreddit.id == self.sub.id).first()
 
         # if sub not in table, add it
         if not queried_sub:
-            new_sub = Subreddit(id = sub.id, 
-                                name = sub.display_name)
+            new_sub = Subreddit(id = self.sub.id, 
+                                name = self.sub.display_name)
             self.db_session.add(new_sub)
             self.db_session.commit()
             return True
