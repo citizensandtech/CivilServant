@@ -55,6 +55,7 @@ class SubredditPageController:
                     'num_comments': new_post['num_comments'],
                     'downs': new_post['downs'],
                     'ups': new_post['ups'], 
+                    'subreddit_id': new_post['subreddit_id'],
                     'score': new_post['score']                                             
                 }
                 posts.append(post)
@@ -74,6 +75,7 @@ class SubredditPageController:
         posts = self.fetch_subreddit_page(pg_type, return_praw_object=False)
         subreddit_page = SubredditPage(created_at = datetime.datetime.now(),
                                 page_type = pg_type.value, 
+                                subreddit_id = posts[0]['subreddit_id'].replace("t5_",""),
                                 page_data = json.dumps(posts))
         self.db_session.add(subreddit_page)
         self.db_session.commit()

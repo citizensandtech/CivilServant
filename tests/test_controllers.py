@@ -136,6 +136,8 @@ def test_archive_subreddit_page(mock_subreddit, mock_reddit):
 
     top_pages_count = db_session.query(SubredditPage).filter(SubredditPage.page_type == PageType.TOP.value).count()
     assert top_pages_count == 1
+    top_page = db_session.query(SubredditPage).filter(SubredditPage.page_type == PageType.TOP.value).first()
+    assert top_page.subreddit_id == "mouw"
 
     contr_pages_count = db_session.query(SubredditPage).filter(SubredditPage.page_type == PageType.CONTR.value).count()
     assert contr_pages_count == 1
