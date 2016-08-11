@@ -1,5 +1,11 @@
 import pytest
 import os
+
+## SET UP THE DATABASE ENGINE
+## TODO: IN FUTURE, SET UP A TEST-WIDE DB SESSION
+TEST_DIR = os.path.dirname(os.path.realpath(__file__))
+ENV = os.environ['CS_ENV'] ="test"
+
 from mock import Mock, patch
 import simplejson as json
 from sqlalchemy import create_engine
@@ -10,11 +16,6 @@ import socket
 
 ### LOAD THE CLASSES TO TEST
 from app.models import Base, FrontPage, PrawKey
-
-## SET UP THE DATABASE ENGINE
-## TODO: IN FUTURE, SET UP A TEST-WIDE DB SESSION
-TEST_DIR = os.path.dirname(os.path.realpath(__file__))
-ENV = os.environ['CS_ENV'] ="test"
 
 db_session = DbEngine(os.path.join(TEST_DIR, "../", "config") + "/{env}.json".format(env=ENV)).new_session()
 

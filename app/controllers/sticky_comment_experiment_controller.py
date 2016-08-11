@@ -183,6 +183,16 @@ class StickyCommentExperimentController:
             metadata_json = json.dumps({"group":"treatment", 
                 "action_object_created_utc":comment.created_utc})
         )
+
+        comment_thing = ExperimentThing(
+            experiment_id = self.experiment.id,
+            object_created = datetime.datetime.fromtimestamp(comment.created_utc),
+            object_type = ThingType.COMMENT.value,
+            id = comment.id,
+            metadata_json = json.dumps({"group":"treatment","submission_id":submission.id})
+        )
+
+        self.db_session.add(comment_thing)
         self.db_session.add(experiment_action)
         self.db_session.commit()
         return distinguish_results
@@ -254,4 +264,3 @@ class StickyCommentExperimentController:
         self.log.info("Experiment {0}: assigned conditions to {1} submissions".format(self.experiment.id,len(experiment_things)))
         self.db_session.commit()
         return experiment_things
-

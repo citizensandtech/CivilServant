@@ -1,5 +1,11 @@
 import pytest
 import os, yaml
+
+## SET UP THE DATABASE ENGINE
+TEST_DIR = os.path.dirname(os.path.realpath(__file__))
+BASE_DIR  = os.path.join(TEST_DIR, "../")
+ENV = os.environ['CS_ENV'] = "test"
+
 from mock import Mock, patch
 import simplejson as json
 import sqlalchemy
@@ -9,15 +15,12 @@ import glob, datetime, time
 from app.controllers.sticky_comment_experiment_controller import StickyCommentExperimentController
 from utils.common import *
 from dateutil import parser
+import praw
 
 ### LOAD THE CLASSES TO TEST
 from app.models import *
 import app.cs_logger
 
-## SET UP THE DATABASE ENGINE
-TEST_DIR = os.path.dirname(os.path.realpath(__file__))
-BASE_DIR  = os.path.join(TEST_DIR, "../")
-ENV = os.environ['CS_ENV'] ="test"
 
 db_session = DbEngine(os.path.join(TEST_DIR, "../", "config") + "/{env}.json".format(env=ENV)).new_session()
 log = app.cs_logger.get_logger(ENV, BASE_DIR)
@@ -201,8 +204,10 @@ def test_make_sticky_post(mock_comment, mock_submission, mock_reddit):
 
     ## Now try to intervene on a more recent post
     mock_submission.created_utc = int(time.time())
+    assert db_session.query(ExperimentThing).filter(ExperimentThing.object_type==ThingType.COMMENT.value).count() == 0
     sticky_result = scec.make_sticky_post(mock_submission)
     assert db_session.query(ExperimentAction).count() == 1
+    assert db_session.query(ExperimentThing).filter(ExperimentThing.object_type==ThingType.COMMENT.value).count() == 1
     assert sticky_result is not None
 
     ## make sure it aborts the call if we try a second time
@@ -238,3 +243,45 @@ def test_make_control_nonaction(mock_comment, mock_submission, mock_reddit):
     assert db_session.query(ExperimentAction).count() == 1
     assert sticky_result is None
     
+@patch('praw.Reddit', autospec=True)
+@patch('praw.objects.Submission', autospec=True)
+@patch('praw.objects.Comment', autospec=True)
+def test_remove_replies_to_sticky_comments(mock_comment,mock_submission,mock_reddit):
+    r = mock_reddit.return_value
+    experiment_name = "sticky_comment_0"
+
+    with open(os.path.join(BASE_DIR, "config", "experiments") + "/"+ experiment_name + ".yml", "r") as f:
+        experiment_settings = yaml.load(f.read())['test']
+
+    with open("{script_dir}/fixture_data/submission_0.json".format(script_dir=TEST_DIR)) as f:
+        submission_json = json.loads(f.read())
+        ## setting the submission time to be recent enough
+        submission = json2obj(json.dumps(submission_json))
+        mock_submission.id = submission.id
+
+    with open("{script_dir}/fixture_data/submission_0_treatment.json".format(script_dir=TEST_DIR)) as f:
+        treatment = json2obj(f.read())
+        mock_comment.id = treatment.id
+        mock_comment.created_utc = treatment.created_utc
+        mock_submission.add_comment.return_value = mock_comment
+
+    with open("{script_dir}/fixture_data/submission_0_treatment_distinguish.json".format(script_dir=TEST_DIR)) as f:
+        distinguish = json.loads(f.read())
+        mock_comment.distinguish.return_value = distinguish
+
+    with open("{script_dir}/fixture_data/flattened_comment_replies_0.json".format(script_dir=TEST_DIR)) as f:
+        flattened_comments = json.loads(f.read())
+        mock_comment.replies = json2obj(json.dumps(flattened_comments))
+        r.get_info.return_value = mock_comment
+
+    patch('praw.')
+
+    scec = StickyCommentExperimentController(experiment_name, db_session, r, log)
+
+    ## Add the sticky comment
+    mock_submission.created_utc = int(time.time())
+    sticky_result = scec.make_sticky_post(mock_submission)
+    assert db_session.query(ExperimentAction).count() == 1
+    assert sticky_result is not None
+    #import pdb; pdb.set_trace()
+
