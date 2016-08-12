@@ -1,5 +1,7 @@
 import pytest
 import os
+from sqlalchemy import and_, or_
+
 
 ## SET UP THE DATABASE ENGINE
 ## TODO: IN FUTURE, SET UP A TEST-WIDE DB SESSION
@@ -15,11 +17,12 @@ from utils.common import PageType, DbEngine
 import socket
 
 ### LOAD THE CLASSES TO TEST
-from app.models import Base, FrontPage, PrawKey
+from app.models import *
 
 db_session = DbEngine(os.path.join(TEST_DIR, "../", "config") + "/{env}.json".format(env=ENV)).new_session()
 
 def clear_front_pages():
+    db_session.query(Comment).delete()
     db_session.query(FrontPage).delete()
     db_session.commit()
 
@@ -56,3 +59,51 @@ def test_front_page(populate_front_pages):
 def test_get_praw_id():
     hostname = socket.gethostname()
     assert PrawKey.get_praw_id(ENV, "DummyController") == "{0}:test:DummyController".format(hostname)    
+
+## test Comment.get_comment_tree(filter)
+def test_comment_get_comment_tree():
+    fixture_dir = os.path.join(TEST_DIR, "fixture_data")
+    with open(os.path.join(fixture_dir, "comment_tree_0.json"),"r") as f:
+        comment_json = json.loads(f.read())
+    
+    for comment in comment_json:
+        dbcomment = Comment(
+            id = comment['id'],
+            created_at = datetime.datetime.utcfromtimestamp(comment['created_utc']),
+            subreddit_id = comment['subreddit_id'],
+            post_id = comment['link_id'],
+            user_id = comment['author'],
+            comment_data = json.dumps(comment)
+        )
+        db_session.add(dbcomment)
+    db_session.commit()
+
+    ## TEST BASE PROCESSING OF FIXTURES
+    comment_tree = Comment.get_comment_tree(db_session, sqlalchemyfilter = and_(Comment.subreddit_id == comment['subreddit_id']))
+    assert len(comment_tree['all_toplevel']) == 11
+    assert len(comment_tree['all_comments']) == len(comment_json)
+    assert len(comment_tree['all_toplevel']['d5q4kcz'].get_all_children()) == 7
+    assert len(comment_tree['all_toplevel']['d5qgz1r'].get_all_children()) == 3
+    assert len(comment_tree['all_toplevel']['d5o11tf'].get_all_children()) == 0
+
+    ### TEST FILTERING
+    db_session.add(
+        Comment(
+            id="123456789",
+            subreddit_id = "987654321",
+            comment_data = json.dumps({"parent_id":"abcde", "link_id":"abcde"})
+        )
+    )
+    db_session.commit()
+    ## TEST THAT THE RESULTS ARE NO DIFFERENT WHEN THERE'S A DIFFERENT SUBREDDIT ID
+    comment_tree = Comment.get_comment_tree(db_session, sqlalchemyfilter = and_(Comment.subreddit_id == comment['subreddit_id']))
+    assert len(comment_tree['all_toplevel']) == 11
+    assert len(comment_tree['all_comments']) == len(comment_json)
+    assert len(comment_tree['all_toplevel']['d5q4kcz'].get_all_children()) == 7
+    assert len(comment_tree['all_toplevel']['d5qgz1r'].get_all_children()) == 3
+    assert len(comment_tree['all_toplevel']['d5o11tf'].get_all_children()) == 0
+
+
+
+
+    

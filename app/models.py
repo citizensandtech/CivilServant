@@ -1,6 +1,8 @@
 # example taken from http://pythoncentral.io/introductory-tutorial-python-sqlalchemy/
 import os
 import sys
+import simplejson as json
+from utils.common import *
 from sqlalchemy import Column, Integer, String, Text, DateTime
 from sqlalchemy.dialects.mysql import MEDIUMTEXT, LONGTEXT
 from sqlalchemy.ext.declarative import declarative_base
@@ -66,6 +68,35 @@ class Comment(Base):
     post_id             = Column(String(32), index=True)
     user_id             = Column(String(64), index=True)
     comment_data        = Column(MEDIUMTEXT)
+
+    @classmethod
+    def get_comment_tree(self, db_session, sqlalchemyfilter = None):
+        all_comments = {}
+        all_toplevel = {}
+        for comment in db_session.query(Comment).filter(sqlalchemyfilter).all():
+            comment_data = json.loads(comment.comment_data)
+            toplevel = comment_data['link_id'] == comment_data['parent_id']
+            comment_node = CommentNode(
+                id   = comment.id,
+                data = comment_data,
+                link_id = comment_data['link_id'],
+                toplevel = toplevel)
+            all_comments[comment.id] = comment_node 
+            if(toplevel):
+                all_toplevel[comment.id] = comment_node
+
+        for comment in all_comments.values():
+            if comment.toplevel:
+                continue
+            # we only care about comments in this subset
+            # so drop anything not here
+            try:
+                parent = all_comments[comment.data['parent_id'].replace("t1_","")]
+                comment.set_parent(parent)
+                parent.add_child(comment)
+            except:
+                continue
+        return {"all_comments": all_comments, "all_toplevel":all_toplevel}    
 
 class User(Base):
     __tablename__ = 'users'

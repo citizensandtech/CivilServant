@@ -43,3 +43,31 @@ def _json_object_hook(d):
 
 def json2obj(data):
 	return json.loads(data, object_hook=_json_object_hook)
+
+
+class CommentNode:
+	def __init__(self, id, data, link_id = None, toplevel = False, parent=None):
+		self.id = id
+		self.children = list()
+		self.parent = parent
+		self.link_id = link_id
+		self.toplevel = toplevel
+		self.data = data
+
+	def add_child(self, child):
+		self.children.append(child)
+
+	def set_parent(self,parent):
+		self.parent = parent
+
+	def get_all_children(self):
+		all_children = self.children
+		for child in self.children:
+			all_children = all_children + child.get_all_children()
+		if(len(all_children)>0):
+			return all_children
+		else:
+			return []
+
+	def __str__(self):
+		return str(self.id)
