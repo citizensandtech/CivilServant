@@ -7,10 +7,12 @@ BASE_DIR  = os.path.join(TEST_DIR, "../")
 ENV = os.environ['CS_ENV'] = "test"
 
 from mock import Mock, patch
+import unittest.mock
 import simplejson as json
 import sqlalchemy
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import and_, or_
 import glob, datetime, time
 from app.controllers.sticky_comment_experiment_controller import StickyCommentExperimentController
 from utils.common import *
@@ -242,46 +244,96 @@ def test_make_control_nonaction(mock_comment, mock_submission, mock_reddit):
     sticky_result = scec.make_control_nonaction(mock_submission)
     assert db_session.query(ExperimentAction).count() == 1
     assert sticky_result is None
-    
+
 @patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Submission', autospec=True)
-@patch('praw.objects.Comment', autospec=True)
-def test_remove_replies_to_sticky_comments(mock_comment,mock_submission,mock_reddit):
+def test_find_treatment_replies(mock_reddit):
+    fixture_dir = os.path.join(TEST_DIR, "fixture_data")
+
     r = mock_reddit.return_value
     experiment_name = "sticky_comment_0"
+    scec = StickyCommentExperimentController(experiment_name, db_session, r, log)
 
     with open(os.path.join(BASE_DIR, "config", "experiments") + "/"+ experiment_name + ".yml", "r") as f:
         experiment_settings = yaml.load(f.read())['test']
 
-    with open("{script_dir}/fixture_data/submission_0.json".format(script_dir=TEST_DIR)) as f:
-        submission_json = json.loads(f.read())
-        ## setting the submission time to be recent enough
-        submission = json2obj(json.dumps(submission_json))
-        mock_submission.id = submission.id
+    experiment_start = parser.parse(experiment_settings['start_time'])
 
-    with open("{script_dir}/fixture_data/submission_0_treatment.json".format(script_dir=TEST_DIR)) as f:
-        treatment = json2obj(f.read())
-        mock_comment.id = treatment.id
-        mock_comment.created_utc = treatment.created_utc
-        mock_submission.add_comment.return_value = mock_comment
+    with open(os.path.join(fixture_dir, "comment_tree_0.json"),"r") as f:
+        comment_json = json.loads(f.read())
+    
+    for comment in comment_json:
+        dbcomment = Comment(
+            id = comment['id'],
+            created_at = datetime.datetime.utcfromtimestamp(comment['created_utc']),
+            #set fixture comments to experiment subreddit _id
+            subreddit_id = experiment_settings['subreddit_id'], 
+            post_id = comment['link_id'],
+            user_id = comment['author'],
+            comment_data = json.dumps(comment)
+        )
+        db_session.add(dbcomment)
+    db_session.commit()
 
-    with open("{script_dir}/fixture_data/submission_0_treatment_distinguish.json".format(script_dir=TEST_DIR)) as f:
-        distinguish = json.loads(f.read())
-        mock_comment.distinguish.return_value = distinguish
+    comment_tree = Comment.get_comment_tree(db_session, sqlalchemyfilter = and_(Comment.subreddit_id == experiment_settings['subreddit_id']))
+    treatment_comments = [(x.id, x.link_id, len(x.get_all_children()), x.data['created_utc']) for x in comment_tree['all_toplevel'].values()]
+    
+    experiment_submissions = []
 
-    with open("{script_dir}/fixture_data/flattened_comment_replies_0.json".format(script_dir=TEST_DIR)) as f:
-        flattened_comments = json.loads(f.read())
-        mock_comment.replies = json2obj(json.dumps(flattened_comments))
-        r.get_info.return_value = mock_comment
+    ## SET UP DATABASE ARCHIVE OF EXPERIMENT ACTIONS
+    ## TO CORRESPOND TO THE FIXTURE DATA
 
-    patch('praw.')
+    for treatment_comment in treatment_comments:
+        submission_id = treatment_comment[1].replace("t3","")
+        if(submission_id not in experiment_submissions):
+            experiment_submission = ExperimentThing(
+                id = submission_id,
+                object_type = ThingType.SUBMISSION.value,
+                experiment_id = scec.experiment.id,
+                metadata_json = json.dumps({"condition":1})            
+            )
+            db_session.add(experiment_submission)
+            experiment_submissions.append(submission_id)
 
-    scec = StickyCommentExperimentController(experiment_name, db_session, r, log)
+        experiment_comment = ExperimentThing(
+            id = treatment_comment[0],
+            object_type = ThingType.COMMENT.value,
+            experiment_id = scec.experiment.id,
+            metadata_json = json.dumps({"group":"treatment",
+                "submission_id":submission_id})
+        )
+        db_session.add(experiment_comment)
+        experiment_action = ExperimentAction(
+            experiment_id = scec.experiment.id,
+            praw_key_id = None,
+            action_subject_type = ThingType.COMMENT.value,
+            action_subject_id = treatment_comment[0],
+            action = "Intervention",
+            action_object_type = ThingType.SUBMISSION.value,
+            action_object_id = treatment_comment[1],
+            metadata_json = json.dumps({"group":"treatment", 
+                "action_object_created_utc":treatment_comment[3]})
+        )
+        db_session.add(experiment_action)
+    db_session.commit()
 
-    ## Add the sticky comment
-    mock_submission.created_utc = int(time.time())
-    sticky_result = scec.make_sticky_post(mock_submission)
-    assert db_session.query(ExperimentAction).count() == 1
-    assert sticky_result is not None
-    #import pdb; pdb.set_trace()
+    assert len(scec.get_all_experiment_comments()) == len(treatment_comments)
+    acre = scec.get_all_experiment_comment_replies()
 
+    ## NOW SET UP THE MOCK RETURN FROM: 
+    ## get_comment_objects_for_experiment_comment_replies
+    assert len(acre) == sum([x[2] for x in treatment_comments])
+    return_comments = [json2obj(json.dumps(x.data)) for x in acre]
+    r.get_info.return_value = return_comments
+    
+    ## NOW TEST THE REMOVAL OF THE COMMENTS
+    assert db_session.query(ExperimentAction).filter(ExperimentAction.action=="RemoveRepliesToTreatment").count() == 0
+    removed_count = scec.remove_replies_to_treatments()
+    experiment_action = db_session.query(ExperimentAction).filter(ExperimentAction.action=="RemoveRepliesToTreatment").first()
+    assert removed_count == sum([x.banned_by is None for x in return_comments])
+    removable_ids = [x.id for x in return_comments if x.banned_by is None]
+    parent_ids = set([x.link_id for x in return_comments if x.banned_by is None])
+    experiment_action_data = json.loads(experiment_action.metadata_json)
+    for id in removable_ids:
+        assert id in experiment_action_data['removed_comment_ids']
+    for id in parent_ids:
+        assert id in experiment_action_data['parent_submission_ids']

@@ -81,3 +81,13 @@ def conduct_sticky_comment_experiment(experiment_name):
         log = log
     )
     sce.update_experiment()
+
+def remove_experiment_replies(experiment_name):
+    r = conn.connect(controller=experiment_name)    
+    sce = app.controllers.sticky_comment_experiment_controller.StickyCommentExperimentController(
+        experiment_name = experiment_name,
+        db_session = db_session,
+        r = r,
+        log = log
+    )
+    sce.remove_replies_to_treatments()

@@ -17,6 +17,10 @@ def main():
     parser.add_argument("experiment",
                         help="The experiment")
 
+    parser.add_argument("job",
+                         choices=["intervene", "tidy"],
+                         help="The job associated with the experiment")
+
     parser.add_argument("interval",
                         default = 120, # default 2 minutes
                         help="Interval between tasks in seconds (default 2 minutes)")
@@ -44,13 +48,23 @@ def main():
         print("File {0} not found. Ignoring schedule command.".format(experiment_file))
         sys.exit(1)
 
-    scheduler.schedule(
-            scheduled_time=datetime.utcnow(),
-            func=app.controller.conduct_sticky_comment_experiment,
-            args=[args.experiment],
-            interval=int(args.interval),
-            repeat=None,
-            result_ttl = ttl)
+
+    if(args.job == "intervene"):
+        scheduler.schedule(
+                scheduled_time=datetime.utcnow(),
+                func=app.controller.conduct_sticky_comment_experiment,
+                args=[args.experiment],
+                interval=int(args.interval),
+                repeat=None,
+                result_ttl = ttl)
+    elif(args.job == "tidy"):
+        scheduler.schedule(
+                scheduled_time=datetime.utcnow(),
+                func=app.controller.remove_experiment_replies,
+                args=[args.experiment],
+                interval=int(args.interval),
+                repeat=None,
+                result_ttl = ttl)
 
 if __name__ == '__main__':
     main()

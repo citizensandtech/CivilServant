@@ -35,11 +35,13 @@ class DbEngine:
 		Base.metadata.bind = db_engine
 		DBSession = sessionmaker(bind=db_engine)
 		db_session = DBSession()
-		return db_session  
+		return db_session
 
-def _json_object_hook(d):
-	d['json_dict'] = d.copy()
-	return namedtuple('X', d.keys(), rename=True)(*d.values())
+def _json_object_hook(dobj):
+	dobj['json_dict'] = dobj.copy()
+	X =  namedtuple('X', dobj.keys(), rename=True)
+	X.remove = lambda x: None
+	return(X(*dobj.values()))
 
 def json2obj(data):
 	return json.loads(data, object_hook=_json_object_hook)

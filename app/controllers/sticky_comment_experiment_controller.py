@@ -8,7 +8,7 @@ import reddit.queries
 import sqlalchemy
 from dateutil import parser
 from utils.common import *
-from app.models import Base, SubredditPage, Subreddit, Post, ModAction, PrawKey
+from app.models import Base, SubredditPage, Subreddit, Post, ModAction, PrawKey, Comment
 from app.models import Experiment, ExperimentThing, ExperimentAction
 from sqlalchemy import and_, or_
 from app.controllers.subreddit_controller import SubredditPageController
@@ -49,6 +49,7 @@ class StickyCommentExperimentController:
                 "comment_text": experiment_config['comment_text'],
                 "username": experiment_config['username'],
                 "subreddit": experiment_config['subreddit'],
+                "subreddit_id": experiment_config['subreddit_id'],
                 "max_eligibility_age": experiment_config['max_eligibility_age']
             }
             experiment = Experiment(
@@ -67,6 +68,7 @@ class StickyCommentExperimentController:
         self.experiment_name = experiment_name
 
         self.subreddit = experiment_config['subreddit']
+        self.subreddit_id = experiment_config['subreddit_id']
         self.username = experiment_config['username']
         self.comment_text = experiment_config['comment_text']
         self.max_eligibility_age = experiment_config['max_eligibility_age']
@@ -264,3 +266,67 @@ class StickyCommentExperimentController:
         self.log.info("Experiment {0}: assigned conditions to {1} submissions".format(self.experiment.id,len(experiment_things)))
         self.db_session.commit()
         return experiment_things
+
+    def get_replies_for_removal(self, comment_objects):
+        replies_for_removal = []
+        for comment_object in comment_objects:
+            comment_object.refresh()
+            replies_for_removal = replies_for_removal + praw.helpers.flatten_tree(comment_object.replies)
+        return replies_for_removal
+
+    def get_all_experiment_comments(self):
+        experiment_comments = self.db_session.query(ExperimentThing).filter(and_(
+            ExperimentThing.experiment_id == self.experiment.id,
+            ExperimentThing.object_type == ThingType.COMMENT.value
+            )).all()
+        return experiment_comments
+
+    def get_all_experiment_comment_replies(self):
+        experiment_comments = self.get_all_experiment_comments()
+        experiment_comment_ids = [x.id for x in experiment_comments]
+        comment_tree = Comment.get_comment_tree(self.db_session, sqlalchemyfilter = and_(
+            Comment.subreddit_id == self.subreddit_id,
+            Comment.created_at >= self.experiment.start_time,
+            Comment.created_at <= self.experiment.end_time)) 
+        experiment_comment_tree = [x for x in comment_tree['all_toplevel'].values() if x.id in experiment_comment_ids]
+        
+        all_experiment_comment_replies = []
+        for comment in experiment_comment_tree:
+            all_experiment_comment_replies = all_experiment_comment_replies + comment.get_all_children()
+        return all_experiment_comment_replies
+
+    def get_comment_objects_for_experiment_comment_replies(self, experiment_comment_replies):
+        reply_ids = ["t1_" + x.id for x in experiment_comment_replies]
+        comments = self.r.get_info(thing_id = reply_ids)
+        return comments
+
+    def remove_replies_to_treatments(self):
+        comments = self.get_comment_objects_for_experiment_comment_replies(
+            self.get_all_experiment_comment_replies()
+        )
+        removed_comment_ids = []
+        parent_submission_ids = set()
+        for comment in comments:
+            if(comment.banned_by is None):
+                comment.remove()
+                removed_comment_ids.append(comment.id)
+                parent_submission_ids.add(comment.link_id)
+
+        experiment_action = ExperimentAction(
+            experiment_id = self.experiment.id,
+            action        = "RemoveRepliesToTreatment",
+            metadata_json = json.dumps({
+                "parent_submission_ids":list(parent_submission_ids),
+                "removed_comment_ids": removed_comment_ids
+                })
+        )
+        self.db_session.add(experiment_action)
+        self.db_session.commit()
+
+        self.log.info("Experiment {experiment}: found {replies} replies to {treatments} treatment comments. Removed {removed} comments.".format(
+            experiment = self.experiment.id,
+            replies = len(comments),
+            treatments = len(parent_submission_ids),
+            removed = len(removed_comment_ids) 
+        ))       
+        return len(removed_comment_ids)     
