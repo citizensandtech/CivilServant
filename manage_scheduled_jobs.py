@@ -31,9 +31,13 @@ def main():
     scheduler = Scheduler(queue_name=os.environ['CS_ENV'], connection=Redis())
 
     if(args.action == "show"):
-        print("SCHEDULE FOR {0}".format(os.environ['CS_ENV']))
-        print
-        print(scheduler.get_jobs(until=timedelta(hours=3), with_times=True))
+        print("\n")
+        print("=================================")
+        print("  Job Schedule For {0}".format(os.environ['CS_ENV']))
+        print("=================================")
+        print("\n")
+        for job in scheduler.get_jobs(until=timedelta(hours=3), with_times=True):
+           print("ID: {1}\n    Job: {0}\n    Time: {2}\n".format(job[0].description, job[0].id, job[1]))
     elif(args.action == "remove"):
         if(args.object is None):
             print("Please specify the job to remove")
