@@ -1,9 +1,12 @@
 production:
   subreddit: natematias
   subreddit_id: 3940b
-  comment_text: This is a sticky comment
   username: CivilServantBot
+  ama_comment_text: This is an AMA specific sticky comment
+  nonama_comment_text: This is a non-AMA sticky comment
   controller: StickyCommentExperimentController
+  ama_conditions: sticky_comment_0_ama.conditions.csv
+  nonama_conditions: sticky_comment_0_nonama.conditions.csv
   start_time: 07/20/2016 00:00:00 UTC
   end_time: 12/30/2016 23:59:59 UTC
   max_eligibility_age: 300
@@ -11,10 +14,13 @@ production:
 development:
   subreddit: natematias
   subreddit_id: 3940b
-  comment_text: This is a sticky comment
   username: CivilServantBot
+  ama_comment_text: This is an AMA specific sticky comment
+  nonama_comment_text: This is a non-AMA sticky comment
   controller: StickyCommentExperimentController
   username: CivilServantBot
+  ama_conditions: sticky_comment_0_ama.conditions.csv
+  nonama_conditions: sticky_comment_0_nonama.conditions.csv
   start_time: 07/20/2016 00:00:00 UTC
   end_time: 12/30/2016 23:59:59 UTC
   max_eligibility_age: 300
@@ -22,8 +28,11 @@ development:
 test:
   subreddit: natematias
   subreddit_id: 3940b
-  comment_text: This is a sticky comment
   username: CivilServantBot
+  ama_comment_text: This is an AMA specific sticky comment
+  nonama_comment_text: This is a non-AMA sticky comment
+  ama_conditions: sticky_comment_0_ama.conditions.csv
+  nonama_conditions: sticky_comment_0_nonama.conditions.csv
   controller: StickyCommentExperimentController
   username: CivilServantBot
   start_time: 07/20/2016 00:00:00 UTC

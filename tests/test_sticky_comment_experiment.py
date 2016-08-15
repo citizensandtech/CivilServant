@@ -13,11 +13,11 @@ import sqlalchemy
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import and_, or_
-import glob, datetime, time
+import glob, datetime, time, pytz
 from app.controllers.sticky_comment_experiment_controller import StickyCommentExperimentController
 from utils.common import *
 from dateutil import parser
-import praw
+import praw, csv, random, string
 
 ### LOAD THE CLASSES TO TEST
 from app.models import *
@@ -44,25 +44,46 @@ def setup_function(function):
 def teardown_function(function):
     clear_all_tables()
 
-
 @patch('praw.Reddit', autospec=True)
 def test_initialize_experiment(mock_reddit):
     r = mock_reddit.return_value
     patch('praw.')
 
+    test_experiment_name = "sticky_comment_0"
+
+    with open(os.path.join(BASE_DIR,"config", "experiments", test_experiment_name + ".yml"), "r") as f:
+        experiment_config = yaml.load(f)['test']
+
     assert(len(db_session.query(Experiment).all()) == 0)
     StickyCommentExperimentController("sticky_comment_0", db_session, r, log)
     assert(len(db_session.query(Experiment).all()) == 1)
     experiment = db_session.query(Experiment).first()
-    assert(experiment.name       == "sticky_comment_0")
-    assert(experiment.controller == "StickyCommentExperimentController")
-#    assert(experiment.start_time == parser.parse("07/22/2016 00:00:00 UTC"))
-#    assert(experiment.end_time   == parser.parse("07/23/2016 23:59:59 UTC"))
+    assert(experiment.name       == test_experiment_name)
+    assert(experiment.controller == experiment_config['controller'])
+    assert(pytz.timezone("UTC").localize(experiment.start_time) == parser.parse(experiment_config['start_time']))
+    assert(pytz.timezone("UTC").localize(experiment.end_time)   == parser.parse(experiment_config['end_time']))
     
     settings = json.loads(experiment.settings_json)
-    assert(settings['comment_text'] == "This is a sticky comment")
-    assert(settings['username']     == "CivilServantBot")
-    assert(settings['subreddit']    == "natematias")
+    for k in ['ama_comment_text', 'nonama_comment_text', 'username', 'subreddit', 'subreddit_id','max_eligibility_age']:
+        assert(settings[k] == experiment_config[k])
+
+    ### NOW TEST THAT AMA OBJECTS ARE ADDED
+    with open(os.path.join(BASE_DIR,"config", "experiments", experiment_config['ama_conditions']), "r") as f:
+        ama_conditions = []
+        for row in csv.DictReader(f):
+            ama_conditions.append(row)
+
+    with open(os.path.join(BASE_DIR,"config", "experiments", experiment_config['nonama_conditions']), "r") as f:
+        nonama_conditions = []
+        for row in csv.DictReader(f):
+            nonama_conditions.append(row)
+
+    assert len(settings['ama_conditions'])    == len(ama_conditions)
+    assert len(settings['nonama_conditions']) == len(nonama_conditions)
+    assert settings['next_ama_condition']     == 0
+    assert settings['next_nonama_condition']  == 0
+    
+
 
 @patch('praw.Reddit', autospec=True)
 @patch('praw.objects.Subreddit', autospec=True)
@@ -139,28 +160,64 @@ def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
     r.get_subreddit.return_value = mock_subreddit
     patch('praw.')
 
+    ## TEST THE BASE CASE OF RANDOMIZATION
     scec = StickyCommentExperimentController(experiment_name, db_session, r, log)
     eligible_objects = scec.get_eligible_objects()
 
     experiment_action_count = db_session.query(ExperimentAction).count()
 
-    assert db_session.query(ExperimentThing).count() == 0
-    scec.assign_randomized_conditions(eligible_objects)
-    assert db_session.query(ExperimentThing).count() == 100
-    assert db_session.query(ExperimentAction).count() == experiment_action_count + 1
-    assert db_session.query(ExperimentAction).filter(ExperimentAction.action=="SetRandomSeed").count() == experiment_action_count + 1
+    experiment_settings = json.loads(scec.experiment.settings_json)
+    assert experiment_settings['next_ama_condition']    == 0
+    assert experiment_settings['next_nonama_condition'] == 0
+    assert db_session.query(ExperimentThing).count()    == 0
 
+    scec.assign_randomized_conditions(eligible_objects)
+    assert db_session.query(ExperimentThing).count() == 100 
+
+    experiment = db_session.query(Experiment).first()
+    experiment_settings = json.loads(experiment.settings_json)
+    assert experiment_settings['next_ama_condition'] + experiment_settings['next_nonama_condition'] == 100
+    assert experiment_settings['next_ama_condition'] == 2
+    assert experiment_settings['next_nonama_condition'] == 98
+    
     for experiment_thing in db_session.query(ExperimentThing).all():
         assert experiment_thing.id != None
         assert experiment_thing.object_type == ThingType.SUBMISSION.value
         assert experiment_thing.experiment_id == scec.experiment.id
         assert "condition" in json.loads(experiment_thing.metadata_json).keys()
     
+    ## TEST THE CASE WHERE THE AMA EXPERIMENT HAS CONCLUDED
+    ### first step: set the condition counts to have just one remaining condition left 
+    experiment_settings['next_ama_condition'] = len(experiment_settings['ama_conditions']) - 1
+    scec.next_ama_condition = experiment_settings['next_ama_condition'] 
+    experiment_settings['next_nonama_condition'] = len(experiment_settings['nonama_conditions'])-1
+    scec.next_nonama_condition = experiment_settings['next_nonama_condition']
+    experiment.settings_json = json.dumps(experiment_settings)
+    db_session.commit()
+
+    posts = []
+    posts = posts + [x for x in sub_data if "ama" in x.link_flair_css_class][0:2]
+    posts = posts + [x for x in sub_data if "ama" not in x.link_flair_css_class][0:2]
+    
+    ## generate new fake ids for these fixture posts, 
+    ## which would otherwise be duplicates
+    new_posts = []
+    for post in posts:
+        post = post.json_dict
+        post['id'] = ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(7))
+        new_posts.append(json2obj(json.dumps(post)))
+    experiment_things = scec.assign_randomized_conditions(new_posts)
+    
+    ## assert that only two of the items went through
+    assert len(experiment_things) == 2
+    for thing in experiment_things:
+        assert thing.id in [x.id for x in new_posts]
+    
+    ## CHECK THE EMPTY CASE
     ## make sure that no actions are taken if the list is empty
     experiment_action_count = db_session.query(ExperimentAction).count()
     scec.assign_randomized_conditions([])
     assert db_session.query(ExperimentAction).count() == experiment_action_count
-
 
 @patch('praw.Reddit', autospec=True)
 @patch('praw.objects.Submission', autospec=True)
@@ -177,6 +234,7 @@ def test_make_sticky_post(mock_comment, mock_submission, mock_reddit):
         ## setting the submission time to be recent enough
         submission = json2obj(json.dumps(submission_json))
         mock_submission.id = submission.id
+        mock_submission.json_dict = submission.json_dict
     
     with open("{script_dir}/fixture_data/submission_0_comments.json".format(script_dir=TEST_DIR)) as f:
         comments = json2obj(f.read())
@@ -200,6 +258,7 @@ def test_make_sticky_post(mock_comment, mock_submission, mock_reddit):
     ## which should return None and take no action
     assert db_session.query(ExperimentAction).count() == 0
     mock_submission.created_utc = int(time.time()) - 1000
+
     sticky_result = scec.make_sticky_post(mock_submission)
     assert sticky_result is None
     assert db_session.query(ExperimentAction).count() == 0
@@ -211,6 +270,7 @@ def test_make_sticky_post(mock_comment, mock_submission, mock_reddit):
     assert db_session.query(ExperimentAction).count() == 1
     assert db_session.query(ExperimentThing).filter(ExperimentThing.object_type==ThingType.COMMENT.value).count() == 1
     assert sticky_result is not None
+
 
     ## make sure it aborts the call if we try a second time
     sticky_result = scec.make_sticky_post(mock_submission)
@@ -337,3 +397,10 @@ def test_find_treatment_replies(mock_reddit):
         assert id in experiment_action_data['removed_comment_ids']
     for id in parent_ids:
         assert id in experiment_action_data['parent_submission_ids']
+
+    
+    ## NOW TEST THE REMOVAL OF COMMENTS WHEN THERE ARE NO COMMENTS TO REMOVE
+    r.get_info.return_value = []
+    removed_count = scec.remove_replies_to_treatments()
+    assert removed_count == 0
+    
