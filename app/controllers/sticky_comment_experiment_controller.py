@@ -98,6 +98,7 @@ class StickyCommentExperimentController:
         self.ama_comment_text = experiment_config['ama_comment_text']
         self.nonama_comment_text = experiment_config['nonama_comment_text']
         self.max_eligibility_age = experiment_config['max_eligibility_age']
+        self.min_eligibility_age = 120 ##TODO: refactor this into the configuration file
         self.r = r
 
         ## LOAD SUBREDDIT PAGE CONTROLLER
@@ -151,6 +152,7 @@ class StickyCommentExperimentController:
 
         ## Avoid Acting if the submission is not recent enough
         curtime = time.time()
+#        if((curtime - submission.created_utc) > 10800):
         if((curtime - submission.created_utc) > self.max_eligibility_age):
             self.log.info("Submission created_utc {0} is {1} seconds greater than current time {2}, exceeding the max eligibility age of {3}. Declining to Add to the Experiment".format(
                 submission.created_utc,
@@ -165,7 +167,6 @@ class StickyCommentExperimentController:
                 action_object_id = submission.id
             )
             return False
-        
         return True
 
     def make_control_nonaction(self, submission):
@@ -251,13 +252,26 @@ class StickyCommentExperimentController:
         already_processed_ids = [thing.id for thing in 
             self.db_session.query(ExperimentThing).filter(and_(
                 ExperimentThing.object_type==ThingType.SUBMISSION.value, 
+                ExperimentThing.experiment_id == self.experiment.id,
                 ExperimentThing.id.in_(submissions.keys()))).all()]
 
         eligible_submissions = []
         eligible_submission_ids = []
+        curtime = time.time()
+
         for id, submission in submissions.items():
             if id in already_processed_ids:
                 continue
+
+            if((curtime - submission.created_utc) < self.min_eligibility_age):
+                self.log.info("Submission {4} created_utc {0} is {1} seconds less than current time {2}, below the minimum eligibility age of {3}. Waiting to Add to the Experiment".format(
+                    submission.created_utc,
+                    curtime - submission.created_utc,
+                    curtime,
+                    self.min_eligibility_age,
+                    submission.id))
+                continue
+
             ### TODO: rule out eligibility based on age at this stage
             ### For now, we rule it out at the point of intervention
             ### Since it's easier to mock single objects in the tests
