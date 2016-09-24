@@ -8,13 +8,20 @@ import praw
 import webbrowser
 import pickle
 import sys
+import simplejson as json
 import os
 
 env =  os.environ['CS_ENV']
 
+settings = json.loads(open("config/"+env+".json", "r").read())
+
 r = praw.Reddit(user_agent="Test version of CivilServant by u/natematias")
+r.set_oauth_app_info(client_id=settings['client_id'],
+                     client_secret=settings['client_secret'],
+                     redirect_uri=settings['redirect_uri'])
+
 url = r.get_authorize_url('uniqueKey', 'identity read modlog modposts submit modconfig flair', True)
-webbrowser.open(url)
+print(url)
 print("After you accept permission, please enter the code from the redirect_url")
 code = input("Enter the text after 'code='\n")
 access_information = r.get_access_information(code)

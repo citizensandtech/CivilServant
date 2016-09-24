@@ -1,5 +1,8 @@
 {
     "database": "",
     "user": "",
-    "password": ""
+    "password": "",
+    "client_id" : "",
+    "client_secret" : "",
+    "redirect_uri" : ""
 }
