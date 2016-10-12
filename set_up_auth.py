@@ -13,12 +13,7 @@ import os
 
 env =  os.environ['CS_ENV']
 
-settings = json.loads(open("config/"+env+".json", "r").read())
-
 r = praw.Reddit(user_agent="Test version of CivilServant by u/natematias")
-r.set_oauth_app_info(client_id=settings['client_id'],
-                     client_secret=settings['client_secret'],
-                     redirect_uri=settings['redirect_uri'])
 
 url = r.get_authorize_url('uniqueKey', 'identity read modlog modposts submit modconfig flair', True)
 print(url)
