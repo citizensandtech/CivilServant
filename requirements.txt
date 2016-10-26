@@ -1,4 +1,4 @@
-praw
+praw==4.0.0b21
 pytest
 mock
 simplejson
@@ -11,3 +11,8 @@ sqlalchemy
 alembic
 ConcurrentLogHandler
 airbrake
+pytz
+numpy
+pyyaml
+urllib3
+requests
