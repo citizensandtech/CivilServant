@@ -13,8 +13,8 @@ ENV = os.environ['CS_ENV']
 db_session = DbEngine(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV)).new_session()
 
 for pk in db_session.query(PrawKey).all():
-  handler = MultiprocessHandler()
-  r = praw.Reddit(user_agent="Test version of CivilServant by u/natematias", handler=handler)
+  #handler = MultiprocessHandler()
+  r = praw.Reddit(user_agent="Test version of CivilServant by u/natematias") #, handler=handler)
 
   access_information = {}
   access_information['access_token'] = pk.access_token

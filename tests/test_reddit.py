@@ -31,9 +31,9 @@ def setup_function(function):
 def teardown_function(function):
     clear_praw_keys()
 
-### TEST THE MOCK SETUP AND MAKE SURE IT WORKS
+### TEST THE MOCK SETUP AND  MAKE SURE IT WORKS
 @patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Subreddit', autospec=True)
+@patch('praw.models.Subreddit', autospec=True)
 def test_mock_setup(mock_subreddit, mock_reddit):
     r = mock_reddit.return_value
     mock_subreddit.display_name = "science"
@@ -52,7 +52,7 @@ def test_mock_setup(mock_subreddit, mock_reddit):
 ### IN A WAY THAT BYPASSES THE FUNCTIONALITY
 ### OF THE app.reddit.Connect CLASS
 @patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Subreddit', autospec=True)    
+@patch('praw.models.Subreddit', autospec=True)    
 def test_get_new_as_dict(mock_subreddit, mock_reddit):
     r = mock_reddit.return_value
     mock_subreddit.display_name = "science"
