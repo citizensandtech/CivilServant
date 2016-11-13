@@ -37,7 +37,6 @@ class Connect:
     # Check the Database for a Stored Praw Key
     db_praw_id = PrawKey.get_praw_id(self.env, controller)
     pk = self.db_session.query(PrawKey).filter_by(id=db_praw_id).first()
-    r = praw.Reddit()
     
     access_information = {}
     
@@ -49,10 +48,9 @@ class Connect:
       access_information['refresh_token'] = pk.refresh_token
       access_information['scope'] = json.loads(pk.scope)
     
+    r = praw.Reddit(refresh_token=access_information['refresh_token'])
 
-    utils.common.set_access_credentials(r, **access_information)
-
-
+    # praw4 TODO: check that this code works
     # SAVE OR UPDATE THE ACCESS TOKEN IF NECESSARY
     if(pk is None):
       pk = PrawKey(id=db_praw_id,

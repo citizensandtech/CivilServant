@@ -19,18 +19,18 @@ class SubredditPageController:
     def fetch_subreddit_page(self, pg_type, limit=100, return_praw_object=False):
         posts = []
         fetched = []
-        sub = self.r.get_subreddit(self.subname)
+        sub = self.r.subreddit(self.subname)
 
         # fetch subreddit posts from reddit
         try:
             if pg_type==PageType.TOP:
-                fetched = sub.get_top(limit=limit)
+                fetched = sub.top(limit=limit)
             elif pg_type==PageType.CONTR:
-                fetched = sub.get_controversial(limit=limit)
+                fetched = sub.controversial(limit=limit)
             elif pg_type==PageType.NEW:
-                fetched = sub.get_new(limit=limit)   
+                fetched = sub.new(limit=limit)   
             elif pg_type==PageType.HOT:
-                fetched = sub.get_hot(limit=limit)   
+                fetched = sub.hot(limit=limit)   
         except:
             self.log.error("Error querying /r/{0} {1} page".format(self.subname, pg_type.name), extra=sys.exc_info()[0] )
             print(sys.exc.info()[0])

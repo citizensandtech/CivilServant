@@ -44,7 +44,7 @@ def setup_function(function):
 def teardown_function(function):
     clear_all_tables()
 
-@patch('praw.Reddit', autospec=True)
+@patch('praw.reddit.Reddit', autospec=True)
 def test_initialize_experiment(mock_reddit):
     r = mock_reddit.return_value
     patch('praw.')
@@ -85,8 +85,8 @@ def test_initialize_experiment(mock_reddit):
     
 
 
-@patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Subreddit', autospec=True)
+@patch('praw.reddit.Reddit', autospec=True)
+@patch('praw.models.reddit.subreddit.Subreddit', autospec=True)
 def test_get_eligible_objects(mock_subreddit, mock_reddit):
     r = mock_reddit.return_value
     experiment_name = "sticky_comment_0"
@@ -137,8 +137,8 @@ def test_get_eligible_objects(mock_subreddit, mock_reddit):
     assert len(eligible_objects) == 50
     
 
-@patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Subreddit', autospec=True)
+@patch('praw.reddit.Reddit', autospec=True)
+@patch('praw.models.reddit.subreddit.Subreddit', autospec=True)
 def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
     r = mock_reddit.return_value
     experiment_name = "sticky_comment_0"
@@ -219,9 +219,9 @@ def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
     scec.assign_randomized_conditions([])
     assert db_session.query(ExperimentAction).count() == experiment_action_count
 
-@patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Submission', autospec=True)
-@patch('praw.objects.Comment', autospec=True)
+@patch('praw.reddit.Reddit', autospec=True)
+@patch('praw.models.reddit.Submission', autospec=True)
+@patch('praw.models.reddit.Comment', autospec=True)
 def test_make_sticky_post(mock_comment, mock_submission, mock_reddit):
     r = mock_reddit.return_value
     experiment_name = "sticky_comment_0"
@@ -278,9 +278,9 @@ def test_make_sticky_post(mock_comment, mock_submission, mock_reddit):
     assert sticky_result is None
 
 
-@patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Submission', autospec=True)
-@patch('praw.objects.Comment', autospec=True)
+@patch('praw.reddit.Reddit', autospec=True)
+@patch('praw.models.reddit.Submission', autospec=True)
+@patch('praw.models.reddit.Comment', autospec=True)
 def test_make_control_nonaction(mock_comment, mock_submission, mock_reddit):
     r = mock_reddit.return_value
     experiment_name = "sticky_comment_0"
@@ -305,7 +305,7 @@ def test_make_control_nonaction(mock_comment, mock_submission, mock_reddit):
     assert db_session.query(ExperimentAction).count() == 1
     assert sticky_result is None
 
-@patch('praw.Reddit', autospec=True)
+@patch('praw.reddit.Reddit', autospec=True)
 def test_find_treatment_replies(mock_reddit):
     fixture_dir = os.path.join(TEST_DIR, "fixture_data")
 

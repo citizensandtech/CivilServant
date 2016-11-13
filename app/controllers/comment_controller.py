@@ -20,7 +20,7 @@ class CommentController:
     def archive_missing_post_comments(self, post_id):
         post = self.db_session.query(Post).filter(Post.id == post_id).first()
         query_time = datetime.datetime.utcnow()
-        submission = self.r.get_submission(submission_id=post_id)
+        submission = self.r.submission(id=post_id)
         self.log.info("Querying Missing Comments for {post_id}. Total comments to archive: {num_comments}".format(
             post_id = post_id,
             num_comments = submission.num_comments

@@ -11,7 +11,8 @@ DEPRECATED - use queue_jobs.py instead
 def get_posts():
   conn = reddit.connection.Connect()
   r = conn.connect(controller="GetTopScience")
-  print(json.dumps(reddit.queries.get_new_as_dict(r, "science")))
-  
+  posts = reddit.queries.get_new_as_dict(r, "science", 3)
+  print(json.dumps(posts))
+
 if __name__ == "__main__":
   get_posts()

@@ -14,7 +14,7 @@ class FrontPageController:
   def __init__(self, db_session, r, log):
     self.db_session = db_session
     self.log = log
-    self.all_sub = r.get_subreddit(ALL_SUBREDDIT_NAME)
+    self.all_sub = r.subreddit(ALL_SUBREDDIT_NAME)
 
   def fetch_reddit_front_page(self, pg_type, limit=100):
       posts = []
@@ -22,13 +22,13 @@ class FrontPageController:
 
       try:
         if pg_type==PageType.TOP:
-            fetched = self.all_sub.get_top(limit=limit)
+            fetched = self.all_sub.top(limit=limit)
         elif pg_type==PageType.CONTR:
-            fetched = self.all_sub.get_controversial(limit=limit)
+            fetched = self.all_sub.controversial(limit=limit)
         elif pg_type==PageType.NEW:
-            fetched = self.all_sub.get_new(limit=limit)
+            fetched = self.all_sub.new(limit=limit)
         elif pg_type==PageType.HOT:
-            fetched = self.all_sub.get_hot(limit=limit)            
+            fetched = self.all_sub.hot(limit=limit)            
       except:
         self.log.error("Error querying reddit {0} page".format(pg_type.name), extra=sys.exc_info()[0] )
         print(sys.exc.info()[0])

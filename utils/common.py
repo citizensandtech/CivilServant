@@ -73,10 +73,3 @@ class CommentNode:
 
 	def __str__(self):
 		return str(self.id)
-
-
-
-def set_access_credentials(r, **access_information):
-	config = r.config
-	for key in access_information:
-		setattr(r.config, key, access_information[key])
