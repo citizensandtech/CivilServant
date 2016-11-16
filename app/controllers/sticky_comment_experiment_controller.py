@@ -281,8 +281,9 @@ class StickyCommentExperimentController:
             eligible_submissions.append(submission)
             eligible_submission_ids.append(id)
 
-        self.log.info("Experiment {0} Discovered eligible submissions: {1}".format(
+        self.log.info("Experiment {0} Discovered {1}eligible submissions: {2}".format(
             self.experiment_name,
+            len(eligible_submission_ids),
             json.dumps(eligible_submission_ids)))
 
         return eligible_submissions

@@ -124,11 +124,12 @@ def test_get_eligible_objects(mock_subreddit, mock_reddit):
     ### TEST THE METHOD FOR FETCHING ELIGIBLE OBJECTS
     ### SECOND TIME AROUND, WITH SOME ExperimentThing objects stored
     limit = 50
-
     for post in db_session.query(Post).all():
         limit -= 1
         experiment_thing = ExperimentThing(
-            id = post.id, object_type=int(ThingType.SUBMISSION.value))
+            id = post.id, 
+            object_type=int(ThingType.SUBMISSION.value),
+            experiment_id = scec.experiment.id)
         db_session.add(experiment_thing)
         if(limit <= 0):
             break
