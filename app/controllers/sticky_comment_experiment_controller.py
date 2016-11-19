@@ -25,7 +25,7 @@ class StickyCommentExperimentController:
 
         required_keys = ['subreddit', 'ama_comment_text', "nonama_comment_text",
                          'username', 'start_time', 'ama_conditions',
-                         'nonama_conditions', 'max_eligibility_age']
+                         'nonama_conditions', 'max_eligibility_age', 'min_eligibility_age']
 
         experiment_file_path = os.path.join(BASE_DIR, "config", "experiments", experiment_name) + ".yml"
         with open(experiment_file_path, 'r') as f:
@@ -98,7 +98,7 @@ class StickyCommentExperimentController:
         self.ama_comment_text = experiment_config['ama_comment_text']
         self.nonama_comment_text = experiment_config['nonama_comment_text']
         self.max_eligibility_age = experiment_config['max_eligibility_age']
-        self.min_eligibility_age = 120 ##TODO: refactor this into the configuration file
+        self.min_eligibility_age = experiment_config['min_eligibility_age']
         self.r = r
 
         ## LOAD SUBREDDIT PAGE CONTROLLER

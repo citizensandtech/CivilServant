@@ -10,6 +10,7 @@ production:
   start_time: 07/20/2016 00:00:00 UTC
   end_time: 12/30/2016 23:59:59 UTC
   max_eligibility_age: 300
+  min_eligibility_age: 120
 
 development:
   subreddit: natematias
@@ -24,6 +25,7 @@ development:
   start_time: 07/20/2016 00:00:00 UTC
   end_time: 12/30/2016 23:59:59 UTC
   max_eligibility_age: 300
+  min_eligibility_age: 120
 
 test:
   subreddit: natematias
@@ -38,3 +40,4 @@ test:
   start_time: 07/20/2016 00:00:00 UTC
   end_time: 12/30/2016 23:59:59 UTC
   max_eligibility_age: 300
+  min_eligibility_age: 120
