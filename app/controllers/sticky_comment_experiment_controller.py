@@ -18,15 +18,16 @@ import numpy as np
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), "..","..")
 ENV = os.environ['CS_ENV']
 
+
 class StickyCommentExperimentController:
-    def __init__(self, experiment_name, db_session, r, log):
+    def __init__(self, experiment_name, db_session, r, log, required_keys):
         self.db_session = db_session
         self.log = log
-
-        required_keys = ['subreddit', 'ama_comment_text', "nonama_comment_text",
-                         'username', 'start_time', 'ama_conditions',
-                         'nonama_conditions', 'max_eligibility_age', 'min_eligibility_age']
-
+        self.r = r
+        self.load_experiment_config(required_keys, experiment_name)
+        
+        
+    def load_experiment_config(self, required_keys, experiment_name):
         experiment_file_path = os.path.join(BASE_DIR, "config", "experiments", experiment_name) + ".yml"
         with open(experiment_file_path, 'r') as f:
             try:
@@ -35,7 +36,7 @@ class StickyCommentExperimentController:
                 self.log.error("Failure loading experiment yaml {0}".format(experiment_file_path), str(exc))
                 sys.exit(1)
         if(ENV not in experiment_config_all.keys()):
-            log.error("Cannot find experiment settings for {0} in {1}".format(ENV, experiment_file_path))
+            self.log.error("Cannot find experiment settings for {0} in {1}".format(ENV, experiment_file_path))
             sys.exit(1)
 
         experiment_config = experiment_config_all[ENV]
@@ -43,69 +44,48 @@ class StickyCommentExperimentController:
             if key not in experiment_config.keys():
                 self.log.error("Value missing from {0}: {1}".format(experiment_file_path, key))
                 sys.exit(1)
-
+        
         experiment = self.db_session.query(Experiment).filter(Experiment.name == experiment_name).first()
         if(experiment is None):
-            ## LOAD RANDOMIZED CONDITIONS (see CivilServant-Analysis)
-            with open(os.path.join(BASE_DIR, "config", "experiments", experiment_config['ama_conditions']), "r") as f:
-                reader = csv.DictReader(f)
-                ama_conditions = []
-                for row in reader:
-                    ama_conditions.append(row)
 
-            with open(os.path.join(BASE_DIR, "config", "experiments", experiment_config['nonama_conditions']), "r") as f:
-                reader = csv.DictReader(f)
-                nonama_conditions = []
-                for row in reader:
-                    nonama_conditions.append(row)
-            
-            settings = {
-                "ama_comment_text": experiment_config['ama_comment_text'],
-                "nonama_comment_text": experiment_config['nonama_comment_text'],
-                "username": experiment_config['username'],
-                "subreddit": experiment_config['subreddit'],
-                "subreddit_id": experiment_config['subreddit_id'],
-                "max_eligibility_age": experiment_config['max_eligibility_age'],
-                "next_ama_condition":  0,
-                "ama_conditions": ama_conditions,
-                "next_nonama_condition": 0,
-                "nonama_conditions": nonama_conditions
-            }
+            condition_keys = []
+
+            ## LOAD RANDOMIZED CONDITIONS (see CivilServant-Analysis)
+            for condition in experiment_config['conditions'].values():
+                with open(os.path.join(BASE_DIR, "config", "experiments", condition['randomizations']), "r") as f:
+                    reader = csv.DictReader(f)
+                    randomizations = []
+                    for row in reader:
+                        randomizations.append(row)
+                        condition['randomizations']  = randomizations
+
             experiment = Experiment(
                 name = experiment_name,
-                controller = "StickyCommentExperimentController",
+                controller = self.__class__.__name__,
                 start_time = parser.parse(experiment_config['start_time']),
                 end_time = parser.parse(experiment_config['end_time']),
-                settings_json = json.dumps(settings)
+                settings_json = json.dumps(experiment_config)
             )
             self.db_session.add(experiment)
             self.db_session.commit()
         
         ### SET UP INSTANCE PROPERTIES
         self.experiment = experiment
-        experiment_settings = json.loads(self.experiment.settings_json)
+        self.experiment_settings = json.loads(self.experiment.settings_json)
         
-        self.ama_conditions        = experiment_settings['ama_conditions']
-        self.nonama_conditions     = experiment_settings['nonama_conditions']
-        self.next_ama_condition    = experiment_settings['next_ama_condition']
-        self.next_nonama_condition = experiment_settings['next_nonama_condition']
 
         self.experiment_name = experiment_name
 
         self.subreddit = experiment_config['subreddit']
         self.subreddit_id = experiment_config['subreddit_id']
         self.username = experiment_config['username']
-        self.ama_comment_text = experiment_config['ama_comment_text']
-        self.nonama_comment_text = experiment_config['nonama_comment_text']
         self.max_eligibility_age = experiment_config['max_eligibility_age']
         self.min_eligibility_age = experiment_config['min_eligibility_age']
-        self.r = r
 
         ## LOAD SUBREDDIT PAGE CONTROLLER
         self.subreddit_page_controller = SubredditPageController(self.subreddit,self.db_session, self.r, self.log)
 
     ## main scheduled job
-    ## TODO: TEST THIS METHOD IN UNIT TESTS
     def update_experiment(self):
         eligible_submissions = {}
         for submission in self.get_eligible_objects():
@@ -113,11 +93,12 @@ class StickyCommentExperimentController:
         
         rvals = []
         for experiment_thing in self.assign_randomized_conditions(eligible_submissions.values()):
-            condition = int(json.loads(experiment_thing.metadata_json)['condition']['treatment'])
-            if(condition == 1):
-                rval = self.make_sticky_post(eligible_submissions[experiment_thing.id])
-            elif(condition == 0):
-                rval = self.make_control_nonaction(eligible_submissions[experiment_thing.id])
+            condition = json.loads(experiment_thing.metadata_json)['condition']
+            randomization = json.loads(experiment_thing.metadata_json)['randomization']
+            arm_label = "arm_"+str(randomization['treatment'])
+            intervene = getattr(self, "intervene_" + condition + "_" + arm_label)
+            rval = intervene(experiment_thing, eligible_submissions[experiment_thing.id])
+ 
             if(rval is not None):
                 rvals.append(rval)
         return rvals
@@ -141,9 +122,14 @@ class StickyCommentExperimentController:
                     submission.id))            
                 return False
 
+        ## possible comment texts to avoid
+        all_experiment_messages = []
+        for label,condition in self.experiment_settings['conditions'].items():
+            all_experiment_messages = all_experiment_messages + list(condition['arms'].values())
+
         ## Avoid Acting if an identical sticky comment already exists
         for comment in submission.comments:
-            if(comment.stickied and (comment.body == self.ama_comment_text or comment.body == self.nonama_comment_text)):
+            if(comment.stickied and (comment.body in all_experiment_messages)):
                 self.log.info("Experiment {0} post {1} already has a sticky comment {2}".format(
                     self.experiment_name, 
                     submission.id,
@@ -169,52 +155,49 @@ class StickyCommentExperimentController:
             return False
         return True
 
-    def make_control_nonaction(self, submission):
+    def make_control_nonaction(self, experiment_thing, submission):
         if(self.submission_acceptable(submission) == False):
             return None
+
+        #TODO: ADD ARM AND CONDITION
+        metadata      = json.loads(experiment_thing.metadata_json)
+        randomization = metadata['randomization']
+        condition     = metadata['condition']
+        
         experiment_action = ExperimentAction(
             experiment_id = self.experiment.id,
             praw_key_id = PrawKey.get_praw_id(ENV, self.experiment_name),
             action = "Intervention",
             action_object_type = ThingType.SUBMISSION.value,
             action_object_id = submission.id,
-            metadata_json = json.dumps({"group":"control"})
+            metadata_json = json.dumps({"group":"control", "condition":condition, "arm":"arm_" + str(randomization)})
         )
         self.db_session.add(experiment_action)
         self.db_session.commit()
-        self.log.info("Experiment {0} applied control condition to post {1}".format(
+        self.log.info("Experiment {0} applied arm {1} to post {2} (condition = {3})".format(
             self.experiment_name, 
-            submission.id
+            randomization,
+            submission.id,
+            condition
         ))
         return experiment_action.id
 
-    def is_ama(self, submission):
-        flair = []
-        if submission.json_dict['link_flair_css_class']:
-            flair = submission.json_dict['link_flair_css_class'].split()
-        ama = False
-        if "ama" in flair:
-            ama = True
-        return ama
-
-    def make_sticky_post(self, submission):
+    def make_sticky_post(self, experiment_thing, submission):
         if(self.submission_acceptable(submission) == False):
             return None
 
-        ## FIRST STEP: DETERMINE AMA STATUS
-        ## TODO: refactor to check this only once
-        is_ama = self.is_ama(submission)
-        if(is_ama):
-            comment_text = self.ama_comment_text
-        else:
-            comment_text = self.nonama_comment_text     
+        metadata = json.loads(experiment_thing.metadata_json)
+        randomization = metadata['randomization']
+        condition     = metadata['condition']
+        comment_text  = self.experiment_settings['conditions'][condition]['arms']['arm_'+str(randomization)]
 
         comment = submission.add_comment(comment_text)
         distinguish_results = comment.distinguish(sticky=True)
-        self.log.info("Experiment {0} applied treatment to post {1} (AMA = {2}). Result: {3}".format(
-            self.experiment_name, 
+        self.log.info("Experiment {0} applied arm {1} to post {2} (condition = {3}). Result: {4}".format(
+            self.experiment_name,
+            randomization, 
             submission.id,
-            is_ama,
+            condition,
             str(distinguish_results)
         ))
 
@@ -226,7 +209,8 @@ class StickyCommentExperimentController:
             action = "Intervention",
             action_object_type = ThingType.SUBMISSION.value,
             action_object_id = submission.id,
-            metadata_json = json.dumps({"group":"treatment", 
+            metadata_json = json.dumps({"group":"treatment", "condition":condition,
+                "arm":"arm_" + str(randomization),
                 "action_object_created_utc":comment.created_utc})
         )
 
@@ -235,7 +219,9 @@ class StickyCommentExperimentController:
             object_created = datetime.datetime.fromtimestamp(comment.created_utc),
             object_type = ThingType.COMMENT.value,
             id = comment.id,
-            metadata_json = json.dumps({"group":"treatment","submission_id":submission.id})
+            metadata_json = json.dumps({"group":"treatment", "arm":"arm_"+str(randomization),
+                                        "condition":condition,
+                                        "submission_id":submission.id})
         )
 
         self.db_session.add(comment_thing)
@@ -288,62 +274,52 @@ class StickyCommentExperimentController:
 
         return eligible_submissions
 
-    ## SEED CAN BE PASSED TO THE METHOD, TO AID IN UNIT TESTING
     def assign_randomized_conditions(self, submissions):
         if(submissions is None or len(submissions)==0):
             return []
-
         ## Assign experiment condition to objects
         experiment_things = []
         for submission in submissions:
-            no_conditions_remain = False
-            if(self.is_ama(submission)):
-                try:
-                    condition = self.ama_conditions[self.next_ama_condition]
-                    self.next_ama_condition += 1
-                except:
-                    self.log.error("Experiment {0} has used its full stock of {1} AMA conditions. Cannot assign any further.".format(
-                        self.experiment.name,
-                        len(self.ama_conditions)
-                    ))
-                    no_conditions_remain = True
-            else:
-                try:
-                    condition = self.nonama_conditions[self.next_nonama_condition]
-                    self.next_nonama_condition += 1
-                except:
-                    self.log.error("Experiment {0} has used its full stock of {1} non-AMA conditions. Cannot assign any further.".format(
-                        self.experiment.name,
-                        len(self.nonama_conditions)
-                    ))
-                    no_conditions_remain = True
-
-            if(no_conditions_remain):
+            label = self.identify_condition(submission)
+            if(label is None):
                 continue
-            metadata = {}
-            metadata['block.id']    = condition['block.id']
-            metadata['block.size']  = int(condition['block.size'])
-            metadata['condition']   = int(condition['treatment'])
 
+            no_randomizations_remain = False
+
+            condition = self.experiment_settings['conditions'][label]
+            try:
+                randomization = condition['randomizations'][condition['next_randomization']]
+                self.experiment_settings['conditions'][label]['next_randomization'] += 1
+            except:
+                self.log.error("Experiment {0} has used its full stock of {1} {2} conditions. Cannot assign any further.".format(
+                    self.experiment.name,
+                    len(condition['randomizations']),
+                    label
+                ))
+                no_randomizations_remain = True
+
+            if(no_randomizations_remain):
+                continue
+                
             experiment_thing = ExperimentThing(
                 id             = submission.id,
                 object_type    = ThingType.SUBMISSION.value,
                 experiment_id  = self.experiment.id,
                 object_created = datetime.datetime.fromtimestamp(submission.created_utc),
-                metadata_json  = json.dumps({"condition":condition})
+                metadata_json  = json.dumps({"randomization":randomization, "condition":label})
             )
             self.db_session.add(experiment_thing)
             experiment_things.append(experiment_thing)
-        
-        ##UPDATE THE EXPERIMENT RECORD
-        experiment_settings = json.loads(self.experiment.settings_json)
-        experiment_settings['next_ama_condition'] = self.next_ama_condition
-        experiment_settings['next_nonama_condition'] = self.next_nonama_condition
-        self.experiment.settings_json = json.dumps(experiment_settings)
-
-        self.log.info("Experiment {0}: assigned conditions to {1} submissions".format(self.experiment.name,len(experiment_things)))
+            
+        self.experiment.settings_json = json.dumps(self.experiment_settings)
         self.db_session.commit()
+        self.log.info("Experiment {0}: assigned conditions to {1} submissions".format(self.experiment.name,len(experiment_things)))
         return experiment_things
+
+        
+    #######################################################
+    ## CODE FOR REMOVING REPLIES TO STICKY COMMENTS
+    #######################################################
 
     def get_replies_for_removal(self, comment_objects):
         replies_for_removal = []
@@ -362,10 +338,12 @@ class StickyCommentExperimentController:
     def get_all_experiment_comment_replies(self):
         experiment_comments = self.get_all_experiment_comments()
         experiment_comment_ids = [x.id for x in experiment_comments]
+        
         comment_tree = Comment.get_comment_tree(self.db_session, sqlalchemyfilter = and_(
             Comment.subreddit_id == self.subreddit_id,
             Comment.created_at >= self.experiment.start_time,
             Comment.created_at <= self.experiment.end_time)) 
+        
         experiment_comment_tree = [x for x in comment_tree['all_toplevel'].values() if x.id in experiment_comment_ids]
         
         all_experiment_comment_replies = []
@@ -409,4 +387,63 @@ class StickyCommentExperimentController:
             treatments = len(parent_submission_ids),
             removed = len(removed_comment_ids) 
         ))       
-        return len(removed_comment_ids)     
+        return len(removed_comment_ids)
+
+    ## IDENTIFY THE CONDITION, IF ANY, THAT APPLIES TO THIS OBSERVATION
+    ## THIS METHOD SHOULD SUPPORT CASES WHERE THERE ARE MULTIPLE CONDITIONS, INCLUSIVE
+    ## OR WHERE ONLY SOME OBSERVATIONS SHOULD BE PART OF THE EXPERIMENT
+    ## RETURN: LABEL NAME FOR THE CONDITION IN QUESTION
+    def identify_condition(self, submission):
+        for label in self.experiment_settings['conditions'].keys():
+            detection_method = getattr(self, "identify_"+label)
+            if(detection_method(submission)):
+                return label
+        return None
+
+class AMAStickyCommentExperimentController(StickyCommentExperimentController):
+    def __init__(self, experiment_name, db_session, r, log):
+        required_keys = ['subreddit', 'subreddit_id', 'username', 
+                         'start_time', 'end_time',
+                         'max_eligibility_age', 'min_eligibility_age',
+                         'conditions']
+        
+        super().__init__(experiment_name, db_session, r, log, required_keys)
+
+
+    ###############################
+    ### EXPERIMENT-SPECIFIC METHODS
+
+    def is_ama(self, submission):
+        flair = []
+        if submission.json_dict['link_flair_css_class']:
+            flair = submission.json_dict['link_flair_css_class'].split()
+        ama = False
+        if "ama" in flair:
+            ama = True
+        return ama
+
+    def identify_ama(self, submission):
+        return self.is_ama(submission)
+
+    def identify_nonama(self, submission):
+        return self.is_ama(submission) != True
+
+    ## CONTROL GROUP (AMA)
+    def intervene_nonama_arm_0(self, experiment_thing, submission):
+        self.make_control_nonaction(experiment_thing, submission)
+        
+    ## TREATMENT GROUP (AMA)
+    def intervene_nonama_arm_1(self, experiment_thing, submission):
+        pass
+
+    ## CONTROL GROUP (NONAMA)
+    def intervene_ama_arm_0(self, experiment_thing, submission):
+        self.make_control_nonaction(experiment_thing, submission)
+    
+    ## TREATMENT GROUP (NONAMA)
+    def intervene_ama_arm_1(self, experiment_thing, submission):
+        pass
+
+
+
+
