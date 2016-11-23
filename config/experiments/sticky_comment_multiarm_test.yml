@@ -1,0 +1,66 @@
+development:
+  subreddit: natematias
+  subreddit_id: 3940b
+  username: CivilServantBot
+  conditions:
+    considered_domain:
+        randomizations: sticky_comment_multiarm.randomizations.csv
+        next_randomization: 0 
+        matched_domains: 
+            - dailymail.co.uk
+            - express.co.uk
+            - mirror.co.uk
+            - news.com.au
+            - nypost.com
+            - thesun.co.uk
+            - dailystar.co.uk
+            - metro.co.uk
+        arms:
+            arm_0: null
+            arm_1: |
+                Users often report submissions from this site and ask us to ban it for sensationalized articles. At /r/worldnews, we oppose blanket banning any news source. Readers have a responsibility to be skeptical, check sources, and comment on any flaws.
+
+                **Help improve this thread by linking to media that verifies or questions this article's claims.** With over 13 million subscribers, your link could help readers better understand this issue.
+            arm_2: |
+                Users often report submissions from this site and ask us to ban it for sensationalized articles. At /r/worldnews, we oppose blanket banning any news source. Readers have a responsibility to be skeptical, check sources, and comment on any flaws.
+
+                **Help improve this thread by linking to media that verify or question this article's claims.** With over 13 million subscribers, your link could help readers better understand this issue. **If you can't independently verify these claims, please consider downvoting.**
+  controller: SubsetStickyCommentExperimentController
+  start_time: 06/25/2016 00:00:00 UTC
+  end_time: 12/30/2020 23:59:59 UTC
+  max_eligibility_age: 300
+  min_eligibility_age: 120
+
+test:
+  subreddit: natematias
+  subreddit_id: 3940b
+  username: CivilServantBot
+  conditions:
+    considered_domain:
+        randomizations: sticky_comment_multiarm.randomizations.csv
+        next_randomization: 0 
+        matched_domains: 
+            - dailymail.co.uk
+            - express.co.uk
+            - mirror.co.uk
+            - news.com.au
+            - nypost.com
+            - thesun.co.uk
+            - dailystar.co.uk
+            - metro.co.uk
+        arms:
+            arm_0: null
+            arm_1: |
+                Users often report submissions from this site and ask us to ban it for sensationalized articles. At /r/worldnews, we oppose blanket banning any news source. Readers have a responsibility to be skeptical, check sources, and comment on any flaws.
+
+                **Help improve this thread by linking to media that verifies or questions this article's claims.** With over 13 million subscribers, your link could help readers better understand this issue.
+            arm_2: |
+                Users often report submissions from this site and ask us to ban it for sensationalized articles. At /r/worldnews, we oppose blanket banning any news source. Readers have a responsibility to be skeptical, check sources, and comment on any flaws.
+
+                **Help improve this thread by linking to media that verify or question this article's claims.** With over 13 million subscribers, your link could help readers better understand this issue. **If you can't independently verify these claims, please consider downvoting.**
+  controller: SubsetStickyCommentExperimentController
+  start_time: 06/25/2016 00:00:00 UTC
+  end_time: 12/30/2020 23:59:59 UTC
+  max_eligibility_age: 300
+  min_eligibility_age: 120
+

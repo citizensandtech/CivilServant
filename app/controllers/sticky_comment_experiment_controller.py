@@ -159,9 +159,8 @@ class StickyCommentExperimentController:
         if(self.submission_acceptable(submission) == False):
             return None
 
-        #TODO: ADD ARM AND CONDITION
         metadata      = json.loads(experiment_thing.metadata_json)
-        randomization = metadata['randomization']
+        treatment_arm = int(metadata['randomization']['treatment'])
         condition     = metadata['condition']
         
         experiment_action = ExperimentAction(
@@ -170,13 +169,13 @@ class StickyCommentExperimentController:
             action = "Intervention",
             action_object_type = ThingType.SUBMISSION.value,
             action_object_id = submission.id,
-            metadata_json = json.dumps({"group":"control", "condition":condition, "arm":"arm_" + str(randomization)})
+            metadata_json = json.dumps({"group":"control", "condition":condition, "arm": "arm_"+str(treatment_arm)})
         )
         self.db_session.add(experiment_action)
         self.db_session.commit()
         self.log.info("Experiment {0} applied arm {1} to post {2} (condition = {3})".format(
             self.experiment_name, 
-            randomization,
+            treatment_arm,
             submission.id,
             condition
         ))
@@ -187,15 +186,16 @@ class StickyCommentExperimentController:
             return None
 
         metadata = json.loads(experiment_thing.metadata_json)
-        randomization = metadata['randomization']
+        treatment_arm = int(metadata['randomization']['treatment'])
         condition     = metadata['condition']
-        comment_text  = self.experiment_settings['conditions'][condition]['arms']['arm_'+str(randomization)]
+
+        comment_text  = self.experiment_settings['conditions'][condition]['arms']["arm_" + str(treatment_arm)]
 
         comment = submission.add_comment(comment_text)
         distinguish_results = comment.distinguish(sticky=True)
         self.log.info("Experiment {0} applied arm {1} to post {2} (condition = {3}). Result: {4}".format(
             self.experiment_name,
-            randomization, 
+            treatment_arm, 
             submission.id,
             condition,
             str(distinguish_results)
@@ -210,7 +210,8 @@ class StickyCommentExperimentController:
             action_object_type = ThingType.SUBMISSION.value,
             action_object_id = submission.id,
             metadata_json = json.dumps({"group":"treatment", "condition":condition,
-                "arm":"arm_" + str(randomization),
+                "arm":"arm_" + str(treatment_arm),
+                "randomization": metadata['randomization'],
                 "action_object_created_utc":comment.created_utc})
         )
 
@@ -219,8 +220,9 @@ class StickyCommentExperimentController:
             object_created = datetime.datetime.fromtimestamp(comment.created_utc),
             object_type = ThingType.COMMENT.value,
             id = comment.id,
-            metadata_json = json.dumps({"group":"treatment", "arm":"arm_"+str(randomization),
+            metadata_json = json.dumps({"group":"treatment", "arm":"arm_"+str(treatment_arm),
                                         "condition":condition,
+                                        "randomization": metadata['randomization'],
                                         "submission_id":submission.id})
         )
 
@@ -300,7 +302,6 @@ class StickyCommentExperimentController:
 
             if(no_randomizations_remain):
                 continue
-                
             experiment_thing = ExperimentThing(
                 id             = submission.id,
                 object_type    = ThingType.SUBMISSION.value,
@@ -430,20 +431,40 @@ class AMAStickyCommentExperimentController(StickyCommentExperimentController):
 
     ## CONTROL GROUP (AMA)
     def intervene_nonama_arm_0(self, experiment_thing, submission):
-        self.make_control_nonaction(experiment_thing, submission)
+        return self.make_control_nonaction(experiment_thing, submission)
         
     ## TREATMENT GROUP (AMA)
     def intervene_nonama_arm_1(self, experiment_thing, submission):
-        pass
+        return self.make_sticky_post(experiment_thing, submission)
 
     ## CONTROL GROUP (NONAMA)
     def intervene_ama_arm_0(self, experiment_thing, submission):
-        self.make_control_nonaction(experiment_thing, submission)
+        return self.make_control_nonaction(experiment_thing, submission)
     
     ## TREATMENT GROUP (NONAMA)
     def intervene_ama_arm_1(self, experiment_thing, submission):
-        pass
+        return self.make_sticky_post(experiment_thing, submission)
 
 
 
+class SubsetStickyCommentExperimentController(StickyCommentExperimentController):
+    def __init__(self, experiment_name, db_session, r, log):
+        required_keys = ['subreddit', 'subreddit_id', 'username', 
+                         'start_time', 'end_time',
+                         'max_eligibility_age', 'min_eligibility_age',
+                         'conditions']
+        
+        super().__init__(experiment_name, db_session, r, log, required_keys)
 
+    def identify_considered_domain(self, submission):
+        return submission.domain in self.experiment_settings['conditions']['considered_domain']['matched_domains']
+
+    def intervene_considered_domain_arm_0(self, experiment_thing, submission):
+        return self.make_control_nonaction(experiment_thing, submission)
+    
+    def intervene_considered_domain_arm_1(self, experiment_thing, submission):
+        return self.make_sticky_post(experiment_thing, submission)
+
+    def intervene_considered_domain_arm_2(self, experiment_thing, submission):
+        return self.make_sticky_post(experiment_thing, submission)
+    

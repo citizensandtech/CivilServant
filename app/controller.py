@@ -1,4 +1,4 @@
-import inspect, os, sys
+import inspect, os, sys, yaml
 import simplejson as json
 import reddit.connection
 import app.controllers.front_page_controller
@@ -73,8 +73,23 @@ def fetch_last_thousand_comments(subreddit_name):
     cc.archive_last_thousand_comments(subreddit_name)
 
 def conduct_sticky_comment_experiment(experiment_name):
+    experiment_file_path = os.path.join(BASE_DIR, "config", "experiments", experiment_name) + ".yml"
+    with open(experiment_file_path, 'r') as f:
+        try:
+            experiment_config_all = yaml.load(f)
+        except yaml.YAMLError as exc:
+            self.log.error("Failure loading experiment yaml {0}".format(experiment_file_path), str(exc))
+            sys.exit(1)
+
+    if(ENV not in experiment_config_all.keys()):
+        self.log.error("Cannot find experiment settings for {0} in {1}".format(ENV, experiment_file_path))
+        sys.exit(1)
+
+    experiment_config = experiment_config_all[ENV]
+
+    c = getattr(app.controllers.sticky_comment_experiment_controller, experiment_config['controller'])
     r = conn.connect(controller=experiment_name)    
-    sce = app.controllers.sticky_comment_experiment_controller.StickyCommentExperimentController(
+    sce = c(        
         experiment_name = experiment_name,
         db_session = db_session,
         r = r,
