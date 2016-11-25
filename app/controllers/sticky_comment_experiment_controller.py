@@ -103,8 +103,7 @@ class StickyCommentExperimentController:
                 rvals.append(rval)
         return rvals
 
-    ## TODO: some of this code should be refactored
-    ## into the code for get_eligible_objects
+    ## Check the acceptability of a submission before acting
     def submission_acceptable(self, submission):
         if(submission is None):
             ## TODO: Determine what to do if you can't find the post
@@ -232,6 +231,7 @@ class StickyCommentExperimentController:
         return distinguish_results
 
     ## TODO: REDUCE THE NUMBER OF API CALLS INVOLVED
+    ## in the future possibly merge with submission_acceptable
     def get_eligible_objects(self):
         submissions = {}
         for submission in self.subreddit_page_controller.fetch_subreddit_page(PageType.NEW, return_praw_object=True):

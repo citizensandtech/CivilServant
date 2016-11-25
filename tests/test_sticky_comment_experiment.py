@@ -400,7 +400,7 @@ def test_make_sticky_post(mock_comment, mock_submission, mock_reddit):
         id = submission.id,
         object_type = ThingType.SUBMISSION.value,
         experiment_id = scec.experiment.id,
-        metadata_json = json.dumps({"randomization":1, "condition":"nonama"})            
+        metadata_json = json.dumps({"randomization":{"treatment":1, "block.id":"nonama.block001", "block.size":10}, "condition":"nonama"})            
     )
 
     ## Try to intervene
@@ -440,7 +440,11 @@ def test_make_control_nonaction(mock_comment, mock_submission, mock_reddit):
         id = submission.id,
         object_type = ThingType.SUBMISSION.value,
         experiment_id = scec.experiment.id,
-        metadata_json = json.dumps({"randomization":1, "condition":"nonama"})            
+        metadata_json = json.dumps({"randomization":{
+                                                "treatment":0, 
+                                                "block.id":"nonama.block001", 
+                                                "block.size":10}, 
+                                    "condition":"nonama"})            
     )
 
     mock_submission.created_utc = int(time.time())
@@ -453,7 +457,7 @@ def test_make_control_nonaction(mock_comment, mock_submission, mock_reddit):
     experiment_submission_metadata = json.loads(experiment_submission.metadata_json)
     assert action_metadata['group'] == "control"
     assert action_metadata['condition'] == experiment_submission_metadata['condition']
-    assert action_metadata['arm'] == "arm_" + str(experiment_submission_metadata['randomization'])
+    assert action_metadata['arm'] == "arm_" + str(experiment_submission_metadata['randomization']['treatment'])
 
     ## make sure it aborts the call if we try a second time
     sticky_result = scec.make_control_nonaction(experiment_submission, mock_submission)
@@ -504,7 +508,12 @@ def test_find_treatment_replies(mock_reddit):
                 id = submission_id,
                 object_type = ThingType.SUBMISSION.value,
                 experiment_id = scec.experiment.id,
-                metadata_json = json.dumps({"randomization":1, "condition":"nonama"})            
+                metadata_json = json.dumps({"randomization":{
+                                                "treatment":1, 
+                                                "block.id":"nonama.block001", 
+                                                "block.size":10}, 
+                                            "condition":"nonama", 
+                                            "condition":"nonama"})
             )
             db_session.add(experiment_submission)
             experiment_submissions.append(submission_id)
@@ -516,6 +525,10 @@ def test_find_treatment_replies(mock_reddit):
             metadata_json = json.dumps({"group":"treatment",
                                         "arm":"arm_1",
                                         "condition":"nonama",
+                                        "randomization":{
+                                                "treatment":1, 
+                                                "block.id":"nonama.block001", 
+                                                "block.size":10},
                                         "submission_id":submission_id})
         )
         db_session.add(experiment_comment)
@@ -530,6 +543,10 @@ def test_find_treatment_replies(mock_reddit):
             metadata_json = json.dumps({"group":"treatment",
                                         "arm":"arm_1",
                                         "condition":"nonama",
+                                        "randomization":{
+                                                "treatment":1, 
+                                                "block.id":"nonama.block001", 
+                                                "block.size":10},
                                         "action_object_created_utc":treatment_comment[3]})
         )
         db_session.add(experiment_action)
