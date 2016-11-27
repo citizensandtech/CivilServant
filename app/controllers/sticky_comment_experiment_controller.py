@@ -410,6 +410,12 @@ class StickyCommentExperimentController:
             self.db_session.query(ExperimentThing).filter(and_(
                 ExperimentThing.object_type==ThingType.SUBMISSION.value, 
                 ExperimentThing.experiment_id == self.experiment.id))]
+        if(len(submission_ids)==0):
+            self.log.info("Experiment {experiment}: Logged metadata for 0 submissions.".format(
+                experiment = self.experiment.id
+            ))       
+            return []
+
         snapshots = []
         for submission in self.r.get_info(thing_id = submission_ids):
             snapshot = {"score":submission.score,
