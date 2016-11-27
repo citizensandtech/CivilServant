@@ -37,6 +37,7 @@ def clear_all_tables():
     db_session.query(Experiment).delete()
     db_session.query(ExperimentThing).delete()
     db_session.query(ExperimentAction).delete()
+    db_session.query(ExperimentThingSnapshot).delete()
     db_session.commit()    
 
 def setup_function(function):
@@ -615,3 +616,69 @@ def test_identify_condition(mock_subreddit, mock_reddit):
 
     assert Counter(condition_list)['nonama'] == 98
     assert Counter(condition_list)['ama'] == 2
+
+
+
+@patch('praw.Reddit', autospec=True)
+@patch('praw.objects.Submission', autospec=True)
+@patch('praw.objects.Comment', autospec=True)
+def test_archive_experiment_submission_metadata(mock_comment, mock_submission, mock_reddit):
+    r = mock_reddit.return_value
+    experiment_name = "sticky_comment_0"
+
+    with open(os.path.join(BASE_DIR, "config", "experiments") + "/"+ experiment_name + ".yml", "r") as f:
+        experiment_settings = yaml.load(f.read())['test']
+
+    with open("{script_dir}/fixture_data/submission_0.json".format(script_dir=TEST_DIR)) as f:
+        submission_json = json.loads(f.read())
+        ## setting the submission time to be recent enough
+        submission = json2obj(json.dumps(submission_json))
+        mock_submission.id = submission.id
+        mock_submission.json_dict = submission.json_dict
+    
+    with open("{script_dir}/fixture_data/submission_0_comments.json".format(script_dir=TEST_DIR)) as f:
+        comments = json2obj(f.read())
+        mock_submission.comments.return_value = comments
+
+    with open("{script_dir}/fixture_data/submission_0_treatment.json".format(script_dir=TEST_DIR)) as f:
+        treatment = json2obj(f.read())
+        mock_comment.id = treatment.id
+        mock_comment.created_utc = treatment.created_utc
+        mock_submission.add_comment.return_value = mock_comment
+
+    with open("{script_dir}/fixture_data/submission_0_treatment_distinguish.json".format(script_dir=TEST_DIR)) as f:
+        distinguish = json.loads(f.read())
+        mock_comment.distinguish.return_value = distinguish
+
+    patch('praw.')
+
+    scec = AMAStickyCommentExperimentController(experiment_name, db_session, r, log)
+
+    experiment_submission = ExperimentThing(
+        id = submission.id,
+        object_type = ThingType.SUBMISSION.value,
+        experiment_id = scec.experiment.id,
+        metadata_json = json.dumps({"randomization":{"treatment":1, "block.id":"nonama.block001", "block.size":10}, "condition":"nonama"})            
+    )
+
+    ## intervene
+    mock_submission.created_utc = int(time.time())
+    assert db_session.query(ExperimentThing).filter(ExperimentThing.object_type==ThingType.COMMENT.value).count() == 0
+    sticky_result = scec.make_sticky_post(experiment_submission, mock_submission)
+    assert db_session.query(ExperimentAction).count() == 1
+    assert db_session.query(ExperimentThing).filter(ExperimentThing.object_type==ThingType.COMMENT.value).count() == 1
+    assert sticky_result is not None
+
+    ## TEST archive_experiment_submission_metadata
+    r.get_info.return_value = [submission]
+    snapshots = scec.archive_experiment_submission_metadata()
+    assert len(snapshots) == 1
+    assert db_session.query(ExperimentThingSnapshot).count()
+    ets = db_session.query(ExperimentThingSnapshot).first()
+    metadata = json.loads(ets.metadata_json)
+    assert metadata['num_reports']  == 0
+    assert metadata['score']        == 1
+    assert metadata['num_comments'] == 3
+    assert ets.experiment_id        == scec.experiment.id
+    assert ets.experiment_thing_id  == submission.id
+    assert ets.object_type          == ThingType.SUBMISSION.value

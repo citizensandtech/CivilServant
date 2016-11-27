@@ -16,7 +16,7 @@ class SubredditPageController:
         self.r = r    
   
 
-    def fetch_subreddit_page(self, pg_type, limit=100, return_praw_object=False):
+    def fetch_subreddit_page(self, pg_type, limit=200, return_praw_object=False):
         posts = []
         fetched = []
         sub = self.r.get_subreddit(self.subname)

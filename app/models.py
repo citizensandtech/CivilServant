@@ -148,6 +148,15 @@ class ExperimentThing(Base):
     object_created      = Column(DateTime)
     metadata_json       = Column(MEDIUMTEXT)
 
+class ExperimentThingSnapshot(Base):
+    __tablename__ = 'experiment_thing_snapshots'
+    id                  = Column(Integer, primary_key = True)
+    experiment_thing_id = Column(String(256), index = True)
+    created_at          = Column(DateTime, default = datetime.datetime.utcnow)
+    object_type         = Column(Integer)
+    experiment_id       = Column(Integer, index = True)
+    metadata_json       = Column(MEDIUMTEXT)
+
 class ExperimentAction(Base):
     __tablename__ = 'experiment_actions'
     id                  = Column(Integer, primary_key = True)

@@ -72,7 +72,7 @@ def fetch_last_thousand_comments(subreddit_name):
     cc = app.controllers.comment_controller.CommentController(db_session, r, log)
     cc.archive_last_thousand_comments(subreddit_name)
 
-def conduct_sticky_comment_experiment(experiment_name):
+def get_experiment_class(experiment_name):
     experiment_file_path = os.path.join(BASE_DIR, "config", "experiments", experiment_name) + ".yml"
     with open(experiment_file_path, 'r') as f:
         try:
@@ -84,10 +84,13 @@ def conduct_sticky_comment_experiment(experiment_name):
     if(ENV not in experiment_config_all.keys()):
         self.log.error("Cannot find experiment settings for {0} in {1}".format(ENV, experiment_file_path))
         sys.exit(1)
-
     experiment_config = experiment_config_all[ENV]
-
     c = getattr(app.controllers.sticky_comment_experiment_controller, experiment_config['controller'])
+    return c
+
+
+def conduct_sticky_comment_experiment(experiment_name):
+    c = get_experiment_class(experiment_name) 
     r = conn.connect(controller=experiment_name)    
     sce = c(        
         experiment_name = experiment_name,
@@ -106,3 +109,15 @@ def remove_experiment_replies(experiment_name):
         log = log
     )
     sce.remove_replies_to_treatments()
+
+def archive_experiment_submission_metadata(experiment_name):
+    r = conn.connect(controller=experiment_name)
+    c = get_experiment_class(experiment_name)
+    sce = c(
+        experiment_name = experiment_name,
+        db_session = db_session,
+        r = r,
+        log = log
+    )
+    sce.archive_experiment_submission_metadata()
+  

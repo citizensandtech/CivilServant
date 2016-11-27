@@ -18,7 +18,7 @@ def main():
                         help="The experiment")
 
     parser.add_argument("job",
-                         choices=["intervene", "tidy"],
+                         choices=["intervene", "tidy", "archive_submissions"],
                          help="The job associated with the experiment")
 
     parser.add_argument("interval",
@@ -61,6 +61,14 @@ def main():
         scheduler.schedule(
                 scheduled_time=datetime.utcnow(),
                 func=app.controller.remove_experiment_replies,
+                args=[args.experiment],
+                interval=int(args.interval),
+                repeat=None,
+                result_ttl = ttl)
+    elif(args.job == "archive_submissions"):
+        scheduler.schedule(
+                scheduled_time=datetime.utcnow(),
+                func=app.controller.archive_experiment_submission_metadata,
                 args=[args.experiment],
                 interval=int(args.interval),
                 repeat=None,
