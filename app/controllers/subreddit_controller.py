@@ -16,7 +16,7 @@ class SubredditPageController:
         self.r = r    
   
 
-    def fetch_subreddit_page(self, pg_type, limit=200, return_praw_object=False):
+    def fetch_subreddit_page(self, pg_type, limit=100, return_praw_object=False):
         posts = []
         fetched = []
         sub = self.r.get_subreddit(self.subname)
@@ -53,13 +53,12 @@ class SubredditPageController:
                     'id': new_post['id'],
                     'author': new_post['author'],
                     'num_comments': new_post['num_comments'],
-                    'downs': new_post['downs'],
-                    'ups': new_post['ups'], 
                     'subreddit_id': new_post['subreddit_id'],
-                    'score': new_post['score']                                             
+                    'score': new_post['score'],
+                    'num_reports': new_post['num_reports']                                            
                 }
                 posts.append(post)
-                json_posts.append(new_post)
+                json_posts.append(pruned_post)
                 is_new_post = self.archive_post(post.json_dict)
                 is_new_user = self.archive_user(pruned_post['author'], datetime.datetime.fromtimestamp(post.created))
             self.log.info("Saved posts from /r/{0} {1} page.".format(self.subname, pg_type.name))
