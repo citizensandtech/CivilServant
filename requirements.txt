@@ -11,3 +11,6 @@ sqlalchemy
 alembic
 ConcurrentLogHandler
 airbrake
+pyyaml
+pytz
+numpy
