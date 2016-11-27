@@ -9,7 +9,7 @@ import sqlalchemy
 from dateutil import parser
 from utils.common import *
 from app.models import Base, SubredditPage, Subreddit, Post, ModAction, PrawKey, Comment
-from app.models import Experiment, ExperimentThing, ExperimentAction
+from app.models import Experiment, ExperimentThing, ExperimentAction, ExperimentThingSnapshot
 from sqlalchemy import and_, or_
 from app.controllers.subreddit_controller import SubredditPageController
 import numpy as np
@@ -401,6 +401,42 @@ class StickyCommentExperimentController:
                 return label
         return None
 
+    #######################################################
+    ## CODE FOR QUERYING INFORMATION ABOUT EXPERIMENT OBJECTS
+    #######################################################
+
+    def archive_experiment_submission_metadata(self):
+        submission_ids = ["t3_" + thing.id for thing in 
+            self.db_session.query(ExperimentThing).filter(and_(
+                ExperimentThing.object_type==ThingType.SUBMISSION.value, 
+                ExperimentThing.experiment_id == self.experiment.id))]
+        snapshots = []
+        for submission in self.r.get_info(thing_id = submission_ids):
+            snapshot = {"score":submission.score,
+                        "num_reports":submission.num_reports,
+                        "num_comments":submission.num_comments,
+                        }
+            experiment_thing_snapshot = ExperimentThingSnapshot(
+                experiment_id = self.experiment.id,
+                experiment_thing_id = submission.id,
+                object_type = ThingType.SUBMISSION.value,
+                metadata_json = json.dumps(snapshot)
+            )
+            self.db_session.add(experiment_thing_snapshot)
+
+            snapshots.append(experiment_thing_snapshot)
+        self.db_session.commit()
+
+        self.log.info("Experiment {experiment}: Logged metadata for {submissions} submissions.".format(
+            experiment = self.experiment.id,
+            submissions = len(snapshots)
+        ))       
+
+        return snapshots
+        
+
+#### Class for experiment with different randomization for AMAs
+#### Used to test subclassess of StickyCommentExperimentController
 class AMAStickyCommentExperimentController(StickyCommentExperimentController):
     def __init__(self, experiment_name, db_session, r, log):
         required_keys = ['subreddit', 'subreddit_id', 'username', 
@@ -444,7 +480,6 @@ class AMAStickyCommentExperimentController(StickyCommentExperimentController):
     ## TREATMENT GROUP (NONAMA)
     def intervene_ama_arm_1(self, experiment_thing, submission):
         return self.make_sticky_post(experiment_thing, submission)
-
 
 
 class SubsetStickyCommentExperimentController(StickyCommentExperimentController):
