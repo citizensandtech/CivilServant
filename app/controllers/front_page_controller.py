@@ -50,9 +50,10 @@ class FrontPageController:
 
   def archive_reddit_front_page(self, pg_type = PageType.TOP):
       posts = self.fetch_reddit_front_page(pg_type)
-      front_page = FrontPage(created_at = datetime.datetime.now(),
+      front_page = FrontPage(created_at = datetime.datetime.utcnow(),
                              page_data = json.dumps(posts),
-                             page_type = pg_type.value)
+                             page_type = pg_type.value,
+                             is_utc = True)
       self.db_session.add(front_page)
       try:
         self.db_session.commit()

@@ -3,7 +3,7 @@ import os
 import sys
 import simplejson as json
 from utils.common import *
-from sqlalchemy import Column, Integer, String, Text, DateTime
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean
 from sqlalchemy.dialects.mysql import MEDIUMTEXT, LONGTEXT
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -20,6 +20,7 @@ class FrontPage(Base):
     created_at          = Column(DateTime, default=datetime.datetime.utcnow)
     page_type           = Column(Integer) # see utils/common.py
     page_data           = Column(MEDIUMTEXT)
+    is_utc              = Column(Boolean, default=False)
 
 class Subreddit(Base):
     __tablename__ = 'subreddits'
@@ -34,6 +35,7 @@ class SubredditPage(Base):
     subreddit_id        = Column(String(32))
     page_type           = Column(Integer) # see utils/common.py
     page_data           = Column(MEDIUMTEXT)
+    is_utc              = Column(Boolean, default=False)
 
 class Post(Base):
     __tablename__ = 'posts'
