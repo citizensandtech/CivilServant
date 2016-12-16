@@ -660,6 +660,8 @@ def test_archive_experiment_submission_metadata(mock_comment, mock_submission, m
         experiment_id = scec.experiment.id,
         metadata_json = json.dumps({"randomization":{"treatment":1, "block.id":"nonama.block001", "block.size":10}, "condition":"nonama"})            
     )
+    db_session.add(experiment_submission)
+    db_session.commit()
 
     ## intervene
     mock_submission.created_utc = int(time.time())
@@ -677,6 +679,8 @@ def test_archive_experiment_submission_metadata(mock_comment, mock_submission, m
     ets = db_session.query(ExperimentThingSnapshot).first()
     metadata = json.loads(ets.metadata_json)
     assert metadata['num_reports']  == 0
+    assert metadata['user_reports']  == 0
+    assert metadata['mod_reports']  == 0
     assert metadata['score']        == 1
     assert metadata['num_comments'] == 3
     assert ets.experiment_id        == scec.experiment.id

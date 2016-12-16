@@ -55,7 +55,9 @@ class SubredditPageController:
                     'num_comments': new_post['num_comments'],
                     'subreddit_id': new_post['subreddit_id'],
                     'score': new_post['score'],
-                    'num_reports': new_post['num_reports']                                            
+                    'num_reports': new_post['num_reports'],
+                    'user_reports': len(new_post['user_reports']),
+                    'mod_reports': len(new_post['mod_reports'])
                 }
                 posts.append(post)
                 json_posts.append(pruned_post)

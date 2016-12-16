@@ -420,6 +420,8 @@ class StickyCommentExperimentController:
         for submission in self.r.get_info(thing_id = submission_ids):
             snapshot = {"score":submission.score,
                         "num_reports":submission.num_reports,
+                        "user_reports":len(submission.user_reports),
+                        "mod_reports":len(submission.mod_reports),
                         "num_comments":submission.num_comments,
                         }
             experiment_thing_snapshot = ExperimentThingSnapshot(
