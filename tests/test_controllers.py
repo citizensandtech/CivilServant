@@ -86,6 +86,7 @@ def test_archive_reddit_front_page(mock_subreddit, mock_reddit):
     assert new_pages.count() == 1  
 
 
+
 """
   basic test for method archive_subreddit_page to insert timestamped pages to subreddit_pages table.
   analogous to test_archive_reddit_front_page.
@@ -546,7 +547,7 @@ def test_archive_all_missing_subreddit_post_comments(mock_submission, mock_reddi
 def test_archive_user(mock_reddit):
 
   username = "merrymou"
-  seen_at = datetime.datetime.now()
+  seen_at = datetime.datetime.utcnow()
 
   r = mock_reddit.return_value
   test_subreddit_name = "science"

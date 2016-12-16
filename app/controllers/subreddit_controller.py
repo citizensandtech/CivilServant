@@ -74,10 +74,12 @@ class SubredditPageController:
 
     def archive_subreddit_page(self, pg_type=PageType.HOT):
         posts = self.fetch_subreddit_page(pg_type, return_praw_object=False)
-        subreddit_page = SubredditPage(created_at = datetime.datetime.now(),
+        subreddit_page = SubredditPage(created_at = datetime.datetime.utcnow(),
                                 page_type = pg_type.value, 
                                 subreddit_id = posts[0]['subreddit_id'].replace("t5_",""),
-                                page_data = json.dumps(posts))
+                                page_data = json.dumps(posts),
+                                is_utc = True
+                                )
         self.db_session.add(subreddit_page)
         self.db_session.commit()
 

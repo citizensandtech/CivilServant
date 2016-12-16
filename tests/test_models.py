@@ -43,7 +43,8 @@ def populate_front_pages():
           print(type(FrontPage.page_type))
           front_page = FrontPage(created_at = first_item_timestamp,
                                  page_type = PageType.TOP.value,
-                                 page_data = json.dumps(front_page_data))
+                                 page_data = json.dumps(front_page_data),
+                                 is_utc = True)
           db_session.add(front_page)
         counter += 1
     db_session.commit()
@@ -55,6 +56,11 @@ def test_front_page(populate_front_pages):
     all_pages = db_session.query(FrontPage).all()
     assert len(all_pages) == 3
     assert len(json.loads(all_pages[0].page_data)) == 100
+
+def test_16dbde_utc_migration(populate_front_pages):
+    all_pages = db_session.query(FrontPage).all()
+    for page in all_pages:
+        assert page.is_utc == True
     
 def test_get_praw_id():
     hostname = socket.gethostname()
