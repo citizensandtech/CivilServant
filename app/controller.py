@@ -8,7 +8,7 @@ import app.controllers.moderator_controller
 import app.controllers.sticky_comment_experiment_controller
 from utils.common import PageType, DbEngine
 import app.cs_logger
-from app.models import Base, SubredditPage, Subreddit, Post, ModAction
+from app.models import Base, SubredditPage, Subreddit, Post, ModAction, Experiment
 
 
 ### LOAD ENVIRONMENT VARIABLES

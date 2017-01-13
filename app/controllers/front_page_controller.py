@@ -42,7 +42,8 @@ class FrontPageController:
             'num_comments': new_post['num_comments'],
             'downs': new_post['downs'],
             'ups': new_post['ups'], 
-            'score': new_post['score']                                             
+            'score': new_post['score'],
+            'created_utc': new_post['created_utc']
             }
           posts.append(pruned_post)
       self.log.info("Queried reddit {0} page".format(pg_type.name))

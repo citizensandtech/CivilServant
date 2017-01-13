@@ -16,7 +16,7 @@ class SubredditPageController:
         self.r = r    
   
 
-    def fetch_subreddit_page(self, pg_type, limit=100, return_praw_object=False):
+    def fetch_subreddit_page(self, pg_type, limit=300, return_praw_object=False):
         posts = []
         fetched = []
         sub = self.r.get_subreddit(self.subname)
@@ -57,7 +57,8 @@ class SubredditPageController:
                     'score': new_post['score'],
                     'num_reports': new_post['num_reports'],
                     'user_reports': len(new_post['user_reports']),
-                    'mod_reports': len(new_post['mod_reports'])
+                    'mod_reports': len(new_post['mod_reports']),
+                    'created_utc':new_post['created_utc']
                 }
                 posts.append(post)
                 json_posts.append(pruned_post)
