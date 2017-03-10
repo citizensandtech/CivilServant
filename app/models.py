@@ -172,7 +172,8 @@ class ExperimentAction(Base):
     action_object_id    = Column(String(256), index=True)
     metadata_json       = Column(MEDIUMTEXT)
 
-    
-
-
-
+#TODO mmou: finish
+#class SNote(Base):
+#    __tablename__ = 'snoonotes'
+#    id                  = Column(Integer, primary_key = True)
+#    

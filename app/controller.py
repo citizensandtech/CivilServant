@@ -1,6 +1,7 @@
 import inspect, os, sys, yaml
 import simplejson as json
 import reddit.connection
+import snoonotes.connection
 import app.controllers.front_page_controller
 import app.controllers.subreddit_controller
 import app.controllers.comment_controller
@@ -16,12 +17,15 @@ BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.
 ENV = os.environ['CS_ENV']
 
 ### LOAD SQLALCHEMY SESSION
-db_session = DbEngine(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV)).new_session()
-
+db_session = DbEngine(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV)).new_session  
 # LOAD LOGGER
 log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
+# Connect -> praw.reddit
 conn = reddit.connection.Connect()
+
+# SnooNotesConnect
+snc = snoonotes.connection.SnooNotesConnect()
 
 def fetch_reddit_front(page_type=PageType.TOP):
     r = conn.connect(controller="FetchRedditFront")
@@ -121,3 +125,7 @@ def archive_experiment_submission_metadata(experiment_name):
     )
     sce.archive_experiment_submission_metadata()
   
+#TODO: fix method name. what other methods?
+#def archive_snoonotes():
+#    sn = app.controllers.SnooNotesController(db_session, snc, log)
+#    sn.archive_all_snoonotes()

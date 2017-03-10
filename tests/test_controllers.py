@@ -702,3 +702,8 @@ def test_archive_mod_action_page(mock_reddit):
     last_action_id = mac.archive_mod_action_page(after_id = mod_action_fixtures[0][-1]['id'])
     assert db_session.query(ModAction).count() == len(mod_action_fixtures[0]) + len(mod_action_fixtures[1])
     assert last_action_id == mod_action_fixtures[1][-1]['id']
+
+# TODO: make snoonotes tests once we have controller methods
+#def test_archive_mod_action_page(mock_snoonotes):
+#    r = mock_reddit.return_value
+#    log = app.cs_logger.get_logger(ENV, BASE_DIR)

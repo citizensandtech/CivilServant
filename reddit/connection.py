@@ -2,11 +2,10 @@ import praw
 from praw.handlers import MultiprocessHandler
 import pickle
 import os, inspect
-from app.models import PrawKey
+from app.models import Base, PrawKey
 import simplejson as json
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from app.models import Base
 import sqlalchemy
 from utils.common import DbEngine
 
