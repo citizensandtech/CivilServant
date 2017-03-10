@@ -1,7 +1,7 @@
 import requests
 import pickle
 import os, inspect
-from app.models import Base, SNote
+from app.models import Base
 import simplejson as json
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
