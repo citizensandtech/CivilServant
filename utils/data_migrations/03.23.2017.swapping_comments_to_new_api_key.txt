@@ -1,0 +1,9 @@
+Step one: export CS_ENV=CivilServantBot2
+Step two: ln -s config/produciton.json config/CivilServantBot2.json
+Step three: linked second account with set_up_auth.py
+Step four: ran get_latest_science_posts.py
+Step five: ran the following SQL queries:
+
+UPDATE praw_keys SET id="pitkin:production.old:FetchComments" WHERE id="pitkin:production:FetchComments";
+UPDATE praw_keys SET id="pitkin:production:FetchComments" WHERE id="pitkin:CivilServantBot2:GetTopScience";
+
