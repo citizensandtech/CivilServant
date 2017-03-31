@@ -1,0 +1,8 @@
+#1 mkdir ~/CivilServant-backups/migrations
+#2 03.30.2017.query.is_utc.sh 
+#2 (alt) copy tables over from live backup machine, into ~/CivilServant-backups/migrations/
+#3 export CS_ENV=production
+#4 run first four queries from  03.30.2017.apply.is_utc.migration.sql
+#5 python 03.30.2017.load.is_utc.csvs.to.tables.py
+#6 run the final two queries from 03.30.2017.apply.is_utc.migration.sql
+
