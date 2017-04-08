@@ -172,8 +172,26 @@ class ExperimentAction(Base):
     action_object_id    = Column(String(256), index=True)
     metadata_json       = Column(MEDIUMTEXT)
 
-#TODO mmou: finish
-#class SNote(Base):
-#    __tablename__ = 'snoonotes'
-#    id                  = Column(Integer, primary_key = True)
-#    
+"""
+class UserSnapshot
+
+#TODO mmou: proposed 
+class SnooNote(Base):
+    __tablename__ = 'snoonotes'
+    id                  = Column(Integer, primary_key = True)
+    recipient_user_id   = Column(String(32), index = True)
+    created_at          = Column(DateTime)
+    submitter           = Column(String(32))
+    parent_subreddit    = Column(String(32))    # often null?
+    subreddit_name      = Column(String(32))
+    note_type           = Column(Integer)
+    schema_id           = Column(Integer, index = True)
+    note_data           = Column(MEDIUMTEXT)
+
+class SnooSchema(Base):
+    __tablename__ = 'snooschema'
+    id                  = Column(Integer, primary_key = True)   # "NoteTypeID"
+    timestamp
+    subreddit_name
+    schema_data         = Column(MEDIUMTEXT)
+"""

@@ -1,1 +1,192 @@
-[{"SubName": "CivilServantBot", "BotSettings": null, "SubredditID": 74, "Settings": {"TempBanID": null, "PermBanID": null, "NoteTypes": [{"DisplayName": "None", "Italic": false, "SubName": "CivilServantBot", "Bold": false, "DisplayOrder": 0, "NoteTypeID": 556, "ColorCode": "369"}, {"DisplayName": "Good Contributor", "Italic": false, "SubName": "CivilServantBot", "Bold": false, "DisplayOrder": 1, "NoteTypeID": 557, "ColorCode": "008000"}, {"DisplayName": "Spam Watch", "Italic": false, "SubName": "CivilServantBot", "Bold": false, "DisplayOrder": 2, "NoteTypeID": 558, "ColorCode": "FF00FF"}, {"DisplayName": "Spam Warning", "Italic": false, "SubName": "CivilServantBot", "Bold": false, "DisplayOrder": 3, "NoteTypeID": 559, "ColorCode": "800080"}, {"DisplayName": "Abuse Warning", "Italic": false, "SubName": "CivilServantBot", "Bold": false, "DisplayOrder": 4, "NoteTypeID": 560, "ColorCode": "FFA500"}, {"DisplayName": "Ban", "Italic": false, "SubName": "CivilServantBot", "Bold": false, "DisplayOrder": 5, "NoteTypeID": 561, "ColorCode": "FF0000"}, {"DisplayName": "Perma Ban", "Italic": false, "SubName": "CivilServantBot", "Bold": false, "DisplayOrder": 6, "NoteTypeID": 562, "ColorCode": "8B0000"}, {"DisplayName": "Bot Ban", "Italic": false, "SubName": "CivilServantBot", "Bold": false, "DisplayOrder": 7, "NoteTypeID": 563, "ColorCode": "000000"}], "AccessMask": 64}, "Active": true}, {"SubName": "natematias", "BotSettings": null, "SubredditID": 75, "Settings": {"TempBanID": null, "PermBanID": null, "NoteTypes": [{"DisplayName": "None", "Italic": false, "SubName": "natematias", "Bold": false, "DisplayOrder": 0, "NoteTypeID": 564, "ColorCode": "369"}, {"DisplayName": "Good Contributor", "Italic": false, "SubName": "natematias", "Bold": false, "DisplayOrder": 1, "NoteTypeID": 565, "ColorCode": "008000"}, {"DisplayName": "Spam Watch", "Italic": false, "SubName": "natematias", "Bold": false, "DisplayOrder": 2, "NoteTypeID": 566, "ColorCode": "FF00FF"}, {"DisplayName": "Spam Warning", "Italic": false, "SubName": "natematias", "Bold": false, "DisplayOrder": 3, "NoteTypeID": 567, "ColorCode": "800080"}, {"DisplayName": "Abuse Warning", "Italic": false, "SubName": "natematias", "Bold": false, "DisplayOrder": 4, "NoteTypeID": 568, "ColorCode": "FFA500"}, {"DisplayName": "Ban", "Italic": false, "SubName": "natematias", "Bold": false, "DisplayOrder": 5, "NoteTypeID": 569, "ColorCode": "FF0000"}, {"DisplayName": "Perma Ban", "Italic": false, "SubName": "natematias", "Bold": false, "DisplayOrder": 6, "NoteTypeID": 570, "ColorCode": "8B0000"}, {"DisplayName": "Bot Ban", "Italic": false, "SubName": "natematias", "Bold": false, "DisplayOrder": 7, "NoteTypeID": 571, "ColorCode": "000000"}, {"DisplayName": "Extraterrestrial", "Italic": false, "SubName": "natematias", "Bold": true, "DisplayOrder": 8, "NoteTypeID": 612, "ColorCode": "00F"}], "AccessMask": 64}, "Active": true}]
+[
+
+    {
+        "SubredditID": 74,
+        "SubName": "CivilServantBot",
+        "Active": true,
+        "BotSettings": null,
+        "Settings": {
+            "AccessMask": 64,
+            "NoteTypes": [
+                {
+                    "NoteTypeID": 556,
+                    "SubName": "CivilServantBot",
+                    "DisplayName": "None",
+                    "ColorCode": "369",
+                    "DisplayOrder": 0,
+                    "Bold": false,
+                    "Italic": false
+                },
+                {
+                    "NoteTypeID": 557,
+                    "SubName": "CivilServantBot",
+                    "DisplayName": "Good Contributor",
+                    "ColorCode": "008000",
+                    "DisplayOrder": 1,
+                    "Bold": false,
+                    "Italic": false
+                },
+                {
+                    "NoteTypeID": 558,
+                    "SubName": "CivilServantBot",
+                    "DisplayName": "Spam Watch",
+                    "ColorCode": "FF00FF",
+                    "DisplayOrder": 2,
+                    "Bold": false,
+                    "Italic": false
+                },
+                {
+                    "NoteTypeID": 559,
+                    "SubName": "CivilServantBot",
+                    "DisplayName": "Spam Warning",
+                    "ColorCode": "800080",
+                    "DisplayOrder": 3,
+                    "Bold": false,
+                    "Italic": false
+                },
+                {
+                    "NoteTypeID": 560,
+                    "SubName": "CivilServantBot",
+                    "DisplayName": "Abuse Warning",
+                    "ColorCode": "FFA500",
+                    "DisplayOrder": 4,
+                    "Bold": false,
+                    "Italic": false
+                },
+                {
+                    "NoteTypeID": 561,
+                    "SubName": "CivilServantBot",
+                    "DisplayName": "Ban",
+                    "ColorCode": "FF0000",
+                    "DisplayOrder": 5,
+                    "Bold": false,
+                    "Italic": false
+                },
+                {
+                    "NoteTypeID": 562,
+                    "SubName": "CivilServantBot",
+                    "DisplayName": "Perma Ban",
+                    "ColorCode": "8B0000",
+                    "DisplayOrder": 6,
+                    "Bold": false,
+                    "Italic": false
+                },
+                {
+                    "NoteTypeID": 563,
+                    "SubName": "CivilServantBot",
+                    "DisplayName": "Bot Ban",
+                    "ColorCode": "000000",
+                    "DisplayOrder": 7,
+                    "Bold": false,
+                    "Italic": false
+                }
+            ],
+            "PermBanID": null,
+            "TempBanID": null
+        }
+    },
+    {
+        "SubredditID": 75,
+        "SubName": "natematias",
+        "Active": true,
+        "BotSettings": null,
+        "Settings": {
+            "AccessMask": 64,
+            "NoteTypes": [
+                {
+                    "NoteTypeID": 564,
+                    "SubName": "natematias",
+                    "DisplayName": "None",
+                    "ColorCode": "369",
+                    "DisplayOrder": 0,
+                    "Bold": false,
+                    "Italic": false
+                },
+                {
+                    "NoteTypeID": 565,
+                    "SubName": "natematias",
+                    "DisplayName": "Good Contributor",
+                    "ColorCode": "008000",
+                    "DisplayOrder": 1,
+                    "Bold": false,
+                    "Italic": false
+                },
+                {
+                    "NoteTypeID": 566,
+                    "SubName": "natematias",
+                    "DisplayName": "Spam Watch",
+                    "ColorCode": "FF00FF",
+                    "DisplayOrder": 2,
+                    "Bold": false,
+                    "Italic": false
+                },
+                {
+                    "NoteTypeID": 567,
+                    "SubName": "natematias",
+                    "DisplayName": "Spam Warning",
+                    "ColorCode": "800080",
+                    "DisplayOrder": 3,
+                    "Bold": false,
+                    "Italic": false
+                },
+                {
+                    "NoteTypeID": 568,
+                    "SubName": "natematias",
+                    "DisplayName": "Abuse Warning",
+                    "ColorCode": "FFA500",
+                    "DisplayOrder": 4,
+                    "Bold": false,
+                    "Italic": false
+                },
+                {
+                    "NoteTypeID": 569,
+                    "SubName": "natematias",
+                    "DisplayName": "Ban",
+                    "ColorCode": "FF0000",
+                    "DisplayOrder": 5,
+                    "Bold": false,
+                    "Italic": false
+                },
+                {
+                    "NoteTypeID": 570,
+                    "SubName": "natematias",
+                    "DisplayName": "Perma Ban",
+                    "ColorCode": "8B0000",
+                    "DisplayOrder": 6,
+                    "Bold": false,
+                    "Italic": false
+                },
+                {
+                    "NoteTypeID": 571,
+                    "SubName": "natematias",
+                    "DisplayName": "Bot Ban",
+                    "ColorCode": "000000",
+                    "DisplayOrder": 7,
+                    "Bold": false,
+                    "Italic": false
+                },
+                {
+                    "NoteTypeID": 612,
+                    "SubName": "natematias",
+                    "DisplayName": "Extraterrestrial",
+                    "ColorCode": "00F",
+                    "DisplayOrder": 8,
+                    "Bold": true,
+                    "Italic": false
+                },
+                {
+                    "NoteTypeID": 662,
+                    "SubName": "natematias",
+                    "DisplayName": "Better Contributor",
+                    "ColorCode": "00C000",
+                    "DisplayOrder": 9,
+                    "Bold": false,
+                    "Italic": false
+                }
+            ],
+            "PermBanID": null,
+            "TempBanID": null
+        }
+    }
+
+]

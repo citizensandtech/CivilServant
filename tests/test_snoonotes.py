@@ -29,12 +29,12 @@ def test_get_users(mock_snoonotesconnect):
     ## NOW START THE TEST
     res_json = snc.get_users()
     assert type(res_json) == list
-    assert len(res_json) == 1
+    assert len(res_json) == 2
 
 @patch('snoonotes.connection.SnooNotesConnect', autospec=True)
 def test_post_get_notes(mock_snoonotesconnect):
     snc = mock_snoonotesconnect.return_value
-    users = ["natematias"]
+    users = ["natematias", "merrymou"]
     with open("{script_dir}/fixture_data/snoonotes_notes.json".format(script_dir=TEST_DIR)) as f:
         data = f.read()
         snc.post_get_notes.return_value = json.loads(data)
@@ -43,6 +43,7 @@ def test_post_get_notes(mock_snoonotesconnect):
     ## NOW START THE TEST
     res_json = snc.post_get_notes(users)
     assert type(res_json) == dict    
+    assert len(res_json) == 2
     assert len(res_json[users[0]]) == 3
 
 @patch('snoonotes.connection.SnooNotesConnect', autospec=True)
