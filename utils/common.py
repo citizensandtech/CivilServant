@@ -1,7 +1,7 @@
 from enum import Enum
 import simplejson as json
 from collections import namedtuple
-
+import datetime
 
 class PageType(Enum):
     TOP = 1
@@ -73,3 +73,8 @@ class CommentNode:
 
 	def __str__(self):
 		return str(self.id)
+
+
+def time_since_epoch_ms(dt):
+	epoch = datetime.datetime.utcfromtimestamp(0)
+	return (dt - epoch).total_seconds() * 1000.0

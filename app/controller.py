@@ -1,15 +1,19 @@
 import inspect, os, sys, yaml
 import simplejson as json
 import reddit.connection
+import lumen_connect.connection
+import twitter_connect.connection
 import app.controllers.front_page_controller
 import app.controllers.subreddit_controller
 import app.controllers.comment_controller
 import app.controllers.moderator_controller
 import app.controllers.sticky_comment_experiment_controller
+import app.controllers.lumen_controller
+import app.controllers.twitter_controller
 from utils.common import PageType, DbEngine
 import app.cs_logger
 from app.models import Base, SubredditPage, Subreddit, Post, ModAction, Experiment
-
+import datetime
 
 ### LOAD ENVIRONMENT VARIABLES
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), "..")
@@ -22,6 +26,8 @@ db_session = DbEngine(os.path.join(BASE_DIR, "config") + "/{env}.json".format(en
 log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
 conn = reddit.connection.Connect()
+lumen_conn = lumen_connect.connection.LumenConnect(log)
+twitter_conn = twitter_connect.connection.TwitterConnect(log)
 
 def fetch_reddit_front(page_type=PageType.TOP):
     r = conn.connect(controller="FetchRedditFront")
@@ -121,3 +127,10 @@ def archive_experiment_submission_metadata(experiment_name):
     )
     sce.archive_experiment_submission_metadata()
   
+
+def archive_lumen_notices():
+    l = app.controllers.lumen_controller.LumenController(db_session, lumen_conn, twitter_conn, log)
+
+    topics = ["Copyright"] # "Government Requests", #["Defamation","Protest, Parody and Criticism Sites","Law Enforcement Requests","International","Government Requests","DMCA Subpoenas","Court Orders"]
+    date = datetime.datetime.utcnow() - datetime.timedelta(days=1) # now-1day
+    l.archive_lumen_notices(topics, date)

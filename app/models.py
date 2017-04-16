@@ -173,6 +173,36 @@ class ExperimentAction(Base):
     metadata_json       = Column(MEDIUMTEXT)
 
     
+class LumenNotice(Base):
+    __tablename__ = 'lumen_notices'
+    id                  = Column(Integer, primary_key = True)
+    date_received       = Column(DateTime, default=datetime.datetime.utcnow)
+    sender              = Column(String(64))
+    principal           = Column(String(64))
+    recipient           = Column(String(64))
+    num_infringing_urls = Column(Integer)
+    notice_data         = Column(MEDIUMTEXT)
 
 
 
+# TODO: don't do foreign keys??
+class LumenNoticeToTwitterUser(Base):
+    __tablename__ = 'lumen_notice_to_twitter_user'
+    id                  = Column(Integer, primary_key = True)    
+    notice_id           = Column(Integer)
+    twitter_username    = Column(String(64))
+
+"""
+class TwitterUser(Base):
+    username    
+    profile characteristics...
+    status - suspended, deleted
+    total number of Tweets
+
+
+class TwitterStatus(Base):
+    id
+    date
+    user
+    tweet_data
+"""
