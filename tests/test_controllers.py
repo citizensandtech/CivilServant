@@ -10,10 +10,13 @@ import app.controllers.front_page_controller
 import app.controllers.subreddit_controller
 import app.controllers.comment_controller
 import app.controllers.moderator_controller
+import app.controllers.lumen_controller
+import app.controllers.twitter_controller
 from utils.common import PageType, DbEngine, json2obj
+import requests
 
 ### LOAD THE CLASSES TO TEST
-from app.models import Base, FrontPage, SubredditPage, Subreddit, Post, ModAction, Comment, User
+from app.models import Base, FrontPage, SubredditPage, Subreddit, Post, ModAction, Comment, User, LumenNotice, LumenNoticeToTwitterUser
 import app.cs_logger
 
 ## SET UP THE DATABASE ENGINE
@@ -32,7 +35,9 @@ def clear_all_tables():
     db_session.query(User).delete()  
     db_session.query(ModAction).delete()    
     db_session.query(Comment).delete()      
-    db_session.commit()    
+    db_session.query(LumenNotice).delete()    
+    db_session.query(LumenNoticeToTwitterUser).delete()          
+    db_session.commit()
 
 def setup_function(function):
     clear_all_tables()
@@ -88,8 +93,8 @@ def test_archive_reddit_front_page(mock_subreddit, mock_reddit):
 
 
 """
-  basic test for method archive_subreddit_page to insert timestamped pages to subreddit_pages table.
-  analogous to test_archive_reddit_front_page.
+####  basic test for method archive_subreddit_page to insert timestamped pages to subreddit_pages table.
+####  analogous to test_archive_reddit_front_page.
 """
 @patch('praw.Reddit', autospec=True)
 @patch('praw.objects.Subreddit', autospec=True)    
@@ -702,3 +707,75 @@ def test_archive_mod_action_page(mock_reddit):
     last_action_id = mac.archive_mod_action_page(after_id = mod_action_fixtures[0][-1]['id'])
     assert db_session.query(ModAction).count() == len(mod_action_fixtures[0]) + len(mod_action_fixtures[1])
     assert last_action_id == mod_action_fixtures[1][-1]['id']
+
+
+
+@patch('lumen_connect.connection.LumenConnect', autospec=True)
+@patch('twitter_connect.connection.TwitterConnect', autospec=True)
+def test_archive_lumen_notices(mock_TwitterConnect, mock_LumenConnect):
+    lc = mock_LumenConnect.return_value
+    tc = mock_TwitterConnect.return_value
+    with open("{script_dir}/fixture_data/lumen_notices.json".format(script_dir=TEST_DIR)) as f:
+        data = f.read()
+        lc.get_search.return_value = json.loads(data)
+
+    patch('lumen_connect.')
+    patch('twitter_connect.')
+
+    assert len(db_session.query(LumenNotice).all()) == 0
+    
+    log = app.cs_logger.get_logger(ENV, BASE_DIR)
+    lumen = app.controllers.lumen_controller.LumenController(db_session, lc, tc, log)
+
+    topics = ["Copyright"]
+    date = datetime.datetime.utcnow() # dummy date
+    lumen.archive_lumen_notices(topics, date, False)
+
+    all_notices = db_session.query(LumenNotice).all()
+    assert len(all_notices) == 50
+
+
+def mocked_requests_get(url):
+    class MockResponse:
+        def __init__(self, url):
+            self.url = url
+            if "t.co" in url:
+                self.url = "https://twitter.com/this_was_tco"
+
+        def url(self):
+            return self.url
+
+    return MockResponse(url)
+
+@patch('requests.get', side_effect=mocked_requests_get)
+def test_helper_parse_url_for_username(mock_get):
+    test_cases = [
+        ("https://twitter.com/sooos243/status/852942353321140224", "sooos243"),
+        ("https://t.co/cDdD0cNOFd", "this_was_tco"),
+        ("any other domain or string actually", None)
+    ]
+
+    for (url, result) in test_cases:
+        assert app.controllers.lumen_controller.helper_parse_url_for_username(url) == result
+
+@patch('requests.get', autospec=True)
+@patch('lumen_connect.connection.LumenConnect', autospec=True)
+@patch('twitter_connect.connection.TwitterConnect', autospec=True)
+def test_parse_notices_archive_users(mock_TwitterConnect, mock_LumenConnect, mock_get):
+    lc = mock_LumenConnect.return_value
+    tc = mock_TwitterConnect.return_value
+    patch('lumen_connect.')
+    patch('twitter_connect.')
+
+    assert len(db_session.query(LumenNoticeToTwitterUser).all()) == 0
+    
+    log = app.cs_logger.get_logger(ENV, BASE_DIR)
+    lumen = app.controllers.lumen_controller.LumenController(db_session, lc, tc, log)
+
+    with open("{script_dir}/fixture_data/lumen_notices.json".format(script_dir=TEST_DIR)) as f:
+        data = json.loads(f.read())
+        notices = data["notices"][:5] # to make test faster
+
+    lumen.parse_notices_archive_users(notices, False)
+    all_notices = db_session.query(LumenNoticeToTwitterUser).all()
+    assert len(all_notices) == 8
