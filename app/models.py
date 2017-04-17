@@ -3,7 +3,7 @@ import os
 import sys
 import simplejson as json
 from utils.common import *
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, BigInteger
 from sqlalchemy.dialects.mysql import MEDIUMTEXT, LONGTEXT
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -37,6 +37,7 @@ class SubredditPage(Base):
     page_data           = Column(MEDIUMTEXT)
     is_utc              = Column(Boolean, default=False)
 
+# TODO: just noticed there are 2 created_at columns????
 class Post(Base):
     __tablename__ = 'posts'
     id                  = Column(String(32), primary_key = True, unique=True, autoincrement=False)	# post id
@@ -175,7 +176,7 @@ class ExperimentAction(Base):
     
 class LumenNotice(Base):
     __tablename__ = 'lumen_notices'
-    id                  = Column(Integer, primary_key = True)
+    id                  = Column(BigInteger, primary_key = True)
     date_received       = Column(DateTime, default=datetime.datetime.utcnow)
     sender              = Column(String(64))
     principal           = Column(String(64))
@@ -192,17 +193,32 @@ class LumenNoticeToTwitterUser(Base):
     notice_id           = Column(Integer)
     twitter_username    = Column(String(64))
 
-"""
+
 class TwitterUser(Base):
-    username    
-    profile characteristics...
-    status - suspended, deleted
-    total number of Tweets
+    __tablename__ = 'twitter_users'
+    id = Column(BigInteger, primary_key = True)
+    screen_name = Column(String(64))
+    name = Column(String(64))
+    created_at = Column(DateTime)
+    followers_count = Column(Integer)
+    friends_count = Column(Integer)
+    lang = Column(String(64))
+    statuses_count = Column(Integer)
+    verified = Column(Boolean)
+    default_profile = Column(Boolean)
+    default_profile_image = Column(Boolean)
+    user_json = Column(MEDIUMTEXT)
+    user_state = Column(Integer) # utils/common.py
 
 
+# TODO: foreign keys????
 class TwitterStatus(Base):
-    id
-    date
-    user
-    tweet_data
-"""
+    __tablename__ = 'twitter_statuses'    
+    id = Column(BigInteger, primary_key = True)
+    user_id = Column(BigInteger)
+    in_reply_to_user_id = Column(BigInteger)
+    created_at = Column(DateTime)
+    favorite_count = Column(Integer)
+    retweet_count = Column(Integer)
+    retweeted = Column(Boolean)
+    status_data = Column(MEDIUMTEXT)

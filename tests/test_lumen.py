@@ -18,12 +18,10 @@ def setup_function(function):
 def teardown_function(function):
     pass
 
-
-# TODO: write tests
 @patch('lumen_connect.connection.LumenConnect', autospec=True)
 def test_archive_lumen_notices(mock_LumenConnect):
     lc = mock_LumenConnect.return_value
-    with open("{script_dir}/fixture_data/lumen_notices.json".format(script_dir=TEST_DIR)) as f:
+    with open("{script_dir}/fixture_data/lumen_notices_0.json".format(script_dir=TEST_DIR)) as f:
         data = f.read()
         lc.get_search.return_value = json.loads(data)
     patch('lumen_connect.')
@@ -40,33 +38,3 @@ def test_archive_lumen_notices(mock_LumenConnect):
     notices_json = data_json["notices"]
     assert type(notices_json) == list
     assert len(notices_json) == 50
-
-"""
-@patch('lumen.connection.LumenConnect', autospec=True)
-def test_post_get_notes(mock_Lumenconnect):
-    snc = mock_Lumenconnect.return_value
-    users = ["natematias", "merrymou"]
-    with open("{script_dir}/fixture_data/lumen_notes.json".format(script_dir=TEST_DIR)) as f:
-        data = f.read()
-        snc.post_get_notes.return_value = json.loads(data)
-    patch('lumen.')
-
-    ## NOW START THE TEST
-    res_json = snc.post_get_notes(users)
-    assert type(res_json) == dict    
-    assert len(res_json) == 2
-    assert len(res_json[users[0]]) == 3
-
-@patch('lumen.connection.LumenConnect', autospec=True)
-def test_get_schemas(mock_Lumenconnect):
-    snc = mock_Lumenconnect.return_value
-    with open("{script_dir}/fixture_data/lumen_schemas.json".format(script_dir=TEST_DIR)) as f:
-        data = f.read()
-        snc.get_schemas.return_value = json.loads(data)
-    patch('lumen.')
-
-    ## NOW START THE TEST
-    res_json = snc.get_schemas()
-    assert type(res_json) == list
-    assert len(res_json) == 2
-"""

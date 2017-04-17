@@ -15,6 +15,12 @@ class ThingType(Enum):
 	SUBREDDIT = 3
 	USER = 4
 
+# not formalized...
+class TwitterUserState(Enum):
+	FOUND = 1
+	NOT_FOUND = 2
+	SUSPENDED = 3
+
 class DbEngine:
 	def __init__(self, config_path):
 		self.config_path = config_path

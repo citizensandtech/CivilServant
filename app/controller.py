@@ -132,5 +132,17 @@ def archive_lumen_notices():
     l = app.controllers.lumen_controller.LumenController(db_session, lumen_conn, twitter_conn, log)
 
     topics = ["Copyright"] # "Government Requests", #["Defamation","Protest, Parody and Criticism Sites","Law Enforcement Requests","International","Government Requests","DMCA Subpoenas","Court Orders"]
-    date = datetime.datetime.utcnow() - datetime.timedelta(days=1) # now-1day
+    date = datetime.datetime.utcnow() - datetime.timedelta(days=2) # now-1day
     l.archive_lumen_notices(topics, date)
+
+# TODO: confirm args?
+def archive_twitter_users(users_file):
+    t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
+    with open(users_file) as f:
+         users = json.loads(f.read())
+    t.archive_users(users)
+
+# TODO: confirm args?
+def archive_user_tweets(username):
+    t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
+    t.archive_user_tweets(username)    
