@@ -48,7 +48,7 @@ def setup_function(function):
 def teardown_function(function):
     clear_all_tables()
 
-
+"""
 @patch('praw.Reddit', autospec=True)
 @patch('praw.objects.Subreddit', autospec=True)    
 def test_archive_reddit_front_page(mock_subreddit, mock_reddit):
@@ -817,7 +817,7 @@ def test_archive_users(mock_TwitterConnect, mock_twitter):
     assert len(not_found_notices) == 6
 
 
-
+"""
 
 # TODO: currently this test does not test users with lots of statuses/tweets, so as to not call api.GetUserTimeline more than once, which is difficult to mock
 @patch('twitter.Api', autospec=True)
@@ -831,11 +831,11 @@ def test_archive_user_tweets(mock_TwitterConnect, mock_twitter): #, mock_twitter
             with open("{script_dir}/fixture_data/twitter_tweets.json".format(script_dir=TEST_DIR)) as f:
                 data = json.loads(f.read())
             return data
-        elif screen_name == "suspended_user":
+        elif screen_name == "suspended_user" or screen_name=="protected_user":
             # not mocking TwitterErrors
             raise TwitterError("Not authorized.")
         elif screen_name == "deleted_user":
-            raise TwitterError({'message': 'Sorry, that page does not exist.', 'code': 34})
+            raise TwitterError([{'message': 'Sorry, that page does not exist.', 'code': 34}])
 
     m = Mock()
     m.side_effect = mocked_GetUserTimeline
@@ -850,27 +850,30 @@ def test_archive_user_tweets(mock_TwitterConnect, mock_twitter): #, mock_twitter
     log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
     ####
-    import twitter_connect.connection 
-    tc = twitter_connect.connection.TwitterConnect(log)
+    #import twitter_connect.connection 
+    #tc = twitter_connect.connection.TwitterConnect(log)
 
 
     t_conroller = app.controllers.twitter_controller.TwitterController(db_session, tc, log)
 
     user_results = [
-        ("existing_user", {"status_count": 200, "user_state": TwitterUserState.FOUND.value}),
-        ("suspended_user", {"status_count": 0, "user_state": TwitterUserState.SUSPENDED.value}),
-        ("deleted_user", {"status_count": 0, "user_state": TwitterUserState.NOT_FOUND.value})]
+        ({"screen_name": "existing_user", "id": 52332354, "user_state": TwitterUserState.FOUND.value}, {"status_count": 200, "user_state": TwitterUserState.FOUND.value}),
+        ({"screen_name": "deleted_user", "id": 1, "user_state": TwitterUserState.NOT_FOUND.value}, {"status_count": 0, "user_state": TwitterUserState.NOT_FOUND.value}),
+        ({"screen_name": "suspended_user", "id": 2, "user_state": TwitterUserState.NOT_FOUND.value}, {"status_count": 0, "user_state": TwitterUserState.SUSPENDED.value}),
+        ({"screen_name": "protected_user", "id": 3, "user_state": TwitterUserState.PROTECTED.value}, {"status_count": 0, "user_state": TwitterUserState.PROTECTED.value})
+    ]
 
     for i, (user, result) in enumerate(user_results):
+        # need to create TwitterUser records first
         user_record = TwitterUser(
-            id = i if user != "existing_user" else 52332354,
-            screen_name = user,
-            user_state = None if user != "existing_user" else TwitterUserState.FOUND.value)
+            id = user["id"],
+            screen_name = user["screen_name"],
+            user_state = user["user_state"])
         db_session.add(user_record)
         db_session.commit()
 
-        t_conroller.archive_user_tweets(user)
-        user_record = db_session.query(TwitterUser).filter(TwitterUser.screen_name == user).first()
+        t_conroller.archive_user_tweets(user["screen_name"])
+        user_record = db_session.query(TwitterUser).filter(TwitterUser.screen_name == user["screen_name"]).first()
         all_tweets = db_session.query(TwitterStatus).filter(TwitterStatus.user_id == user_record.id).all()
         assert len(all_tweets) == result["status_count"]
         assert user_record.user_state == result["user_state"]

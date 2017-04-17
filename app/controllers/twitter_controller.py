@@ -58,7 +58,7 @@ class TwitterController():
                                 default_profile = user_json["default_profile"],
                                 default_profile_image = user_json["default_profile_image"],
                                 user_json = json.dumps(user_json), #already encoded
-                                user_state = TwitterUserState.FOUND.value)
+                                user_state = TwitterUserState.FOUND.value if not user_json["protected"] else TwitterUserState.PROTECTED.value)
                             self.db_session.add(user_record)
                             new_users_set.discard(screen_name) # discard doesn't throw an error
                     except:
@@ -140,20 +140,22 @@ class TwitterController():
                 else:
                     break
         except twitter.error.TwitterError as e:
-
+            self.log.info(e)
             # TODO: un-jankify this error handling/parsing code
             state = None
             if e.message == "Not authorized.": 
-                # Account is suspended
+                # Account is either protected or suspended
                 state = TwitterUserState.SUSPENDED.value
-            elif e.message['code'] == 34: # message = "Sorry, that page does not exist.": 
+            elif e.message[0]['code'] == 34: # message = "Sorry, that page does not exist."
                 state = TwitterUserState.NOT_FOUND.value
             else:
                 self.log.error("Unexpected exception while calling api.GetUserTimeline on user {0}: {1}".format(screen_name, e))
 
             if state:
                 queried_user = self.db_session.query(TwitterUser).filter(TwitterUser.screen_name == screen_name).first()    # record should exist
-                queried_user.user_state = state
+                if queried_user.user_state is not TwitterUserState.PROTECTED.value: 
+                    # if user is protected, this update will not have been helpful
+                    queried_user.user_state = state
                 try:
                     self.db_session.commit()
                     self.log.info("Updated twitter user {0}'s state to {1}.".format(screen_name, state))

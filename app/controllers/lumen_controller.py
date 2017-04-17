@@ -37,17 +37,14 @@ class LumenController():
                     }
                 }
 
-                self.log.info("archive_lumen_notices: about to call get_search")
                 data = self.l.get_search(payload)
                 #with open("tests/fixture_data/lumen_notices_0.json") as f:
                 #    data = json.loads(f.read())
                 notices_json = data["notices"]
                 next_page = data["meta"]["next_page"]
-                self.log.info(data)
 
                 added_notices = []
                 for notice in notices_json:
-                    self.log.info(notice["id"])
                     if not self.db_session.query(LumenNotice).filter(LumenNotice.id == notice["id"]).first():
                         try:
                             date_received = datetime.datetime.strptime(notice["date_received"], '%Y-%m-%dT%H:%M:%S.000Z') # expect string like "2017-04-15T22:28:26.000Z"
