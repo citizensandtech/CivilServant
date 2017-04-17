@@ -76,7 +76,7 @@ class TwitterController():
             try:
                 if not self.db_session.query(TwitterUser).filter(TwitterUser.screen_name == user).first():
                     user_record = TwitterUser(
-                        screen_name = user,
+                        screen_name = user.lower(),
                         user_state = TwitterUserState.NOT_FOUND.value)
                     self.db_session.add(user_record)
             except:

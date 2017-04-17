@@ -178,9 +178,9 @@ class LumenNotice(Base):
     __tablename__ = 'lumen_notices'
     id                  = Column(BigInteger, primary_key = True)
     date_received       = Column(DateTime, default=datetime.datetime.utcnow)
-    sender              = Column(String(64))
-    principal           = Column(String(64))
-    recipient           = Column(String(64))
+    sender              = Column(String(256))
+    principal           = Column(String(256))
+    recipient           = Column(String(256))
     num_infringing_urls = Column(Integer)
     notice_data         = Column(MEDIUMTEXT)
 
@@ -191,14 +191,14 @@ class LumenNoticeToTwitterUser(Base):
     __tablename__ = 'lumen_notice_to_twitter_user'
     id                  = Column(Integer, primary_key = True)    
     notice_id           = Column(Integer)
-    twitter_username    = Column(String(64))
+    twitter_username    = Column(String(256))
 
 
 class TwitterUser(Base):
     __tablename__ = 'twitter_users'
     id = Column(BigInteger, primary_key = True)
-    screen_name = Column(String(64))
-    name = Column(String(64))
+    screen_name = Column(String(256))
+    name = Column(String(256))
     created_at = Column(DateTime)
     followers_count = Column(Integer)
     friends_count = Column(Integer)

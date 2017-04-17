@@ -37,12 +37,17 @@ class LumenController():
                     }
                 }
 
+                self.log.info("archive_lumen_notices: about to call get_search")
                 data = self.l.get_search(payload)
+                #with open("tests/fixture_data/lumen_notices_0.json") as f:
+                #    data = json.loads(f.read())
                 notices_json = data["notices"]
                 next_page = data["meta"]["next_page"]
+                self.log.info(data)
 
                 added_notices = []
                 for notice in notices_json:
+                    self.log.info(notice["id"])
                     if not self.db_session.query(LumenNotice).filter(LumenNotice.id == notice["id"]).first():
                         try:
                             date_received = datetime.datetime.strptime(notice["date_received"], '%Y-%m-%dT%H:%M:%S.000Z') # expect string like "2017-04-15T22:28:26.000Z"
@@ -50,6 +55,7 @@ class LumenController():
                             principal = (notice["principal_name"].encode("utf-8", "replace") if notice["principal_name"] else "")
                             recipient = (notice["recipient_name"].encode("utf-8", "replace") if notice["recipient_name"] else "")
                             num_infringing_urls = sum(len(work["infringing_urls"]) for work in notice["works"])
+                            self.log.info(num_infringing_urls)
                             notice_record = LumenNotice(
                                 id = notice["id"],
                                 date_received = date_received,
@@ -59,6 +65,7 @@ class LumenController():
                                 num_infringing_urls = num_infringing_urls,
                                 notice_data = json.dumps(notice).encode("utf-8", "replace"))
                             self.db_session.add(notice_record)
+                            self.log.info("added {0}".format(notice["id"]))
                             added_notices.append(notice)
                         except:
                             self.log.error("Error while creating LumenNotice object for notice {0}".format(notice["id"]))
@@ -95,7 +102,7 @@ class LumenController():
             for username in notice_users:
                 notice_user_record = LumenNoticeToTwitterUser(
                         notice_id = notice["id"],
-                        twitter_username = username)
+                        twitter_username = username.lower())
                 self.db_session.add(notice_user_record)
             try:
                 self.db_session.commit()
