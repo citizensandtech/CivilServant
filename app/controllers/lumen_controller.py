@@ -25,6 +25,7 @@ class LumenController():
             next_page = 1
             while next_page is not None:
 
+                # TODO: move payload construction into get_search()
                 payload = {
                     "topics": [topic],
                     "per_page": 50,
@@ -45,14 +46,15 @@ class LumenController():
 
                 added_notices = []
                 for notice in notices_json:
+                    # TODO: instead query for list of ids that were received in the last n days....
                     if not self.db_session.query(LumenNotice).filter(LumenNotice.id == notice["id"]).first():
                         try:
                             date_received = datetime.datetime.strptime(notice["date_received"], '%Y-%m-%dT%H:%M:%S.000Z') # expect string like "2017-04-15T22:28:26.000Z"
+                            # make sure mysql string encoding setting is utf-8
                             sender = (notice["sender_name"].encode("utf-8", "replace") if notice["sender_name"] else "")
                             principal = (notice["principal_name"].encode("utf-8", "replace") if notice["principal_name"] else "")
                             recipient = (notice["recipient_name"].encode("utf-8", "replace") if notice["recipient_name"] else "")
                             num_infringing_urls = sum(len(work["infringing_urls"]) for work in notice["works"])
-                            self.log.info(num_infringing_urls)
                             notice_record = LumenNotice(
                                 id = notice["id"],
                                 date_received = date_received,
@@ -62,7 +64,6 @@ class LumenController():
                                 num_infringing_urls = num_infringing_urls,
                                 notice_data = json.dumps(notice).encode("utf-8", "replace"))
                             self.db_session.add(notice_record)
-                            self.log.info("added {0}".format(notice["id"]))
                             added_notices.append(notice)
                         except:
                             self.log.error("Error while creating LumenNotice object for notice {0}".format(notice["id"]))
@@ -108,6 +109,7 @@ class LumenController():
                     sum(len(work["infringing_urls"]) for work in notice["works"]),
                     notice["id"]))
             except:
+                # TODO: make error messages more specific, aka Error while saving n LumenNoticeToTwitterUsers....
                 self.log.error("Error while saving DB Session")
 
         # for every batch of ~50 notices, calls the twitter controller. 
@@ -130,6 +132,7 @@ def helper_parse_url_for_username(url):
     if len(url_split) >= 3 and url_split[2] == tco_domain:
         # try to get request and unshorten the url
         try:
+            # TODO: better way to unshorten t.co links?? header-only requests??
             r = requests.get(url)
             if r:
                 url = r.url
@@ -142,6 +145,7 @@ def helper_parse_url_for_username(url):
 
     if url == "https://twitter.com/account/suspended":
         # TODO: then we have no information. what should we do about them? should we count these? 
+        # save a LumenNoticeToTwitterUser record, with username = "SUSPENDED"
         return None
 
     if len(url_split) >= 3 and url_split[2] == twitter_domain:

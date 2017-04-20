@@ -32,7 +32,7 @@ class LumenConnect():
     if r.status_code == 200:
         return json.loads(r.text)
     else:
-        self.log.info("Error querying usernames with notes. Status code {0}".format(r.status_code))
+        self.log.error("Error querying usernames with notes. Status code {0}".format(r.status_code))
 
   def get_search(self, payload):
     return self.get("https://Lumendatabase.org/notices/search", payload)

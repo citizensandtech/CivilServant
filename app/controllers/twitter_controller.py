@@ -15,6 +15,9 @@ class TwitterController():
 
     # users_set is a set
     def archive_users(self, users_set, archive_tweets=True):
+        if len(users_set) <= 0:
+            return None
+
         # make all Twitter usernames lowercase
         users_set = set([x.lower() for x in list(users_set)])
         existing_users = self.db_session.query(TwitterUser).filter(TwitterUser.screen_name.in_(list(users_set))).all()
@@ -40,14 +43,16 @@ class TwitterController():
 
                 # for found users, commit to db
                 for user in users_info:
+                    # also update LumenNoticeToTwitterUser record
                     user_json = json.loads(json.dumps(user._json).encode("utf-8", "replace")) if type(user) is twitter.models.User else user   # to accomodate test fixture data
                     screen_name = user_json["screen_name"].lower()
                     try:
+                        # TODO: is this query necessary?
                         if not self.db_session.query(TwitterUser).filter(TwitterUser.screen_name == screen_name).first():
                             created_at = datetime.datetime.strptime(user_json["created_at"], "%a %b %d %H:%M:%S %z %Y")
                             user_record = TwitterUser(
                                 id = user_json["id"],
-                                screen_name = screen_name,
+                                screen_name = screen_name, #usernames change! index/search on id when possible
                                 name = user_json["name"].encode("utf-8", "replace"), 
                                 created_at = created_at,   # is UTC; expected string format: "Mon Nov 29 21:18:15 +0000 2010"
                                 followers_count = user_json["followers_count"],
@@ -76,6 +81,7 @@ class TwitterController():
             try:
                 if not self.db_session.query(TwitterUser).filter(TwitterUser.screen_name == user).first():
                     user_record = TwitterUser(
+                        #id = "SUSPENDED-[rand int]" # make this field a string
                         screen_name = user.lower(),
                         user_state = TwitterUserState.NOT_FOUND.value)
                     self.db_session.add(user_record)

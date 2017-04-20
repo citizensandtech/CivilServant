@@ -48,7 +48,7 @@ def setup_function(function):
 def teardown_function(function):
     clear_all_tables()
 
-"""
+
 @patch('praw.Reddit', autospec=True)
 @patch('praw.objects.Subreddit', autospec=True)    
 def test_archive_reddit_front_page(mock_subreddit, mock_reddit):
@@ -816,8 +816,6 @@ def test_archive_users(mock_TwitterConnect, mock_twitter):
     not_found_notices = db_session.query(TwitterUser).filter(TwitterUser.user_state == TwitterUserState.NOT_FOUND.value).all()
     assert len(not_found_notices) == 6
 
-
-"""
 
 # TODO: currently this test does not test users with lots of statuses/tweets, so as to not call api.GetUserTimeline more than once, which is difficult to mock
 @patch('twitter.Api', autospec=True)

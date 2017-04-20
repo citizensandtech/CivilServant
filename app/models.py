@@ -173,7 +173,8 @@ class ExperimentAction(Base):
     action_object_id    = Column(String(256), index=True)
     metadata_json       = Column(MEDIUMTEXT)
 
-    
+
+# TODO: index cols!
 class LumenNotice(Base):
     __tablename__ = 'lumen_notices'
     id                  = Column(BigInteger, primary_key = True)
@@ -181,44 +182,47 @@ class LumenNotice(Base):
     sender              = Column(String(256))
     principal           = Column(String(256))
     recipient           = Column(String(256))
-    num_infringing_urls = Column(Integer)
+    #num_infringing_urls = Column(Integer)
     notice_data         = Column(MEDIUMTEXT)
-
-
+    CS_parsed_usernames    = Column(Boolean, default=False)
 
 # TODO: don't do foreign keys??
 class LumenNoticeToTwitterUser(Base):
     __tablename__ = 'lumen_notice_to_twitter_user'
     id                  = Column(Integer, primary_key = True)    
     notice_id           = Column(Integer)
-    twitter_username    = Column(String(256))
-
+    twitter_username    = Column(String(256), index = True)
+    twitter_user_id     = Column(String(256), index = True) # how long? 
+    CS_account_queried    = Column(Boolean, default=False)
 
 class TwitterUser(Base):
     __tablename__ = 'twitter_users'
-    id = Column(BigInteger, primary_key = True)
-    screen_name = Column(String(256))
-    name = Column(String(256))
+    id = Column(BigInteger, primary_key = True) # TODO: make this a string
+    screen_name = Column(String(256), index = True)
     created_at = Column(DateTime)
+    lang = Column(String(64))
+
+class TwitterUserSnapshot(Base):
+    __tablename__ = 'twitter_user_snapshots'
+    id = Column(BigInteger, primary_key = True) # TODO: make this a string
+    created_at = #
+    verified = Column(Boolean)
+    user_state = Column(Integer) # utils/common.py
+    user_json = Column(MEDIUMTEXT)
+
+    statuses_count = Column(Integer)
     followers_count = Column(Integer)
     friends_count = Column(Integer)
-    lang = Column(String(64))
-    statuses_count = Column(Integer)
-    verified = Column(Boolean)
-    default_profile = Column(Boolean)
-    default_profile_image = Column(Boolean)
-    user_json = Column(MEDIUMTEXT)
-    user_state = Column(Integer) # utils/common.py
-
 
 # TODO: foreign keys????
 class TwitterStatus(Base):
     __tablename__ = 'twitter_statuses'    
     id = Column(BigInteger, primary_key = True)
-    user_id = Column(BigInteger)
-    in_reply_to_user_id = Column(BigInteger)
+    user_id = Column(BigInteger, index = True) # string!
+    #in_reply_to_user_id = Column(BigInteger) #string!
+    is_reply = Column(Boolean) #
     created_at = Column(DateTime)
-    favorite_count = Column(Integer)
-    retweet_count = Column(Integer)
-    retweeted = Column(Boolean)
     status_data = Column(MEDIUMTEXT)
+
+#TODO: multiple keys???
+#TODO: learn of lumen's API
