@@ -129,7 +129,7 @@ def archive_experiment_submission_metadata(experiment_name):
   
 
 # python app/controller.py create_csvs_sticky_comment_power_analysis mouw 12.2016 12.2016 
-#   /home/mmou/Dropbox/Documents/MIT/CM/CivilServant-Analysis/test_data /home/mmou/Dropbox/Documents/MIT/CM/CivilServant-Analysis
+# /mnt/samba/reddit-archive/03.2017 /home/mmou/CivilServant/output
 def create_csvs_sticky_comment_power_analysis(subreddit_id, start_date, end_date, data_dir, output_dir, frontpage_limit=10):
     start_date = datetime.datetime.strptime(start_date, "%m.%Y")
     end_date = datetime.datetime.strptime(end_date, "%m.%Y")    

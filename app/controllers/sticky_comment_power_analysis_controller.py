@@ -14,9 +14,10 @@ REMOVE_POSTS_ACTIONS = set(["removelink", "spamlink"])
 class StickyCommentPowerAnalysisController:
     def __init__(self, subreddit_id, start_date, end_date, data_dir, output_dir, db_session, log):
 
-        self.start_date = start_date
-        self.begin_date = self.start_date - datetime.timedelta(days=6*31) # about 6 months ago
-        self.end_date = end_date
+        begin_date = start_date - datetime.timedelta(days=6*31) # about 6 months ago
+        self.start_date_utc = utc.localize(start_date) if (start_date.tzinfo is None or start_date.tzinfo.utcoffset(d) is None) else start_date
+        self.begin_date_utc = utc.localize(begin_date) if (begin_date.tzinfo is None or begin_date.tzinfo.utcoffset(d) is None) else begin_date
+        self.end_date_utc = utc.localize(end_date) if (end_date.tzinfo is None or end_date.tzinfo.utcoffset(d) is None) else end_date
 
         self.data_dir = data_dir
         self.output_dir = output_dir
@@ -43,28 +44,30 @@ class StickyCommentPowerAnalysisController:
     # start_date = datetime.datetime.strptime(start_date, "%m.%Y")
     # end_date = datetime.datetime.strptime(end_date, "%m.%Y")    
     def create_csvs(self, frontpage_limit=10):
-        self.log.info("Creating csvs for posts and comments from {0} to {1}".format(self.begin_date, self.end_date))
-        start_date_str = "{0}.{1}".format(self.start_date.month, self.start_date.year)
-        end_date_str = "{0}.{1}".format(self.end_date.month, self.end_date.year)
+        self.log.info("Creating csvs for posts and comments from {0} to {1}".format(self.begin_date_utc, self.end_date_utc))
+        start_date_str = "{0}.{1}".format(self.start_date_utc.month, self.start_date_utc.year)
+        end_date_str = "{0}.{1}".format(self.end_date_utc.month, self.end_date_utc.year)
         
-        posts_fname = "sticky_comment_power_analysis_{0}_{1}_{2}_posts".format(self.subreddit.id, start_date_str, end_date_str)
+        posts_fname = "sticky_comment_power_analysis_{0}_{1}_{2}_posts.csv".format(self.subreddit.id, start_date_str, end_date_str)
         post_heading = ["id","created.utc","author","body.length","weekday","url","is.selftext","visible","num.comments","num.comments.removed","front_page","author.prev.posts","author.prev.participation"]
         with open(os.path.join(self.output_dir, posts_fname), "w") as f:
             f.write(",".join(post_heading) + "\n")
 
-        comments_fname = "sticky_comment_power_analysis_{0}_{1}_{2}_comments".format(self.subreddit.id, start_date_str, end_date_str)
+        comments_fname = "sticky_comment_power_analysis_{0}_{1}_{2}_comments.csv".format(self.subreddit.id, start_date_str, end_date_str)
         comment_heading = ["id","created.utc","author","body.length","toplevel","post.id","visible","post.visible","post.author","author.prev.comments","author.prev.participation"]
         with open(os.path.join(self.output_dir, comments_fname), "w") as f:
             f.write(",".join(comment_heading) + "\n")
 
         self.create_datasets(frontpage_limit)
         
+        pruned_posts = {pid: self.posts[pid] for pid in self.posts if self.posts[pid]["created.utc"] >= self.start_date_utc}
+        pruned_comments = {cid: self.comments[cid] for cid in self.comments if self.comments[cid]["created.utc"] >= self.start_date_utc}        
         with open(os.path.join(self.output_dir, posts_fname), "a") as f:
-            for post_id in self.posts:
+            for post_id in pruned_posts:
                 row = [str(post_id)] + [str(self.posts[post_id][label]) for label in post_heading[1:]]
                 f.write(",".join(row) + "\n")
         with open(os.path.join(self.output_dir, comments_fname), "a") as f:
-            for comment_id in self.comments:
+            for comment_id in pruned_comments:
                 row = [str(comment_id)] + [str(self.comments[comment_id][label]) for label in comment_heading[1:]]
                 f.write(",".join(row) + "\n")
 
@@ -74,7 +77,7 @@ class StickyCommentPowerAnalysisController:
 
     # Returns Two Lists of Dicts, Where Each Dict Contains One Row
     def create_datasets(self, frontpage_limit):
-        # get posts, comments, modlog from (self.start_date - 6 months) to self.end_date
+        # get posts, comments, modlog from (self.start_date_utc - 6 months) to self.end_date_utc
 
         self.log.info("Getting posts...")
         self.posts = self.get_posts()
@@ -94,14 +97,14 @@ class StickyCommentPowerAnalysisController:
         self.log.info("Applying frontpages...")
         self.apply_frontpage_data(frontpage_limit) # posts   # get front page minutes
         self.log.info("Applying participation and post to comment info...")
-        #####self.apply_participation_and_post_to_comment_info() # posts, comments   # count prev posts
+        self.apply_participation_and_post_to_comment_info() # posts, comments   # count prev posts
 
 
     # general note for post, comment creation: yet-to-be-processed field default to None.
     # in later methods (eg when applying modlog visibility information), fields will update to True/False
     def get_posts(self):
         posts_data_dir = os.path.join(self.data_dir, "posts") # note that it's looking here for posts!
-        files = os.listdir(self.data_dir)
+        files = os.listdir(posts_data_dir)
         my_post_files = []
         for f in files:
             f_str = f.split(".")
@@ -109,13 +112,15 @@ class StickyCommentPowerAnalysisController:
             if f_str[0] == "reddit" and f_str[1] == "posts" and f_str[-1] == "json":
                 month = f_str[2]
                 year = f_str[3]
-                date = datetime.datetime.strptime("{0}.{1}".format(month, year), "%m.%Y")
-                if date - self.begin_date >= datetime.timedelta(0) and self.end_date - date >= datetime.timedelta(0):
+                date = utc.localize(datetime.datetime.strptime("{0}.{1}".format(month, year), "%m.%Y"))
+                if date - self.begin_date_utc >= datetime.timedelta(0) and self.end_date_utc - date >= datetime.timedelta(0):
                     my_post_files.append(f)
 
-        self.log.info("Looking in {0} posts files".format(len(my_post_files)))
+
+        self.log.info("Looking in {0} posts files in path {1}".format(len(my_post_files), posts_data_dir))
         all_posts = {} # post id: post_data
         for file in my_post_files:
+            self.log.info("...file {0}".format(file))
             with open(os.path.join(posts_data_dir, file), "r") as lines:
                 for line in lines:
                     post = json.loads(line)
@@ -126,7 +131,7 @@ class StickyCommentPowerAnalysisController:
                             "created.utc": date,
                             "weekday": date.weekday(),  # day of the week as an integer, where Monday is 0 and Sunday is 6
                             "author": post["author"],
-                            "body.length": len(post["body"].split(" ")),
+                            "body.length": len(post["body"].split(" ")) if "body" in post else 0,
                             "is.selftext": post["is_self"],
                             "url": post["url"] if post["is_self"] else None, # url of link (if link)
                             "author.deleted.later": post["author"] == "[deleted]",
@@ -159,14 +164,14 @@ class StickyCommentPowerAnalysisController:
             if f_str[0] == "reddit" and f_str[1] == "comments" and f_str[-1] == "json":
                 month = f_str[2]
                 year = f_str[3]
-                date = datetime.datetime.strptime("{0}.{1}".format(month, year), "%m.%Y")
-                if date - self.begin_date >= datetime.timedelta(0) and self.end_date - date >= datetime.timedelta(0):
+                date = utc.localize(datetime.datetime.strptime("{0}.{1}".format(month, year), "%m.%Y"))
+                if date - self.begin_date_utc >= datetime.timedelta(0) and self.end_date_utc - date >= datetime.timedelta(0):
                     my_comment_files.append(f)
 
-
-        self.log.info("Looking in {0} comments files".format(len(my_comment_files)))
+        self.log.info("Looking in {0} comments files in path {1}".format(len(my_comment_files), self.data_dir))
         all_comments = {} # comment id: post_data
         for file in my_comment_files:
+            self.log.info("...file {0}".format(file))
             with open(os.path.join(self.data_dir, file), "r") as lines:
                 for line in lines:
                     comment = json.loads(line)
@@ -197,10 +202,10 @@ class StickyCommentPowerAnalysisController:
         return all_comments
 
     def get_modlog(self):
-        rows = self.db_session.query(ModAction).filter(and_(ModAction.subreddit_id == self.subreddit.id, ModAction.created_utc >= self.begin_date)).order_by(ModAction.created_utc).all()
+        rows = self.db_session.query(ModAction).filter(and_(ModAction.subreddit_id == self.subreddit.id, ModAction.created_utc >= self.begin_date_utc)).order_by(ModAction.created_utc).all()
         mod_actions = []
         for row in rows:
-            mod_action = json.loads(row['action_data']) # a dict
+            mod_action = json.loads(row.action_data) # a dict
             mod_action['created'] = utc.localize(datetime.datetime.utcfromtimestamp(mod_action['created_utc']))
             mod_actions.append(mod_action)
         self.log.info("Loaded {0} mod actions total".format(len(mod_actions)))
@@ -249,17 +254,20 @@ class StickyCommentPowerAnalysisController:
                         post_to_comment_info[post_id]["removed_comments"].discard(comment_id)        
 
         self.log.info("Found {0} posts that have comments".format(len(post_to_comment_info)))
+        self.log.info("Found {0} total comments".format(sum([len(post_to_comment_info[pid]["comments"]) for pid in post_to_comment_info])))        
+        self.log.info("Found {0} total removed comments".format(sum([len(post_to_comment_info[pid]["removed_comments"]) for pid in post_to_comment_info])))
         return post_to_comment_info
 
 
 
     def get_frontpage_data(self):
-        rows = self.db_session.query(FrontPage).filter(FrontPage.created_at >= self.begin_date).order_by(FrontPage.created_at).all()
+        rows = self.db_session.query(FrontPage).filter(FrontPage.created_at >= self.begin_date_utc).order_by(FrontPage.created_at).all()
         frontpage_data = []
         for row in rows:
-            frontpage['data'] = json.loads(row['page_data']) # a list
-            frontpage['created'] = utc.localize(datetime.datetime.utcfromtimestamp(row['created_at']))
-            recent_frontpages.append(frontpage)
+            frontpage = {}
+            frontpage['data'] = json.loads(row.page_data) # a list
+            frontpage['created'] = utc.localize(row.created_at)
+            frontpage_data.append(frontpage)
         self.log.info("Loaded {0} frontpage records".format(len(frontpage_data)))            
         return frontpage_data
 
@@ -278,15 +286,15 @@ class StickyCommentPowerAnalysisController:
         # Updates comment["visible"]
         for item_id in mod_actions_items:
             actions = mod_actions_items[item_id]
-            if item_id in self.items:
-                item = self.items[item_id]
+            if item_id in items:
+                item = items[item_id]
                 num_items_with_mod_actions.add(item_id)
                 for action in actions:
                     ## many authors are later deleted, so try to 
                     ## add in the author information here, since
                     ## the moderation log retains the author information
-                    item['author']  = action['target_author'] # updates author name
-                    if is_comment:
+                    item['is_comments']  = action['target_author'] # updates author name
+                    if is_comments:
                         post_id = item["post.id"].replace("t3_","")
 
 
@@ -313,16 +321,16 @@ class StickyCommentPowerAnalysisController:
             comment = self.comments[comment_id]
             post_id = comment["post.id"].replace("t3_","")
             comment["post.visible"] = self.posts[post_id]["visible"] if post_id in self.posts else None
-            comment["post.author"] = self.posts[post_id]["num.comments.removed"] if post_id in self.posts else None
+            comment["post.author"] = self.posts[post_id]["author"] if post_id in self.posts else None
 
 
     def apply_frontpage_data(self, limit):
 
-        post_to_timestamps = {} # {post_id: (min_timestamp, max_timestamp)}
+        posts_to_timestamps = {} # {post_id: (min_timestamp, max_timestamp)}
 
         for page in self.frontpages:
             this_time = page["created"]
-            for i, item in page['data'][:limit]:
+            for item in page['data'][:limit]:
                 post_id = item["id"]
                 if post_id in self.posts:
                     if post_id not in posts_to_timestamps:
@@ -333,11 +341,11 @@ class StickyCommentPowerAnalysisController:
         for post_id in self.posts:
             post = self.posts[post_id]
             post["front_page"] = 0
-            if post_id in post_to_timestamps:
+            if post_id in posts_to_timestamps:
                 (min_time, max_time) = posts_to_timestamps[post_id]
                 post["front_page"] = int((max_time - min_time).total_seconds()/60)
 
-        self.log.info("{0} posts appeared on frontpage".format(len(post_to_timestamps)))
+        self.log.info("{0} posts appeared on frontpage".format(len(posts_to_timestamps)))
 
 
     # for each comment, add author previous comment count 
@@ -360,64 +368,89 @@ class StickyCommentPowerAnalysisController:
             "is_post": True, 
             "created_at": self.posts[post_id]["created.utc"]} for post_id in sorted(self.posts, key=lambda p: self.posts[p]["created.utc"])]
         all_items = sorted_comments + sorted_posts
-        sorted_items = sorted(all_items, key=lambda x: all_items[x]["created_at"])
+        sorted_items = sorted(all_items, key=lambda x: x["created_at"])
 
-        # update participation, then update fields: 
+        # update participation, newcomer_comments, newcomer_comments_removed, then update fields: 
         participation = {} # {author: {"num_posts": counter, "num_comments": counter}}
+        newcomer_comments = set([]) # set of comment_ids made by newcomers (prev.comments == 0)
+        newcomer_comments_removed = set([]) # set of removed comment_ids made by newcomers
+        deleted_author_count = 0
         for item in sorted_items:   
             author = item["author"]
-            if author not in participation:
-                participation[author] = {"num_posts": 0, "num_comments": 0}
-            if item["is_post"]:
-                post_id = item["id"]
-                post = self.posts[post_id]
-
-                participation[author]["num_posts"] += 1
-
-                # update "author.prev.posts", "author.prev.participation"
-                post["author.prev.posts"] = participation[author]["num_posts"]
-                post["author.prev.participation"] = participation[author]["num_posts"] + participation[author]["num_comments"]
-
+            if author is "[deleted]":
+                # can't include these posts/comments in participation counts
+                deleted_author_count += 1
             else:
-                comment_id = item["id"]
-                seen_comment_ids.add(comment_id)
-                comment = self.comments[comment_id]
-                participation[author]["num_comments"] += 1
+                if author not in participation:
+                    participation[author] = {
+                        "num_posts": 0, 
+                        "num_comments": 0
+                    }
+                if item["is_post"]:
+                    # is post
 
-                # update "author.prev.comments", "author.prev.participation"
-                comment["author.prev.comments"] = participation[author]["num_comments"]
-                comment["author.prev.participation"] = participation[author]["num_posts"] + participation[author]["num_comments"]
+                    post_id = item["id"]
+                    post = self.posts[post_id]
 
+                    # update "author.prev.posts", "author.prev.participation"
+                    post["author.prev.posts"] = participation[author]["num_posts"]
+                    post["author.prev.participation"] = participation[author]["num_posts"] + participation[author]["num_comments"]
 
-        def is_newcomer(author, participation):
-            return (author not in participation) or (participation[author]["num_posts"] == 0 and participation[author]["num_comments"] == 0)
+                    participation[author]["num_posts"] += 1
 
+                else:
+                    # is comment
 
-        # using final participation dict, self.post_to_comment_info
+                    comment_id = item["id"]
+                    comment = self.comments[comment_id]
+
+                    # update "author.prev.comments", "author.prev.participation"
+                    comment["author.prev.comments"] = participation[author]["num_comments"]
+                    comment["author.prev.participation"] = participation[author]["num_posts"] + participation[author]["num_comments"]
+
+                    if comment["author.prev.comments"] == 0:    # this is their 1st comment
+                        if comment["visible"]:
+                            newcomer_comments.add(comment_id)
+                        else:
+                            newcomer_comments_removed.add(comment_id)                        
+
+                    participation[author]["num_comments"] += 1
+
+        self.log.info("{0} comments came from newcomers".format(len(newcomer_comments)))
+        self.log.info("{0} removed comments came from newcomers".format(len(newcomer_comments_removed)))
+        self.log.info("{0} posts and comments found with '[deleted]' authors".format(deleted_author_count))
+
+        # using newcomer_comments, newcomer_comments_removed, self.post_to_comment_info...
+        # basic idea: for each post, for each comment, if comment.post.id == post_id and prev.comments == 0, then newcomer.comments+1
+        # recall self.post_to_comment_info[post_id] contains the final list of ids of "commments" and "removed_comments", 
+        #   constructed from self.comments and self.mod_actions_comments 
+
+        applied_newcomer_count = 0
+        applied_newcomer_removed_count = 0
         for post_id in self.posts:
             post = self.posts[post_id]
 
             # update "num.comments", "num.comments.removed" fields
             post["num.comments"] = 0
             post["num.comments.removed"] = 0
-            if post_id in self.post_to_comment_info:
-                post["num.comments"] = self.post_to_comment_info["comments"]
-                post["num.comments.removed"] = self.post_to_comment_info["removed_comments"]
 
             # "newcomer.comments", "newcomer.comments.removed"
             post["newcomer.comments"] = 0
             post["newcomer.comments.removed"] = 0
+
             if post_id in self.post_to_comment_info:
                 info = self.post_to_comment_info[post_id]
 
-                # total number of comments that come from authors that are comment newcomers
-                # self.post_to_comment_info[post_id] contains the final list of ids of "commments" and "removed_comments", constructed from self.comments and self.mod_actions_comments 
-                posts[post_id]["newcomer.comments"] = [cid for cid in info["comments"] if cid in seen_comment_ids and is_newcomer(self.comments[cid]["author"], participation)]
-                posts[post_id]["newcomer.comments.removed"] = [cid for cid in info["removed_comments"] if cid in seen_comment_ids and is_newcomer(self.comments[cid]["author"], participation)]
+                post["num.comments"] = info["comments"]
+                post["num.comments.removed"] = info["removed_comments"]
 
+                num_newcomer_comments = len([cid for cid in info["comments"] if cid in newcomer_comments])
+                num_newcomer_comments_removed = len([cid for cid in info["removed_comments"] if cid in newcomer_comments_removed])
+                post["newcomer.comments"] = num_newcomer_comments
+                post["newcomer.comments.removed"] = num_newcomer_comments_removed
 
+                applied_newcomer_count += num_newcomer_comments
+                applied_newcomer_removed_count += num_newcomer_comments_removed
 
-    # comment newcommers: 
-    # for each comment, if comment["author.prev.comments"] == 0, then newcomer.
-
-    #for each post, for each comment, if comment.post.id == post_id and prev.comments == 0, then +1
+        self.log.info("{0} (out of {1}) newcomer comments applied to posts".format(applied_newcomer_count, len(newcomer_comments)))
+        self.log.info("{0} (out of {1}) newcomer removed comments applied to posts".format(applied_newcomer_removed_count, len(newcomer_comments_removed)))        
