@@ -1,4 +1,11 @@
 import inspect, os, sys, yaml
+### LOAD ENVIRONMENT VARIABLES
+BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), "..")
+ENV = os.environ['CS_ENV']
+
+sys.path.append(BASE_DIR)
+
+
 import simplejson as json
 import reddit.connection
 import app.controllers.front_page_controller
@@ -6,14 +13,13 @@ import app.controllers.subreddit_controller
 import app.controllers.comment_controller
 import app.controllers.moderator_controller
 import app.controllers.sticky_comment_experiment_controller
+import app.controllers.sticky_comment_power_analysis_controller
 from utils.common import PageType, DbEngine
 import app.cs_logger
+import datetime
 from app.models import Base, SubredditPage, Subreddit, Post, ModAction, Experiment
 
 
-### LOAD ENVIRONMENT VARIABLES
-BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), "..")
-ENV = os.environ['CS_ENV']
 
 ### LOAD SQLALCHEMY SESSION
 db_session = DbEngine(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV)).new_session()
@@ -121,3 +127,30 @@ def archive_experiment_submission_metadata(experiment_name):
     )
     sce.archive_experiment_submission_metadata()
   
+
+# python app/controller.py create_csvs_sticky_comment_power_analysis mouw 12.2016 12.2016 
+#   /home/mmou/Dropbox/Documents/MIT/CM/CivilServant-Analysis/test_data /home/mmou/Dropbox/Documents/MIT/CM/CivilServant-Analysis
+def create_csvs_sticky_comment_power_analysis(subreddit_id, start_date, end_date, data_dir, output_dir, frontpage_limit=10):
+    start_date = datetime.datetime.strptime(start_date, "%m.%Y")
+    end_date = datetime.datetime.strptime(end_date, "%m.%Y")    
+
+    scpac = app.controllers.sticky_comment_power_analysis_controller.StickyCommentPowerAnalysisController( 
+        subreddit_id = subreddit_id, 
+        start_date = start_date, 
+        end_date = end_date, 
+        data_dir = data_dir, 
+        output_dir = output_dir, 
+        db_session = db_session, 
+        log = log 
+    )
+    log.info("---")
+    log.info(scpac.db_session)
+
+    scpac.create_csvs(frontpage_limit)
+
+
+
+if __name__ == "__main__":
+    fnc = sys.argv[1]
+    args =  sys.argv[2:]
+    locals()[fnc](*args)
