@@ -17,7 +17,7 @@ import requests
 from twitter import TwitterError
 
 ### LOAD THE CLASSES TO TEST
-from app.models import Base, FrontPage, SubredditPage, Subreddit, Post, ModAction, Comment, User, LumenNotice, LumenNoticeToTwitterUser, TwitterUser, TwitterStatus
+from app.models import Base, FrontPage, SubredditPage, Subreddit, Post, ModAction, Comment, User, LumenNotice, LumenNoticeToTwitterUser, TwitterUser, TwitterStatus, TwitterUserSnapshot
 import app.cs_logger
 
 ## SET UP THE DATABASE ENGINE
@@ -29,6 +29,7 @@ ENV = os.environ['CS_ENV'] ="test"
 db_session = DbEngine(os.path.join(TEST_DIR, "../", "config") + "/{env}.json".format(env=ENV)).new_session()
 
 def clear_all_tables():
+    db_session.rollback()
     db_session.query(FrontPage).delete()
     db_session.query(SubredditPage).delete()
     db_session.query(Subreddit).delete()
@@ -39,6 +40,7 @@ def clear_all_tables():
     db_session.query(LumenNotice).delete()    
     db_session.query(LumenNoticeToTwitterUser).delete()
     db_session.query(TwitterUser).delete()
+    db_session.query(TwitterUserSnapshot).delete()    
     db_session.query(TwitterStatus).delete()                  
     db_session.commit()
 
@@ -47,6 +49,7 @@ def setup_function(function):
 
 def teardown_function(function):
     clear_all_tables()
+
 
 
 @patch('praw.Reddit', autospec=True)
@@ -710,32 +713,29 @@ def test_archive_mod_action_page(mock_reddit):
     last_action_id = mac.archive_mod_action_page(after_id = mod_action_fixtures[0][-1]['id'])
     assert db_session.query(ModAction).count() == len(mod_action_fixtures[0]) + len(mod_action_fixtures[1])
     assert last_action_id == mod_action_fixtures[1][-1]['id']
+"""
+"""
 
-
-@patch('lumen_connect.connection.LumenConnect', autospec=True)
-@patch('twitter_connect.connection.TwitterConnect', autospec=True)
-def test_archive_lumen_notices(mock_TwitterConnect, mock_LumenConnect):
+@patch('app.connections.lumen_connect.LumenConnect', autospec=True)
+def test_archive_lumen_notices(mock_LumenConnect):
     lc = mock_LumenConnect.return_value
-    tc = mock_TwitterConnect.return_value
     with open("{script_dir}/fixture_data/lumen_notices_1.json".format(script_dir=TEST_DIR)) as f:
         data = f.read()
-        lc.get_search.return_value = json.loads(data)
+        lc.get_notices_to_twitter.return_value = json.loads(data)
 
-    patch('lumen_connect.')
-    patch('twitter_connect.')
+    patch('app.connections.lumen_connect.')
 
     assert len(db_session.query(LumenNotice).all()) == 0
     
     log = app.cs_logger.get_logger(ENV, BASE_DIR)
-    lumen = app.controllers.lumen_controller.LumenController(db_session, lc, tc, log)
+    lumen = app.controllers.lumen_controller.LumenController(db_session, lc, log)
 
     topics = ["Copyright"]
     date = datetime.datetime.utcnow() # dummy date
-    lumen.archive_lumen_notices(topics, date, False)
+    lumen.archive_lumen_notices(topics, date)
 
     all_notices = db_session.query(LumenNotice).all()
     assert len(all_notices) == 50
-
 
 def mocked_requests_get(url):
     class MockResponse:
@@ -761,33 +761,29 @@ def test_helper_parse_url_for_username(mock_get):
         assert app.controllers.lumen_controller.helper_parse_url_for_username(url) == result
 
 @patch('requests.get', autospec=True)
-@patch('lumen_connect.connection.LumenConnect', autospec=True)
-@patch('twitter_connect.connection.TwitterConnect', autospec=True)
-def test_parse_notices_archive_users(mock_TwitterConnect, mock_LumenConnect, mock_get):
+@patch('app.connections.lumen_connect.LumenConnect', autospec=True)
+def test_parse_notices_archive_users(mock_LumenConnect, mock_get):
     lc = mock_LumenConnect.return_value
-    tc = mock_TwitterConnect.return_value
-    patch('lumen_connect.')
-    patch('twitter_connect.')
+    patch('app.connections.lumen_connect.')
 
     assert len(db_session.query(LumenNoticeToTwitterUser).all()) == 0
     
     log = app.cs_logger.get_logger(ENV, BASE_DIR)
-    lumen = app.controllers.lumen_controller.LumenController(db_session, lc, tc, log)
+    lumen = app.controllers.lumen_controller.LumenController(db_session, lc, log)
 
     with open("{script_dir}/fixture_data/lumen_notices_0.json".format(script_dir=TEST_DIR)) as f:
         data = json.loads(f.read())
         notices = data["notices"][:30] # to make test faster, but get >100 users
 
-    lumen.parse_notices_archive_users(notices, False)
+    lumen.parse_notices_archive_users(notices)
     all_notices = db_session.query(LumenNoticeToTwitterUser).all()
     assert len(all_notices) == 140
 
 
-
 # TODO: currently this test does not test user list with len>90, so as to not call api.UsersLookup more than once, which is difficult to mock
 @patch('twitter.Api', autospec=True)
-@patch('twitter_connect.connection.TwitterConnect', autospec=True)
-def test_archive_users(mock_TwitterConnect, mock_twitter):
+@patch('app.connections.twitter_connect.TwitterConnect', autospec=True)
+def test_archive_new_users(mock_TwitterConnect, mock_twitter):
     tc = mock_TwitterConnect.return_value
     api = mock_twitter.return_value
     with open("{script_dir}/fixture_data/twitter_users.json".format(script_dir=TEST_DIR)) as f:
@@ -795,7 +791,7 @@ def test_archive_users(mock_TwitterConnect, mock_twitter):
         api.UsersLookup.return_value = json.loads(data)
     tc.api = api
     patch('twitter.')
-    patch('twitter_connect.')
+    patch('app.connections.twitter_connect.')
 
     
     assert len(db_session.query(TwitterUser).all()) == 0
@@ -806,9 +802,10 @@ def test_archive_users(mock_TwitterConnect, mock_twitter):
     with open("{script_dir}/fixture_data/twitter_username_list.json".format(script_dir=TEST_DIR)) as f:
         users = json.loads(f.read())
 
-    twitter.archive_users(set(users), False)
-    all_notices = db_session.query(TwitterUser).all()
-    assert len(all_notices) == len(users)
+
+    ####### essentially query_and_archive_new_users
+    all_users_info = twitter.archive_users(set(users), twitter.new_found_users_store_func, twitter.new_not_found_users_store_func, has_ids=False)
+    assert len(all_users_info) == 80
 
     found_notices = db_session.query(TwitterUser).filter(TwitterUser.user_state == TwitterUserState.FOUND.value).all()
     assert len(found_notices) == 80
@@ -816,31 +813,65 @@ def test_archive_users(mock_TwitterConnect, mock_twitter):
     not_found_notices = db_session.query(TwitterUser).filter(TwitterUser.user_state == TwitterUserState.NOT_FOUND.value).all()
     assert len(not_found_notices) == 6
 
+    all_notices = db_session.query(TwitterUser).all()
+    assert len(all_notices) == len(users)
+
+
+# TODO: currently this test does not test user list with len>90, so as to not call api.UsersLookup more than once, which is difficult to mock
+@patch('twitter.Api', autospec=True)
+@patch('app.connections.twitter_connect.TwitterConnect', autospec=True)
+def test_archive_old_users(mock_TwitterConnect, mock_twitter):
+    tc = mock_TwitterConnect.return_value
+    api = mock_twitter.return_value
+    with open("{script_dir}/fixture_data/twitter_users.json".format(script_dir=TEST_DIR)) as f:
+        data = f.read()
+        api.UsersLookup.return_value = json.loads(data)
+    tc.api = api
+    patch('twitter.')
+    patch('app.connections.twitter_connect.')
+
+    
+    assert len(db_session.query(TwitterUser).all()) == 0
+
+    log = app.cs_logger.get_logger(ENV, BASE_DIR)
+    twitter = app.controllers.twitter_controller.TwitterController(db_session, tc, log)
+
+    with open("{script_dir}/fixture_data/twitter_id_list.json".format(script_dir=TEST_DIR)) as f:
+        users = json.loads(f.read())
+
+    ####### essentially query_and_archive_user_snapshots_and_tweets
+    all_users_info = twitter.archive_users(set(users), twitter.old_found_users_store_func, twitter.old_not_found_users_store_func, has_ids=True)
+
+    found_notices = db_session.query(TwitterUserSnapshot).all()
+    assert len(found_notices) == 80
+
 
 # TODO: currently this test does not test users with lots of statuses/tweets, so as to not call api.GetUserTimeline more than once, which is difficult to mock
 @patch('twitter.Api', autospec=True)
-@patch('twitter_connect.connection.TwitterConnect', autospec=True)
+@patch('app.connections.twitter_connect.TwitterConnect', autospec=True)
 def test_archive_user_tweets(mock_TwitterConnect, mock_twitter): #, mock_twitter_error):    
     tc = mock_TwitterConnect.return_value
     api = mock_twitter.return_value
 
-    def mocked_GetUserTimeline(screen_name, count=None, max_id=None):
-        if screen_name == "existing_user":
-            with open("{script_dir}/fixture_data/twitter_tweets.json".format(script_dir=TEST_DIR)) as f:
-                data = json.loads(f.read())
-            return data
-        elif screen_name == "suspended_user" or screen_name=="protected_user":
+    def mocked_GetUserTimeline(user_id, count=None, max_id=None):
+        with open("{script_dir}/fixture_data/twitter_tweets.json".format(script_dir=TEST_DIR)) as f:
+            data = json.loads(f.read())
+        assert len(data) == 200
+        if user_id == "2" or user_id == "3": # suspended_user or protected_user
             # not mocking TwitterErrors
             raise TwitterError("Not authorized.")
-        elif screen_name == "deleted_user":
+        elif user_id == "1": # deleted_user
             raise TwitterError([{'message': 'Sorry, that page does not exist.', 'code': 34}])
+        else:   # # existing_user ?
+            return data
+
 
     m = Mock()
     m.side_effect = mocked_GetUserTimeline
     api.GetUserTimeline = m
     tc.api = api
     patch('twitter.')
-    patch('twitter_connect.')
+    patch('app.connections.twitter_connect.')
 
     
     assert len(db_session.query(TwitterStatus).all()) == 0
@@ -848,17 +879,17 @@ def test_archive_user_tweets(mock_TwitterConnect, mock_twitter): #, mock_twitter
     log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
     ####
-    #import twitter_connect.connection 
-    #tc = twitter_connect.connection.TwitterConnect(log)
+    #import app.connections.twitter_connect 
+    #tc = app.connections.twitter_connect.TwitterConnect(log)
 
 
     t_conroller = app.controllers.twitter_controller.TwitterController(db_session, tc, log)
 
     user_results = [
-        ({"screen_name": "existing_user", "id": 52332354, "user_state": TwitterUserState.FOUND.value}, {"status_count": 200, "user_state": TwitterUserState.FOUND.value}),
-        ({"screen_name": "deleted_user", "id": 1, "user_state": TwitterUserState.NOT_FOUND.value}, {"status_count": 0, "user_state": TwitterUserState.NOT_FOUND.value}),
-        ({"screen_name": "suspended_user", "id": 2, "user_state": TwitterUserState.NOT_FOUND.value}, {"status_count": 0, "user_state": TwitterUserState.SUSPENDED.value}),
-        ({"screen_name": "protected_user", "id": 3, "user_state": TwitterUserState.PROTECTED.value}, {"status_count": 0, "user_state": TwitterUserState.PROTECTED.value})
+        ({"screen_name": "existing_user", "id": "52332354", "user_state": TwitterUserState.FOUND.value}, {"status_count": 200, "user_state": TwitterUserState.FOUND.value}),
+        ({"screen_name": "deleted_user", "id": "1", "user_state": TwitterUserState.NOT_FOUND.value}, {"status_count": 0, "user_state": TwitterUserState.NOT_FOUND.value}),
+        ({"screen_name": "suspended_user", "id": "2", "user_state": TwitterUserState.NOT_FOUND.value}, {"status_count": 0, "user_state": TwitterUserState.SUSPENDED.value}),
+        ({"screen_name": "protected_user", "id": "3", "user_state": TwitterUserState.PROTECTED.value}, {"status_count": 0, "user_state": TwitterUserState.PROTECTED.value})
     ]
 
     for i, (user, result) in enumerate(user_results):
@@ -870,10 +901,18 @@ def test_archive_user_tweets(mock_TwitterConnect, mock_twitter): #, mock_twitter
         db_session.add(user_record)
         db_session.commit()
 
-        t_conroller.archive_user_tweets(user["screen_name"])
+        t_conroller.archive_user_tweets(user["id"])
         user_record = db_session.query(TwitterUser).filter(TwitterUser.screen_name == user["screen_name"]).first()
         all_tweets = db_session.query(TwitterStatus).filter(TwitterStatus.user_id == user_record.id).all()
         assert len(all_tweets) == result["status_count"]
         assert user_record.user_state == result["user_state"]
 
+        break
 
+"""
+Should also test:
+    lumen.query_and_parse_notices_archive_users()
+    t.query_and_archive_new_users()
+    t.query_and_archive_user_snapshots_and_tweets(date)
+    t.query_and_archive_tweets(username)
+"""

@@ -3,6 +3,8 @@ import simplejson as json
 from collections import namedtuple
 import datetime
 
+SUSPENDED_TWITTER_USER_STR = "<SUSPENDED_TWITTER_USER>"
+
 class PageType(Enum):
     TOP = 1
     CONTR = 2 # controversial
@@ -21,6 +23,12 @@ class TwitterUserState(Enum):
 	NOT_FOUND = 2 # deleted (or never existed)
 	SUSPENDED = 3
 	PROTECTED = 4
+
+class ParseUsernameNoUserFound(Exception):
+	pass
+
+class ParseUsernameSuspendedUserFound(Exception):
+	pass
 
 class DbEngine:
 	def __init__(self, config_path):

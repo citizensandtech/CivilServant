@@ -1,4 +1,4 @@
-import twitter_connect.connection
+import app.connections.twitter_connect
 import os
 import simplejson as json
 from sqlalchemy import create_engine

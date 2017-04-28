@@ -174,7 +174,6 @@ class ExperimentAction(Base):
     metadata_json       = Column(MEDIUMTEXT)
 
 
-# TODO: index cols!
 class LumenNotice(Base):
     __tablename__ = 'lumen_notices'
     id                  = Column(BigInteger, primary_key = True)
@@ -182,47 +181,44 @@ class LumenNotice(Base):
     sender              = Column(String(256))
     principal           = Column(String(256))
     recipient           = Column(String(256))
-    #num_infringing_urls = Column(Integer)
     notice_data         = Column(MEDIUMTEXT)
-    CS_parsed_usernames    = Column(Boolean, default=False)
+    CS_parsed_usernames = Column(Boolean, default=False)
 
-# TODO: don't do foreign keys??
 class LumenNoticeToTwitterUser(Base):
     __tablename__ = 'lumen_notice_to_twitter_user'
     id                  = Column(Integer, primary_key = True)    
-    notice_id           = Column(Integer)
+    notice_id           = Column(BigInteger, index=True)
     twitter_username    = Column(String(256), index = True)
-    twitter_user_id     = Column(String(256), index = True) # how long? 
-    CS_account_queried    = Column(Boolean, default=False)
+    twitter_user_id     = Column(String(64), index = True) 
+    CS_account_queried  = Column(Boolean, default=False)
 
 class TwitterUser(Base):
     __tablename__ = 'twitter_users'
-    id = Column(BigInteger, primary_key = True) # TODO: make this a string
+    id = Column(String(64), primary_key = True) # should be lowercase
     screen_name = Column(String(256), index = True)
     created_at = Column(DateTime)
-    lang = Column(String(64))
+    lang = Column(String(32))
+    user_state = Column(Integer) # utils/common.py
+    CS_most_tweets_queried = Column(Boolean, default=False)
 
 class TwitterUserSnapshot(Base):
     __tablename__ = 'twitter_user_snapshots'
-    id = Column(BigInteger, primary_key = True) # TODO: make this a string
-    created_at = #
-    verified = Column(Boolean)
+    id = Column(Integer, primary_key = True)
+    twitter_user_id = Column(String(64), index = True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
     user_state = Column(Integer) # utils/common.py
     user_json = Column(MEDIUMTEXT)
 
+    # should we have thses???
     statuses_count = Column(Integer)
     followers_count = Column(Integer)
     friends_count = Column(Integer)
+    verified = Column(Boolean)
 
-# TODO: foreign keys????
 class TwitterStatus(Base):
     __tablename__ = 'twitter_statuses'    
     id = Column(BigInteger, primary_key = True)
-    user_id = Column(BigInteger, index = True) # string!
-    #in_reply_to_user_id = Column(BigInteger) #string!
-    is_reply = Column(Boolean) #
+    user_id = Column(String(64), index = True)
+    #is_reply = Column(Boolean) # i'm going delete?
     created_at = Column(DateTime)
     status_data = Column(MEDIUMTEXT)
-
-#TODO: multiple keys???
-#TODO: learn of lumen's API

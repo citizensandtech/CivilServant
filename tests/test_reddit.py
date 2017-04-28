@@ -1,5 +1,5 @@
-import reddit.connection
-import reddit.queries
+import app.connections.reddit_connect
+import app.connections.queries
 import os
 import praw
 from mock import Mock, patch
@@ -62,19 +62,19 @@ def test_get_new_as_dict(mock_subreddit, mock_reddit):
     patch('praw.')
 
     ## NOW START THE TEST
-    d = reddit.queries.get_new_as_dict(r, "subreddit")
+    d = app.connections.queries.get_new_as_dict(r, "subreddit")
     assert len(d) == 100
 
 ### TEST THE SYSTEM THAT STORES ACCESS KEYS
 ### IN THE DATABASE 
 #@patch('praw.Reddit', autospec=True)
-@patch('reddit.connection.praw.Reddit', autoSpec=True)
+@patch('app.connections.reddit_connect.praw.Reddit', autoSpec=True)
 def test_connect_to_reddit_with_auth(mock_reddit):
     
     assert db_session.query(PrawKey).count() == 0
     
-    reddit.connection.ENV= "test"    
-    conn = reddit.connection.Connect()
+    app.connections.reddit_connect.ENV= "test"    
+    conn = app.connections.reddit_connect.RedditConnect()
 
     conn.connect()
     db_session.commit() ## update the objects

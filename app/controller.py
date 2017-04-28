@@ -1,8 +1,8 @@
 import inspect, os, sys, yaml
 import simplejson as json
-import reddit.connection
-import lumen_connect.connection
-import twitter_connect.connection
+import app.connections.reddit_connect
+import app.connections.lumen_connect
+import app.connections.twitter_connect
 import app.controllers.front_page_controller
 import app.controllers.subreddit_controller
 import app.controllers.comment_controller
@@ -25,9 +25,9 @@ db_session = DbEngine(os.path.join(BASE_DIR, "config") + "/{env}.json".format(en
 # LOAD LOGGER
 log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
-conn = reddit.connection.Connect()
-lumen_conn = lumen_connect.connection.LumenConnect(log)
-twitter_conn = twitter_connect.connection.TwitterConnect(log)
+conn = app.connections.reddit_connect.RedditConnect()
+lumen_conn = app.connections.lumen_connect.LumenConnect(log)
+twitter_conn = app.connections.twitter_connect.TwitterConnect(log)
 
 def fetch_reddit_front(page_type=PageType.TOP):
     r = conn.connect(controller="FetchRedditFront")
@@ -127,22 +127,42 @@ def archive_experiment_submission_metadata(experiment_name):
     )
     sce.archive_experiment_submission_metadata()
   
+"""
+Archive lumen notices.
+"""
+def fetch_lumen_notices(topics=None, date=None):
+    l = app.controllers.lumen_controller.LumenController(db_session, lumen_conn, log)
 
-def archive_lumen_notices():
-    l = app.controllers.lumen_controller.LumenController(db_session, lumen_conn, twitter_conn, log)
-
-    topics = ["Copyright"] # "Government Requests", #["Defamation","Protest, Parody and Criticism Sites","Law Enforcement Requests","International","Government Requests","DMCA Subpoenas","Court Orders"]
-    date = datetime.datetime.utcnow() - datetime.timedelta(days=2) # now-1day
+    topics = topics if topics else ["Copyright"]    # "Government Requests", #["Defamation","Protest, Parody and Criticism Sites","Law Enforcement Requests","International","Government Requests","DMCA Subpoenas","Court Orders"]
+    date = date if dates else datetime.datetime.utcnow() - datetime.timedelta(days=2) # now-2days
     l.archive_lumen_notices(topics, date)
 
-# TODO: confirm args?
-def archive_twitter_users(users_file):
-    t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
-    with open(users_file) as f:
-         users = json.loads(f.read())
-    t.archive_users(users)
+"""
+For all LumenNotices with CS_parsed_usernames=False, parse for twitter accounts
+"""
+def parse_lumen_notices_for_twitter_accounts():
+    l = app.controllers.lumen_controller.LumenController(db_session, lumen_conn, log)
+    l.query_and_parse_notices_archive_users()
 
-# TODO: confirm args?
-def archive_user_tweets(username):
+"""
+For all LumenNoticeToTwitterUser with CS_account_queried=False, 
+archive Twitter accounts in TwitterUser objects,  and create 1st TwitterUserSnapshot 
+"""
+def fetch_twitter_users():
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
-    t.archive_user_tweets(username)    
+    t.query_and_archive_new_users()
+
+"""
+For all TwitterUserSnapshot.created_at older than x hours, fetch another snapshot 
+"""
+def fetch_twitter_snapshot_and_tweets():
+    t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
+    date = date if dates else datetime.datetime.utcnow() - datetime.timedelta(minutes=60) # now-1hour
+    t.query_and_archive_user_snapshots_and_tweets(date)
+
+"""
+For all TwitterUsers with CS_most_tweets_queried=False, fetch tweets
+"""
+def fetch_twitter_tweets():
+    t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
+    t.query_and_archive_tweets(username)

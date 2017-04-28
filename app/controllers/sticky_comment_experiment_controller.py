@@ -2,9 +2,9 @@ import praw
 import inspect, os, sys # set the BASE_DIR
 import simplejson as json
 import datetime, yaml, time, csv
-import reddit.connection
-import reddit.praw_utils as praw_utils
-import reddit.queries
+import app.connections.reddit_connect
+import app.connections.praw_utils as praw_utils
+import app.connections.queries
 import sqlalchemy
 from dateutil import parser
 from utils.common import *
