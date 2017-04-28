@@ -1,6 +1,6 @@
 import praw
-import reddit.connection
-import reddit.praw_utils as praw_utils
+import app.connections.reddit_connect
+import app.connections.praw_utils as praw_utils
 import copy
 
 

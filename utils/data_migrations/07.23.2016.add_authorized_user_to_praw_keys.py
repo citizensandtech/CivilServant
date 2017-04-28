@@ -2,7 +2,7 @@ import os, sys
 BASE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../", "../")
 sys.path.append(BASE_DIR)
 
-import reddit.connection
+import app.connections.reddit_connect
 from app.models import PrawKey
 from utils.common import DbEngine
 from praw.handlers import MultiprocessHandler

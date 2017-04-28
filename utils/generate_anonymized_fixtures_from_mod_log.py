@@ -2,7 +2,7 @@ import re, random, string, sys, math, os
 BASEDIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../") 
 sys.path.append(BASEDIR)
 import simplejson as json
-import reddit.connection
+import app.connections.reddit_connect
 
 # GENERATES FOUR PAGES PAGE OF ANONYMIZED FIXTURE DATA 
 # FROM THE ACTUAL MODERATION LOG OF A SUBREDDIT
@@ -14,7 +14,7 @@ pages = int(sys.argv[2])
 def randstring(n):
   return ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(n))
 
-conn = reddit.connection.Connect()
+conn = app.connections.reddit_connect
 r = conn.connect(controller="ModLog")
 
 actions =  [x.json_dict for x in r.get_mod_log(subreddit, limit=500)]

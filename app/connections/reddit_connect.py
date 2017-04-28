@@ -12,7 +12,7 @@ from utils.common import DbEngine
 
 ENV =  os.environ['CS_ENV']
 
-class Connect:
+class RedditConnect:
 
   # this initializer accepts a database session
   # and if it doesn't exist, initializes one
@@ -31,7 +31,7 @@ class Connect:
       self.db_session = DbEngine(os.path.join(self.base_dir, "config","{env}.json".format(env=self.env))).new_session()
     else:
       self.db_session = db_session
-    
+      
   def connect(self, controller="Main"):
     r = None #Praw Connection Object
     handler = MultiprocessHandler()
