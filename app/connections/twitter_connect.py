@@ -7,7 +7,7 @@ ENV =  os.environ['CS_ENV']
 
 class TwitterConnect():
     def __init__(self, log):
-        BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), "..")
+        BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), "../..")
         twitter_config_path = os.path.join(BASE_DIR, "config", "twitter_auth_" + ENV + ".json")
         
         with open(twitter_config_path, 'r') as config:

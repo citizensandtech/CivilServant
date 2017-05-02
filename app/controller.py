@@ -1,4 +1,10 @@
 import inspect, os, sys, yaml
+### LOAD ENVIRONMENT VARIABLES
+BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), "..")
+ENV = os.environ['CS_ENV']
+
+sys.path.append(BASE_DIR)
+
 import simplejson as json
 import app.connections.reddit_connect
 import app.connections.lumen_connect
@@ -134,7 +140,7 @@ def fetch_lumen_notices(topics=None, date=None):
     l = app.controllers.lumen_controller.LumenController(db_session, lumen_conn, log)
 
     topics = topics if topics else ["Copyright"]    # "Government Requests", #["Defamation","Protest, Parody and Criticism Sites","Law Enforcement Requests","International","Government Requests","DMCA Subpoenas","Court Orders"]
-    date = date if dates else datetime.datetime.utcnow() - datetime.timedelta(days=2) # now-2days
+    date = date if date else datetime.datetime.utcnow() - datetime.timedelta(days=2) # now-2days
     l.archive_lumen_notices(topics, date)
 
 """
@@ -155,14 +161,21 @@ def fetch_twitter_users():
 """
 For all TwitterUserSnapshot.created_at older than x hours, fetch another snapshot 
 """
-def fetch_twitter_snapshot_and_tweets():
+def fetch_twitter_snapshot_and_tweets(cutoff_date=None):
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
-    date = date if dates else datetime.datetime.utcnow() - datetime.timedelta(minutes=60) # now-1hour
-    t.query_and_archive_user_snapshots_and_tweets(date)
+    date = date if cutoff_date else datetime.datetime.utcnow() - datetime.timedelta(minutes=60) # now-1hour
+    t.query_and_archive_user_snapshots_and_tweets(date, prioritize_new_users) # add boolean prioritize_new_users
 
 """
 For all TwitterUsers with CS_most_tweets_queried=False, fetch tweets
 """
 def fetch_twitter_tweets():
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
-    t.query_and_archive_tweets(username)
+    t.query_and_archive_tweets()
+
+
+
+if __name__ == "__main__":
+    fnc = sys.argv[1]
+    args =  sys.argv[2:]
+    locals()[fnc](*args)

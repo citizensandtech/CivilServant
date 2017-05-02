@@ -1,6 +1,7 @@
 import requests
 import simplejson as json
 import os, inspect
+import utils.common
 #import pickle
 #from app.models import Base
 #from sqlalchemy import create_engine
@@ -12,7 +13,7 @@ ENV =  os.environ['CS_ENV']
 
 class LumenConnect():
     def __init__(self, log):
-        BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), "..")
+        BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), "../..")
         lumen_config_path = os.path.join(BASE_DIR, "config") + "/lumen_auth_" + ENV + ".json"
 
         with open(lumen_config_path, 'r') as config:

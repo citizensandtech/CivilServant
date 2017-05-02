@@ -3,6 +3,7 @@ import datetime
 from app.models import Base, LumenNotice, LumenNoticeToTwitterUser, TwitterUser
 from app.controllers.twitter_controller import TwitterController
 import utils.common
+from utils.common import CS_JobState
 import requests
 import app.controllers.twitter_controller
 import sqlalchemy
@@ -40,12 +41,13 @@ class LumenController():
                             recipient = (notice["recipient_name"].encode("utf-8", "replace") if notice["recipient_name"] else "")
                             notice_record = LumenNotice(
                                 id = notice["id"],
+                                created_at = datetime.datetime.utcnow(),
                                 date_received = date_received,
                                 sender = sender,
                                 principal = principal,
                                 recipient = recipient,
                                 notice_data = json.dumps(notice).encode("utf-8", "replace"),
-                                CS_parsed_usernames = False)
+                                CS_parsed_usernames = CS_JobState.NOT_PROCESSED)
                             self.db_session.add(notice_record)
                             added_notices.append(notice)
                         except:
@@ -58,12 +60,18 @@ class LumenController():
 
 
     """
-    For all LumenNotices with CS_parsed_usernames=False, parse for twitter accounts
+    For all LumenNotices with CS_parsed_usernames=NOT_PROCESSED, parse for twitter accounts
     """
     def query_and_parse_notices_archive_users(self):
         unparsed_notices = self.db_session.query(LumenNotice).filter(LumenNotice.CS_parsed_usernames == False).all()
-        parse_notices_archive_users(unparsed_notices)
 
+        utils.common.update_CS_JobState(unparsed_notices, "CS_parsed_usernames", CS_JobState.IN_PROGRESS, self.db_session, self.log)
+
+        notice_to_state = self.parse_notices_archive_users(unparsed_notices)
+
+        utils.common.update_all_CS_JobState(notice_to_state, "CS_parsed_usernames", self.db_session, self.log)
+
+        """
         for notice in unparsed_notices:
             notice.CS_parsed_usernames = True   # update LumenNotice
         try:
@@ -71,12 +79,13 @@ class LumenController():
             self.log.info("Updated {0} LumenNotice CS_parsed_usernames fields.".format(len(unparsed_notices)))
         except:
             self.log.error("Error while saving DB Session for updating {0} LumenNotice CS_parsed_usernames fields.".format(len(unparsed_notices)))
-
+        """
 
     """
-    unparsed_notices = listo of LumenNotice
+    unparsed_notices = list of LumenNotice
     """
     def parse_notices_archive_users(self, unparsed_notices):
+        notice_to_state = {notice: CS_JobState.PROCESSED for notice in unparsed_notices}
         for notice in unparsed_notices:
             notice_json = json.loads(notice.notice_data) if type(notice) is LumenNotice else notice # to accomodate test fixture data
             notice_users = set([])
@@ -88,17 +97,21 @@ class LumenController():
                     try:
                         username = helper_parse_url_for_username(url)    
                         if username:
+                            # if no username, then no username found
                             notice_users.add(username)
                     except utils.common.ParseUsernameSuspendedUserFound:
                         suspended_user_count += 1
                 if len(work["copyrighted_urls"]) > 0:  # I've only seen this empty
                     self.log.error("method helper_parse_notices_archive_users: maybe missed something in notice_json['works']['copyrighted_urls']; notice id = {0}".format(notice_json["id"]))                
+                    notice_to_state[notice] = CS_JobState.NEEDS_RETRY
                 if work["description"]:  # I've only seen this null
                     self.log.error("method helper_parse_notices_archive_users: maybe missed something in notice_json['works']['description']; notice id = {0}".format(notice_json["id"]))                
+                    notice_to_state[notice] = CS_JobState.NEEDS_RETRY
             if notice_json["body"]:  # I've only seen this null
                 self.log.error("method helper_parse_notices_archive_users: maybe missed something in notice_json['body']; notice id = {0}".format(notice_json["id"]))                
+                notice_to_state[notice] = CS_JobState.NEEDS_RETRY
 
-
+            # don't process these users
             existing_users = []
             if len(notice_users) > 0:
                 existing_users = self.db_session.query(TwitterUser).filter(TwitterUser.screen_name.in_(list(notice_users))).all()
@@ -106,17 +119,20 @@ class LumenController():
             # for every notice, commit LumenNoticeToTwitterUser records 
             for username in notice_users:
                 notice_user_record = LumenNoticeToTwitterUser(
+                        created_at = datetime.datetime.utcnow(),
                         notice_id = notice_json["id"],
                         twitter_username = username.lower(),
                         twitter_user_id = None,
-                        CS_account_queried = username in existing_users)
+                        CS_account_queried = CS_JobState.PROCESSED if username in existing_users else CS_JobState.NOT_PROCESSED)
                 self.db_session.add(notice_user_record)
+
             for i in range(suspended_user_count):
                 notice_user_record = LumenNoticeToTwitterUser(
+                        created_at = datetime.datetime.utcnow(),
                         notice_id = notice_json["id"],
-                        twitter_username = utils.common.SUSPENDED_TWITTER_USER_STR,
-                        twitter_user_id = utils.common.SUSPENDED_TWITTER_USER_STR,
-                        CS_account_queried = False)
+                        twitter_username = utils.common.NOT_FOUND_TWITTER_USER_STR,
+                        twitter_user_id = utils.common.NOT_FOUND_TWITTER_USER_STR,
+                        CS_account_queried = CS_JobState.NOT_PROCESSED)
                 self.db_session.add(notice_user_record)                
 
             try:
@@ -131,7 +147,9 @@ class LumenController():
                     len(notice_users),
                     sum(len(work["infringing_urls"]) for work in notice_json["works"]),
                     notice_json["id"]))
+                notice_to_state[notice] = CS_JobState.FAILED
 
+        return notice_to_state
 
 # assume url is of the form 'https://twitter.com/sooos243/status/852942353321140224' 
 # OR check if a t.co url extends to a twitter.com url 
@@ -155,7 +173,7 @@ def helper_parse_url_for_username(url):
             else:
                 raise Exception
         except:
-            raise utils.common.ParseUsernameNoUserFound
+            return None
 
     if url == "https://twitter.com/account/suspended":
         # TODO: then we have no information. what should we do about them? should we count these? 
