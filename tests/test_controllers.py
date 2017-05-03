@@ -51,7 +51,7 @@ def teardown_function(function):
     clear_all_tables()
 
 
-
+"""
 @patch('praw.Reddit', autospec=True)
 @patch('praw.objects.Subreddit', autospec=True)    
 def test_archive_reddit_front_page(mock_subreddit, mock_reddit):
@@ -714,7 +714,7 @@ def test_archive_mod_action_page(mock_reddit):
     assert db_session.query(ModAction).count() == len(mod_action_fixtures[0]) + len(mod_action_fixtures[1])
     assert last_action_id == mod_action_fixtures[1][-1]['id']
 """
-"""
+
 
 @patch('app.connections.lumen_connect.LumenConnect', autospec=True)
 def test_archive_lumen_notices(mock_LumenConnect):
@@ -779,7 +779,7 @@ def test_parse_notices_archive_users(mock_LumenConnect, mock_get):
     all_notices = db_session.query(LumenNoticeToTwitterUser).all()
     assert len(all_notices) == 140
 
-
+# TODO: need to patch get_statuses_user_state
 # TODO: currently this test does not test user list with len>90, so as to not call api.UsersLookup more than once, which is difficult to mock
 @patch('twitter.Api', autospec=True)
 @patch('app.connections.twitter_connect.TwitterConnect', autospec=True)
@@ -804,8 +804,7 @@ def test_archive_new_users(mock_TwitterConnect, mock_twitter):
 
 
     ####### essentially query_and_archive_new_users
-    all_users_info = twitter.archive_users(set(users), twitter.new_found_users_store_func, twitter.new_not_found_users_store_func, has_ids=False)
-    assert len(all_users_info) == 80
+    twitter.archive_new_users(users)
 
     found_notices = db_session.query(TwitterUser).filter(TwitterUser.user_state == TwitterUserState.FOUND.value).all()
     assert len(found_notices) == 80
@@ -817,6 +816,7 @@ def test_archive_new_users(mock_TwitterConnect, mock_twitter):
     assert len(all_notices) == len(users)
 
 
+# TODO: need to patch get_statuses_user_state
 # TODO: currently this test does not test user list with len>90, so as to not call api.UsersLookup more than once, which is difficult to mock
 @patch('twitter.Api', autospec=True)
 @patch('app.connections.twitter_connect.TwitterConnect', autospec=True)
@@ -840,7 +840,7 @@ def test_archive_old_users(mock_TwitterConnect, mock_twitter):
         users = json.loads(f.read())
 
     ####### essentially query_and_archive_user_snapshots_and_tweets
-    all_users_info = twitter.archive_users(set(users), twitter.old_found_users_store_func, twitter.old_not_found_users_store_func, has_ids=True)
+    twitter.archive_old_users(users)
 
     found_notices = db_session.query(TwitterUserSnapshot).all()
     assert len(found_notices) == 80
@@ -909,6 +909,8 @@ def test_archive_user_tweets(mock_TwitterConnect, mock_twitter): #, mock_twitter
 
         break
 
+"""
+"""
 """
 Should also test:
     lumen.query_and_parse_notices_archive_users()

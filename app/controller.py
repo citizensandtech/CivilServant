@@ -161,10 +161,10 @@ def fetch_twitter_users():
 """
 For all TwitterUserSnapshot.created_at older than x hours, fetch another snapshot 
 """
-def fetch_twitter_snapshot_and_tweets(cutoff_date=None):
+def fetch_twitter_snapshot_and_tweets(max_time_delta_min=60):
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
-    date = date if cutoff_date else datetime.datetime.utcnow() - datetime.timedelta(minutes=60) # now-1hour
-    t.query_and_archive_user_snapshots_and_tweets(date, prioritize_new_users) # add boolean prioritize_new_users
+    date = datetime.datetime.utcnow() - datetime.timedelta(minutes=int(max_time_delta_min)) # now-1hour
+    t.query_and_archive_user_snapshots_and_tweets(date)
 
 """
 For all TwitterUsers with CS_most_tweets_queried=False, fetch tweets

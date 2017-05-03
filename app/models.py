@@ -37,11 +37,9 @@ class SubredditPage(Base):
     page_data           = Column(MEDIUMTEXT)
     is_utc              = Column(Boolean, default=False)
 
-# TODO: just noticed there are 2 created_at columns????
 class Post(Base):
     __tablename__ = 'posts'
     id                  = Column(String(32), primary_key = True, unique=True, autoincrement=False)	# post id
-    created_at          = Column(DateTime, default=datetime.datetime.utcnow)
     subreddit_id        = Column(String(32))	# "subreddit_id"
     created             = Column(DateTime) # "created"
     #when this record was created:
@@ -177,48 +175,48 @@ class ExperimentAction(Base):
 class LumenNotice(Base):
     __tablename__ = 'lumen_notices'
     id                  = Column(BigInteger, primary_key = True)
-    date_received       = Column(DateTime, default=datetime.datetime.utcnow)
+    record_created_at   = Column(DateTime, default=datetime.datetime.utcnow)
+    date_received       = Column(DateTime, default=None)
     sender              = Column(String(256))
     principal           = Column(String(256))
     recipient           = Column(String(256))
     notice_data         = Column(MEDIUMTEXT)
-    CS_parsed_usernames = Column(Boolean, default=False)
+    CS_parsed_usernames = Column(Integer, default=1) # see CS_JobState Enum
 
+# twitter_username is the username parsed from the notice; may change later, but these changes will not be reflected in this record.
+# use twitter_use_id to join with TwitterUser, TwitterUserSnapshot, TwitterStatus
 class LumenNoticeToTwitterUser(Base):
     __tablename__ = 'lumen_notice_to_twitter_user'
     id                  = Column(Integer, primary_key = True)    
+    record_created_at   = Column(DateTime, default=datetime.datetime.utcnow)
     notice_id           = Column(BigInteger, index=True)
-    twitter_username    = Column(String(256), index = True)
-    twitter_user_id     = Column(String(64), index = True) 
-    CS_account_queried  = Column(Boolean, default=False)
+    twitter_username    = Column(String(256), index = True) # if not found, NOT_FOUND_TWITTER_USER_STR
+    twitter_user_id     = Column(String(64), index = True) # if not found, NOT_FOUND_TWITTER_USER_STR_[date]
+    CS_account_archived = Column(Integer, default=1) # see CS_JobState Enum
 
+# most up to date knowledge about a user at a current time
 class TwitterUser(Base):
     __tablename__ = 'twitter_users'
-    id = Column(String(64), primary_key = True) # should be lowercase
-    screen_name = Column(String(256), index = True)
-    created_at = Column(DateTime)
-    lang = Column(String(32))
-    user_state = Column(Integer) # utils/common.py
-    CS_most_tweets_queried = Column(Boolean, default=False)
+    id                  = Column(String(64), primary_key = True) # should be lowercase; if not found, # if not found, NOT_FOUND_TWITTER_USER_STR_[date]
+    screen_name         = Column(String(256), index = True) # if not found, # if not found, NOT_FOUND_TWITTER_USER_STR
+    created_at          = Column(DateTime)
+    record_created_at   = Column(DateTime, default=datetime.datetime.utcnow)
+    lang                = Column(String(32))
+    user_state          = Column(Integer) # utils/common.py
+    CS_oldest_tweets_archived = Column(Integer, default=1) # see CS_JobState Enum
 
 class TwitterUserSnapshot(Base):
     __tablename__ = 'twitter_user_snapshots'
-    id = Column(Integer, primary_key = True)
-    twitter_user_id = Column(String(64), index = True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    user_state = Column(Integer) # utils/common.py
-    user_json = Column(MEDIUMTEXT)
-
-    # should we have thses???
-    statuses_count = Column(Integer)
-    followers_count = Column(Integer)
-    friends_count = Column(Integer)
-    verified = Column(Boolean)
+    id                  = Column(Integer, primary_key = True)
+    twitter_user_id     = Column(String(64), index = True)
+    record_created_at   = Column(DateTime, default=datetime.datetime.utcnow)
+    user_state          = Column(Integer) # utils/common.py
+    user_json           = Column(MEDIUMTEXT)
 
 class TwitterStatus(Base):
     __tablename__ = 'twitter_statuses'    
-    id = Column(BigInteger, primary_key = True)
-    user_id = Column(String(64), index = True)
-    #is_reply = Column(Boolean) # i'm going delete?
-    created_at = Column(DateTime)
-    status_data = Column(MEDIUMTEXT)
+    id                  = Column(BigInteger, primary_key = True)
+    user_id             = Column(String(64), index = True)
+    created_at          = Column(DateTime)
+    record_created_at   = Column(DateTime, default=datetime.datetime.utcnow)
+    status_data         = Column(MEDIUMTEXT)

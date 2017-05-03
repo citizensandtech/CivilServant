@@ -3,7 +3,7 @@ import simplejson as json
 from collections import namedtuple
 import datetime
 
-NOT_FOUND_TWITTER_USER_STR = "<NOT_FOUND_TWITTER_USER>"
+NOT_FOUND_TWITTER_USER_STR = "<NOT_FOUND>"
 
 class PageType(Enum):
     TOP = 1
@@ -37,15 +37,15 @@ def update_all_CS_JobState(row_to_state, field, db_session, log):
         log.info("Updated 0 CS_JobState fields.")
         return
 
-
     for row in row_to_state:
-        setattr(row, field, row_to_state[row])
+        log.info(row_to_state[row].value)
+        setattr(row, field, row_to_state[row].value)
 
     try:
         db_session.commit()
-        log.info("Updated {0} {1} {2} fields to new CS_JobState.".format(len(row_to_state), type(list(row_to_state.keys)()[0]), field))
+        log.info("Updated {0} {1} {2} fields to new CS_JobState.".format(len(row_to_state), type(list(row_to_state.keys())[0]), field))
     except:
-        log.error("Error while saving DB Session for updating {0} {1} {2} fields to new CS_JobState.".format(len(row_to_state), type(list(row_to_state.keys())[0]), field))
+        log.error("Error while saving DB Session for updating {0} {1} {2} fields to new CS_JobState.".format(len(row_to_state), type(list(row_to_state.keys())[0]), field), extra=sys.exc_info()[0])
 
 
 def update_CS_JobState(rows, field, to_state, db_session, log):
@@ -54,12 +54,12 @@ def update_CS_JobState(rows, field, to_state, db_session, log):
         return
 
     for row in rows:
-        setattr(row, field, to_state)
+        setattr(row, field, to_state.value)
     try:
         db_session.commit()
         log.info("Updated {0} {1} {2} fields to {3}.".format(len(rows), type(rows[0]), field, to_state))
     except:
-        log.error("Error while saving DB Session for updating {0} {1} {2} fields to {3}.".format(len(rows), type(rows[0]), field, to_state))
+        log.error("Error while saving DB Session for updating {0} {1} {2} fields to {3}.".format(len(rows), type(rows[0]), field, to_state), extra=sys.exc_info()[0])
 
 
 class ParseUsernameSuspendedUserFound(Exception):

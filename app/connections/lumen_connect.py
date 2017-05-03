@@ -2,6 +2,7 @@ import requests
 import simplejson as json
 import os, inspect
 import utils.common
+import time
 #import pickle
 #from app.models import Base
 #from sqlalchemy import create_engine
@@ -27,13 +28,17 @@ class LumenConnect():
         self.log = log
 
     def get(self, url, payload):
-        r = requests.get(url, 
-            params=payload,
-            headers=self.headers)
-        if r.status_code == 200:
-            return json.loads(r.text)
-        else:
-            self.log.error("Error querying usernames with notes. Status code {0}".format(r.status_code))
+        retries = 3
+        while retries > 0:
+            r = requests.get(url, 
+                params=payload,
+                headers=self.headers)
+            if r.status_code == 200:
+                return json.loads(r.text)
+            else:
+                retries -= 1
+                self.log.error("Error querying usernames with notes. Status code {0}. Retrying ({1} retries left)".format(r.status_code, retries))
+                time.sleep(30) # "If you do not have a researcher API token you will limited to 25 results per request and 3 requests per minute. "
 
     def get_search(self, payload):
         return self.get("https://Lumendatabase.org/notices/search", payload)
