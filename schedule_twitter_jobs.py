@@ -12,25 +12,16 @@ from utils.common import PageType
 
 when starting up these jobs, best to offset them all a bit (by a couple minutes)
 fetch_lumen_notices: every 3 hours, look for posts that are from at most 2 days ago
-parse_lumen_notices_for_twitter_accounts: every 2 hours
-fetch_twitter_users: every 2 hours
+parse_lumen_notices_for_twitter_accounts: every 1 hour
+fetch_twitter_users: every 1 hour
 fetch_twitter_snapshot_and_tweets: every 24 hours, get new snapshots for users who haven't had a snapshot in the last 23.3 hours
-fetch_twitter_tweets: every 2 hours
+fetch_twitter_tweets: every 1 hour
 
-python schedule_twitter_jobs.py --function fetch_lumen_notices                  --lumen_delta_days 2        --interval 180 --env development
-python schedule_twitter_jobs.py --function parse_lumen_notices_for_twitter_accounts                         --interval 120 --env development
-python schedule_twitter_jobs.py --function fetch_twitter_users                                              --interval 120 --env development
-python schedule_twitter_jobs.py --function fetch_twitter_snapshot_and_tweets    --snapshot_delta_min 1400   --interval 1440 --env development
-python schedule_twitter_jobs.py --function fetch_twitter_tweets                                             --interval 120 --env development
-
-
-for testing purposes:
-python schedule_twitter_jobs.py --function fetch_lumen_notices                  --lumen_delta_days 2        --interval 20 --env development
-python schedule_twitter_jobs.py --function parse_lumen_notices_for_twitter_accounts                         --interval 15 --env development
-python schedule_twitter_jobs.py --function fetch_twitter_users                                              --interval 15 --env development
-python schedule_twitter_jobs.py --function fetch_twitter_snapshot_and_tweets    --snapshot_delta_min 15   --interval 20 --env development
-python schedule_twitter_jobs.py --function fetch_twitter_tweets                                             --interval 20 --env development
-
+python schedule_twitter_jobs.py --function fetch_lumen_notices                  --lumen_delta_days 2        --interval 10800 --env development
+python schedule_twitter_jobs.py --function parse_lumen_notices_for_twitter_accounts                         --interval 3600 --env development
+python schedule_twitter_jobs.py --function fetch_twitter_users                                              --interval 3600 --env development
+python schedule_twitter_jobs.py --function fetch_twitter_snapshot_and_tweets    --snapshot_delta_min 1400   --interval 86400 --env development
+python schedule_twitter_jobs.py --function fetch_twitter_tweets                                             --interval 3600 --env development
 
 """
 
@@ -54,8 +45,8 @@ def main():
                         help="For fetch_twitter_snapshot_and_tweets; for all users older than snapshot_delta_min (in minutes), need to fetch new snapshots.")
 
     parser.add_argument("--interval",
-                        default = 60, # default 60 min
-                        help="Interval (in minutes) between tasks in seconds (default 60 minutes)")
+                        default = 3600, # default 60 min = 60*60 = 3600 seconds
+                        help="Interval (in seconds) between tasks in seconds (default 60 seconds)")
 
     parser.add_argument("-e", '--env',
                         choices=['development', 'test', 'production'],

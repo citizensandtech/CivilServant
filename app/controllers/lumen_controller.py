@@ -183,20 +183,22 @@ def helper_parse_url_for_username(url):
     url_split = url.split("/")
     retries = 3
 
+    # TODO: how to resolve t.co urls without hitting twitter.com without auth tokens (since we're getting rate limited?) 
     # calling requests.get is very time inefficient
-    if False: #len(url_split) >= 3 and url_split[2] == tco_domain:
+    if len(url_split) >= 3 and url_split[2] == tco_domain:
+        self.log.error("t.co url that we didn't attempt to resolve: {0}".format(url))
         # try to get request and unshorten the url
 
-        r = None
-        while retries > 0:
-            try:
-                r = requests.get(url)
-                url = r.url
-                url_split = url.split("/")
-            except:
-                retries -=1
-        if retries == 0 and not r:
-            raise Exception
+        #####r = None
+        #####while retries > 0:
+        #####    try:
+        #####        r = requests.get(url)
+        #####        url = r.url
+        #####        url_split = url.split("/")
+        #####    except:
+        #####        retries -=1
+        #####if retries == 0 and not r:
+        #####    raise Exception
 
     if url == "https://twitter.com/account/suspended":
         # TODO: then we have no information. 

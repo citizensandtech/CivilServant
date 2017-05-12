@@ -140,7 +140,6 @@ class TwitterController():
         all_existing_ids = set([]) # all ids already stored in db
 
         for i in range(1,int(len(user_names)/batch_size)+2):
-            rows = []
             limit = min(i*batch_size, len(user_names))
             if limit > prev_limit:
                 # query twitter API for user info
@@ -150,11 +149,11 @@ class TwitterController():
                     users_info = self.t.api.UsersLookup(screen_name=this_users)
                 except twitter.error.TwitterError as e:
                     failed_users.update(this_users)
-                    self.log.error("Failed to query for Twitter users using api.UsersLookup: {0}".format(str(e)))
+                    self.log.error("Failed to query for {0} Twitter users using api.UsersLookup: {1}".format(limit-prev_limit, str(e)))
                 else:
                     self.log.info("Queried for {0} Twitter users out of a total of {1} users, got {2} users".format(
                         limit-prev_limit, len(user_names), len(users_info)))
-                    prev_limit = limit
+                prev_limit = limit
 
                 # for found users, commit to db
 
@@ -343,12 +342,13 @@ class TwitterController():
         left_users = set(user_keys)
 
         for i in range(1,int(len(user_keys)/batch_size)+2):
-            rows = []
             limit = min(i*batch_size, len(user_keys))
             if limit > prev_limit:
                 # query twitter API for user info
                 users_info = []
                 this_users = user_keys[prev_limit:limit]
+                if len(this_users) > batch_size:
+                    self.log.error("Caught error where this_users is too long??? : len(this_users) = {0}".format(len(this_users)))
                 try:
                     if has_ids:
                         users_info = self.t.api.UsersLookup(user_id=this_users)
@@ -357,11 +357,11 @@ class TwitterController():
                 except twitter.error.TwitterError as e:
                     # this message means no users_info found: "[{'code': 17, 'message': 'No user matches for specified terms.'}]"
                     if e.message[0]['code'] != 17:
-                        self.log.error("Unexpected error while querying for Twitter users using api.UsersLookup: {0}".format(str(e)))
+                        self.log.error("Unexpected error while querying for {0} Twitter users using api.UsersLookup: {1}; users: {2}".format(limit-prev_limit, str(e), this_users))
                 else:
                     self.log.info("Queried for {0} Twitter users out of a total of {1} users, got {2} users".format(
                         limit-prev_limit, len(user_keys), len(users_info)))
-                    prev_limit = limit
+                prev_limit = limit
                 
 
                 # for found users, commit to db
