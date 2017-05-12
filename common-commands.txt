@@ -63,3 +63,13 @@ civilservant-error-handler.herokuapp.com
 
 ## Monitoring errors and info, locally
 ./logs
+
+
+
+#### SUMMARY: COMMANDS TO RUN WHEN STARTING UP #####
+
+redis-server &
+rqworker development &
+praw-multiprocess &
+rq-dashboard &
+rqscheduler &

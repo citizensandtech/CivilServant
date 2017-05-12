@@ -198,6 +198,8 @@ class LumenNoticeToTwitterUser(Base):
 class TwitterUser(Base):
     __tablename__ = 'twitter_users'
     id                  = Column(String(64), primary_key = True) # should be lowercase; if not found, # if not found, NOT_FOUND_TWITTER_USER_STR_[date]
+    not_found_id        = Column(String(64), index = True, default=None)    # if a user ever goes between e.g. FOUND and NOT_FOUND (either direction), 
+                                                                            # we want to be able to map between the actual id and the <NOT_FOUND>... id 
     screen_name         = Column(String(256), index = True) # if not found, # if not found, NOT_FOUND_TWITTER_USER_STR
     created_at          = Column(DateTime)
     record_created_at   = Column(DateTime, default=datetime.datetime.utcnow)
@@ -209,6 +211,8 @@ class TwitterUserSnapshot(Base):
     __tablename__ = 'twitter_user_snapshots'
     id                  = Column(Integer, primary_key = True)
     twitter_user_id     = Column(String(64), index = True)
+    twitter_not_found_id= Column(String(64), index = True, default=None)    # if a user ever goes between e.g. FOUND and NOT_FOUND (either direction), 
+                                                                                    # we want to be able to map between the actual id and the <NOT_FOUND>... id 
     record_created_at   = Column(DateTime, default=datetime.datetime.utcnow)
     user_state          = Column(Integer) # utils/common.py
     user_json           = Column(MEDIUMTEXT)

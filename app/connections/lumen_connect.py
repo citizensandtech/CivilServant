@@ -3,12 +3,6 @@ import simplejson as json
 import os, inspect
 import utils.common
 import time
-#import pickle
-#from app.models import Base
-#from sqlalchemy import create_engine
-#from sqlalchemy.orm import sessionmaker
-#import sqlalchemy
-#from utils.common import DbEngine
 
 ENV =  os.environ['CS_ENV']
 
@@ -23,7 +17,8 @@ class LumenConnect():
         self.headers = {
             "Content-type": "application/json",
             "Accept": "application/json",
-            "X-Authentication-Token": LUMENCONFIG["X-Authentication-Token"]
+            "X-Authentication-Token": LUMENCONFIG["X-Authentication-Token"],
+            "User-Agent": "MerryMouCSBot/1.0"
         } 
         self.log = log
 

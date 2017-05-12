@@ -32,13 +32,21 @@ class CS_JobState(Enum):
     FAILED = 4          # in_progress but never succeeded processing; because e.g. internet went down or system crashed
     NEEDS_RETRY = 5     # for flagging purposes...
 
+def generate_not_found_twitter_user_id(screen_name=""):
+    capped_screen_name = screen_name if len(screen_name)<30 else screen_name[:30] + "..."
+    return "{0}_{1}_{2}".format(
+        NOT_FOUND_TWITTER_USER_STR, 
+        capped_screen_name, 
+        time_since_epoch_ms(datetime.datetime.utcnow())
+        )
+
+
 def update_all_CS_JobState(row_to_state, field, db_session, log):
     if len(row_to_state) == 0:
         log.info("Updated 0 CS_JobState fields.")
         return
 
     for row in row_to_state:
-        log.info(row_to_state[row].value)
         setattr(row, field, row_to_state[row].value)
 
     try:
