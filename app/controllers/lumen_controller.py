@@ -25,24 +25,27 @@ class LumenController():
         for topic in topics:
             next_page = 1
             while next_page is not None:
-                #data = self.l.get_notices_to_twitter([topic], 50, next_page, date, nowish)
+                data = self.l.get_notices_to_twitter([topic], 50, next_page, date, nowish)
                 
-                with open("tests/fixture_data/lumen_notices_0.json") as f:
-                    data = json.loads(f.read())
+                #with open("tests/fixture_data/lumen_notices_0.json") as f:
+                #    data = json.loads(f.read())
                 
-                notices_json = data["notices"][13:20]
+                notices_json = data["notices"]
                 next_page = data["meta"]["next_page"]
 
-                added_notices = []
+
+                added_notices_ids = set([])
+                prev_add_notices_size = len(added_notices_ids)
                 for notice in notices_json:
-                    if notice["id"] not in recent_notices_ids:
+                    nid = notice["id"]
+                    date_received = datetime.datetime.strptime(notice["date_received"], '%Y-%m-%dT%H:%M:%S.000Z') # expect string like "2017-04-15T22:28:26.000Z"
+                    if nid not in recent_notices_ids and date_received >= date and date_received <= nowish:
                         try:
-                            date_received = datetime.datetime.strptime(notice["date_received"], '%Y-%m-%dT%H:%M:%S.000Z') # expect string like "2017-04-15T22:28:26.000Z"
                             sender = (notice["sender_name"].encode("utf-8", "replace") if notice["sender_name"] else "")
                             principal = (notice["principal_name"].encode("utf-8", "replace") if notice["principal_name"] else "")
                             recipient = (notice["recipient_name"].encode("utf-8", "replace") if notice["recipient_name"] else "")
                             notice_record = LumenNotice(
-                                id = notice["id"],
+                                id = nid,
                                 record_created_at = datetime.datetime.utcnow(),
                                 date_received = date_received,
                                 sender = sender,
@@ -51,15 +54,20 @@ class LumenController():
                                 notice_data = json.dumps(notice).encode("utf-8", "replace"),
                                 CS_parsed_usernames = CS_JobState.NOT_PROCESSED.value)
                             self.db_session.add(notice_record)
-                            added_notices.append(notice)
+                            recent_notices_ids.add(nid)
+                            added_notices_ids.add(nid)
                         except:
                             self.log.error("Error while creating LumenNotice object for notice {0}".format(notice["id"]), extra=sys.exc_info()[0])
+                if len(added_notices_ids) == prev_add_notices_size:
+                    break
+
+                prev_add_notices_size = len(added_notices_ids)
                 try:
                     self.db_session.commit()
                 except:         
-                    self.log.error("Error while saving {0} lumen notices in DB Session".format(len(added_notices)), extra=sys.exc_info()[0])
+                    self.log.error("Error while saving {0} lumen notices in DB Session".format(len(added_notices_ids)), extra=sys.exc_info()[0])
                 else:
-                    self.log.info("Saved {0} lumen notices.".format(len(added_notices)))
+                    self.log.info("Saved {0} lumen notices.".format(len(added_notices_ids)))
 
 
     """

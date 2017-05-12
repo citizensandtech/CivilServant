@@ -17,11 +17,19 @@ fetch_twitter_users: every 2 hours
 fetch_twitter_snapshot_and_tweets: every 24 hours, get new snapshots for users who haven't had a snapshot in the last 23.3 hours
 fetch_twitter_tweets: every 2 hours
 
-python twitter_schedule_jobs.py --function fetch_lumen_notices                  --lumen_delta_days 2        --interval 180 --env development
-python twitter_schedule_jobs.py --function parse_lumen_notices_for_twitter_accounts                         --interval 120 --env development
-python twitter_schedule_jobs.py --function fetch_twitter_users                                              --interval 120 --env development
-python twitter_schedule_jobs.py --function fetch_twitter_snapshot_and_tweets    --snapshot_delta_min 1400   --interval 1440 --env development
-python twitter_schedule_jobs.py --function fetch_twitter_tweets                                             --interval 120 --env development
+python schedule_twitter_jobs.py --function fetch_lumen_notices                  --lumen_delta_days 2        --interval 180 --env development
+python schedule_twitter_jobs.py --function parse_lumen_notices_for_twitter_accounts                         --interval 120 --env development
+python schedule_twitter_jobs.py --function fetch_twitter_users                                              --interval 120 --env development
+python schedule_twitter_jobs.py --function fetch_twitter_snapshot_and_tweets    --snapshot_delta_min 1400   --interval 1440 --env development
+python schedule_twitter_jobs.py --function fetch_twitter_tweets                                             --interval 120 --env development
+
+
+for testing purposes:
+python schedule_twitter_jobs.py --function fetch_lumen_notices                  --lumen_delta_days 2        --interval 20 --env development
+python schedule_twitter_jobs.py --function parse_lumen_notices_for_twitter_accounts                         --interval 15 --env development
+python schedule_twitter_jobs.py --function fetch_twitter_users                                              --interval 15 --env development
+python schedule_twitter_jobs.py --function fetch_twitter_snapshot_and_tweets    --snapshot_delta_min 15   --interval 20 --env development
+python schedule_twitter_jobs.py --function fetch_twitter_tweets                                             --interval 20 --env development
 
 
 """
@@ -63,18 +71,19 @@ def main():
     queue_name = os.environ['CS_ENV']
     scheduler = Scheduler(queue_name = os.environ['CS_ENV'], connection=Redis())
 
-    ttl = 172800 ## two days in seconds
-    if(ttl <= int(args.interval) + 3600):
-        ttl = int(args.interval) + 3600 # args.interval + 1 hr
+    ttl = max(172800, int(args.interval) + 3600) # max of (2days in seconds, args.interval + 1 hr)
+    timeout = max(60*60*3, int(args.interval) + 300) # max of (3hrs in seconds, args.interval + 50min)
+
 
     if args.function =="fetch_lumen_notices":
         scheduler.schedule(
                 scheduled_time=datetime.utcnow(),
                 func=app.controller.fetch_lumen_notices,
-                args=[args.lumen_date],
+                args=[args.lumen_delta_days],
                 interval=int(args.interval),
                 repeat=None,
-                result_ttl = ttl)
+                result_ttl = ttl,
+                timeout = timeout)
     elif args.function =="parse_lumen_notices_for_twitter_accounts":
         scheduler.schedule(
                 scheduled_time=datetime.utcnow(),
@@ -82,7 +91,8 @@ def main():
                 args=[],
                 interval=int(args.interval),
                 repeat=None,
-                result_ttl = ttl)
+                result_ttl = ttl,
+                timeout = timeout)
     elif args.function =="fetch_twitter_users":
         scheduler.schedule(
                 scheduled_time=datetime.utcnow(),
@@ -90,7 +100,8 @@ def main():
                 args=[],
                 interval=int(args.interval),
                 repeat=None,
-                result_ttl = ttl)
+                result_ttl = ttl,
+                timeout = timeout)
     elif args.function =="fetch_twitter_snapshot_and_tweets":
         scheduler.schedule(
                 scheduled_time=datetime.utcnow(),
@@ -98,15 +109,17 @@ def main():
                 args=[args.snapshot_delta_min],
                 interval=int(args.interval),
                 repeat=None,
-                result_ttl = ttl)
+                result_ttl = ttl,
+                timeout = timeout)
     elif args.function =="fetch_twitter_tweets":                    
         scheduler.schedule(
                 scheduled_time=datetime.utcnow(),
                 func=app.controller.fetch_twitter_tweets,
-                args=[args.lumen_date],
+                args=[],
                 interval=int(args.interval),
                 repeat=None,
-                result_ttl = ttl)
+                result_ttl = ttl,
+                timeout = timeout)
 
 
 if __name__ == '__main__':

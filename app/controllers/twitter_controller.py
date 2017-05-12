@@ -57,6 +57,8 @@ if in a TwitterUser record
         at some point the user has also been FOUND or PROTECTED, since we found the user info
         at some point the user has been NOT_FOUND or SUSPENDED (since we once assigned a not_found_id to them),
 
+Note that if a username changes for an account that we don't have the id for, we will have no idea.
+
 """
 
 class TwitterController():
@@ -105,6 +107,8 @@ class TwitterController():
 
 
     """
+        unarchived_notice_users: list of LumenNoticeToTwitterUser
+
         returns 
             user_name_to_id = {name: id}
             noticeuser_to_state = {LumenNoticeToTwitterUser: CS_JobState}
@@ -130,6 +134,11 @@ class TwitterController():
         left_users = unarchived_user_names # reference
         failed_users = set([])
 
+
+
+        all_found_ids = set([]) # all ids returned by UsersLookup
+        all_existing_ids = set([]) # all ids already stored in db
+
         for i in range(1,int(len(user_names)/batch_size)+2):
             rows = []
             limit = min(i*batch_size, len(user_names))
@@ -148,53 +157,62 @@ class TwitterController():
                     prev_limit = limit
 
                 # for found users, commit to db
-                all_found_users = []
-                for user_info in users_info:
-                    user_json = json.loads(json.dumps(user_info._json).encode("utf-8", "replace")) if type(user_info) is twitter.models.User else user_info   # to accomodate test fixture data
-                    all_found_users.append(user_json["screen_name"])
+
+                users_json = [json.loads(json.dumps(user_info._json).encode("utf-8", "replace")) if type(user_info) is twitter.models.User else user_info for user_info in users_info] # to accomodate test fixture data
+
+                this_found_ids = set([user_json["id"] for user_json in users_json])
+                all_found_ids.update(this_found_ids)
+                existing_ids = self.db_session.query(TwitterUser).filter(TwitterUser.id.in_(list(this_found_ids))).all()
+                all_existing_ids.update(existing_ids)
+
+                for user_json in users_json:
+                    uid = str(user_json["id"])
                     screen_name = user_json["screen_name"].lower()
-                    uid = user_json["id"]
-                    created_at = datetime.datetime.strptime(user_json["created_at"], TWITTER_DATETIME_STR_FORMAT)
 
-                    # determine user state
-                    user_state = TwitterUserState.FOUND if not user_json["protected"] else TwitterUserState.PROTECTED
+                    if uid not in all_existing_ids and screen_name in left_users:   
+                        # if uid not in all_existing_ids: if this id hasn't been seen before. need to do this if querying off usernames, since usernames can change.
+                        # if (uid in left_users or screen_name in left_users): then we haven't seen this screen_name before. else, don't archive. actually this is a redundant check
+                        created_at = datetime.datetime.strptime(user_json["created_at"], TWITTER_DATETIME_STR_FORMAT)
 
-                    user_name_to_id[screen_name] = uid
+                        # determine user state
+                        user_state = TwitterUserState.FOUND if not user_json["protected"] else TwitterUserState.PROTECTED
 
-                    now = datetime.datetime.utcnow()
-                    try:
-                        # create TwitterUser record
-                        user_record = TwitterUser(
-                            id = uid,
-                            not_found_id = None,
-                            screen_name = screen_name, #usernames change! index/search on id when possible
-                            created_at = created_at,   # is UTC; expected string format: "Mon Nov 29 21:18:15 +0000 2010"
-                            record_created_at = now,
-                            lang = user_json["lang"],
-                            user_state = user_state.value,                
-                            CS_oldest_tweets_archived = CS_JobState.NOT_PROCESSED.value)
-                        self.db_session.add(user_record)
+                        user_name_to_id[screen_name] = uid
 
-                        # create first TwitterUserSnapshot record
-                        user_snapshot_record = TwitterUserSnapshot(
-                            twitter_user_id = uid,
-                            twitter_not_found_id = None,
-                            record_created_at = now,
-                            user_state = user_state.value,
-                            user_json = json.dumps(user_json)) #already encoded
-                        self.db_session.add(user_snapshot_record)
+                        now = datetime.datetime.utcnow()
+                        try:
+                            # create TwitterUser record
+                            user_record = TwitterUser(
+                                id = uid,
+                                not_found_id = None,
+                                screen_name = screen_name, #usernames change! index/search on id when possible
+                                created_at = created_at,   # is UTC; expected string format: "Mon Nov 29 21:18:15 +0000 2010"
+                                record_created_at = now,
+                                lang = user_json["lang"],
+                                user_state = user_state.value,                
+                                CS_oldest_tweets_archived = CS_JobState.NOT_PROCESSED.value)
+                            self.db_session.add(user_record)
 
-                        left_users.discard(screen_name) # discard doesn't throw an error
-                    except:
-                        self.log.error("Error while creating TwitterUser, TwitterUserSnapshot objects for user {0}".format(user_json["id"]), extra=sys.exc_info()[0])
-                        failed_users.add(screen_name)
+                            # create first TwitterUserSnapshot record
+                            user_snapshot_record = TwitterUserSnapshot(
+                                twitter_user_id = uid,
+                                twitter_not_found_id = None,
+                                record_created_at = now,
+                                user_state = user_state.value,
+                                user_json = json.dumps(user_json)) #already encoded
+                            self.db_session.add(user_snapshot_record)
+
+                            left_users.discard(screen_name) # discard doesn't throw an error
+                        except:
+                            self.log.error("Error while creating TwitterUser, TwitterUserSnapshot objects for user {0}".format(user_json["id"]), extra=sys.exc_info()[0])
+                            failed_users.add(screen_name)
                 if len(users_info) > 0:
                     try:
                         self.db_session.commit()
                     except:
                         self.log.error("Error while saving DB Session for TwitterUser, TwitterUserSnapshot object for {0} users".format(
                             len(users_info)), extra=sys.exc_info()[0])
-                        failed_users.update(all_found_users)
+                        failed_users.update(this_found_ids)
                     else:
                         self.log.info("Saved {0} found twitter users' info.".format(len(users_info)))
 
@@ -345,27 +363,54 @@ class TwitterController():
                         limit-prev_limit, len(user_keys), len(users_info)))
                     prev_limit = limit
                 
+
                 # for found users, commit to db
-                for user_info in users_info:
-                    user_json = json.loads(json.dumps(user_info._json).encode("utf-8", "replace")) if type(user_info) is twitter.models.User else user_info   # to accomodate test fixture data
 
-
+                users_json = [json.loads(json.dumps(user_info._json).encode("utf-8", "replace")) if type(user_info) is twitter.models.User else user_info for user_info in users_info] # to accomodate test fixture data
+                for user_json in users_json:
                     uid = str(user_json["id"])
                     screen_name = user_json["screen_name"].lower()
+  
                     user_state = TwitterUserState.FOUND if not user_json["protected"] else TwitterUserState.PROTECTED
                     created_at = datetime.datetime.strptime(user_json["created_at"], TWITTER_DATETIME_STR_FORMAT)
-
-                    user = key_to_users[uid] if has_ids else key_to_users[screen_name] # TwitterUser record
-
                     now = datetime.datetime.utcnow()
+
+                    # get TwitterUser record
+                    new_user_record_created = False
+                    if has_ids:
+                        user = key_to_users[uid]
+                    else:
+                        if screen_name in key_to_users:
+                            # then screen_name hasn't changed. update the existing user record.
+                            user = key_to_users[screen_name]
+                        else:
+                            # we wouldn't have called UsersLookup with screen_names unless we didn't have the ids (users not found)
+                            # if a previously not found user changed their screen name, AND their account got unsuspended, 
+                            # such that we are able to get their account info now, we'd get an id we haven't seen before, and there is 
+                            # NO WAY for us to match up these records.
+                            # so we create a new record.
+                            user = TwitterUser(
+                                id =  uid,
+                                not_found_id = None,
+                                screen_name = screen_name,
+                                created_at = created_at,
+                                record_created_at = now,
+                                lang = user_json["lang"],
+                                user_state = user_state.value,                
+                                CS_oldest_tweets_archived = CS_JobState.NOT_PROCESSED.value)
+                            self.db_session.add(user_record)
+                            new_user_record_created = True
+
+
                     try:
-                        # update TwitterUser record
-                        user.id = uid
-                        user.screen_name = screen_name
-                        user.created_at = created_at
-                        user.record_updated_at = now
-                        user.lang = user_json["lang"]
-                        user.state = user_state.value
+                        if not new_user_record_created:
+                            # update TwitterUser record
+                            user.id = uid
+                            user.screen_name = screen_name
+                            user.created_at = created_at
+                            user.record_updated_at = now
+                            user.lang = user_json["lang"]
+                            user.state = user_state.value
 
                         # create TwitterUserSnapshot record
                         user_snapshot_record = TwitterUserSnapshot(
@@ -439,6 +484,9 @@ class TwitterController():
         self.with_user_records_archive_tweets(unarchived_users)
 
 
+    """
+        user_records: list of TwitterUser records
+    """
     def with_user_records_archive_tweets(self, user_records):
         if len(user_records) == 0:
             return
@@ -457,10 +505,11 @@ class TwitterController():
         if not oldest_tweets_archived:
             utils.common.update_all_CS_JobState(user_to_state, "CS_oldest_tweets_archived", self.db_session, self.log)
 
-    # returns (statuses, user_state, job_state)
-    # possible user_state: SUSPENDED, NOT_FOUND
-
-    # not responsible for updating user_state; user_state in TwitterUser is updated solely by archive_old/new_users methods
+    """
+        returns (statuses, user_state, job_state)
+        
+        possible user_state: SUSPENDED, NOT_FOUND
+    """
     def get_statuses_user_state(self, user_id, count=200, max_id=None, user_state=TwitterUserState.NOT_FOUND, job_state=CS_JobState.FAILED):
         (statuses, user_state, job_state) = ([], user_state, job_state) 
         try:
@@ -482,8 +531,10 @@ class TwitterController():
         return (statuses, user_state, job_state)
 
 
-    # given user_id, archive user tweets.
-    # also updates TwitterUser record if new user_state info
+    """
+        given TwitterUser user, archive user tweets.
+        also updates TwitterUser record if unexpected user state, by calling self.archive_old_users
+    """
     def archive_user_tweets(self, user):
         user_id = user.id
 

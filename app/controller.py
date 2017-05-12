@@ -140,7 +140,7 @@ def fetch_lumen_notices(num_days=2):
     l = app.controllers.lumen_controller.LumenController(db_session, lumen_conn, log)
 
     topics = ["Copyright"]    # "Government Requests", #["Defamation","Protest, Parody and Criticism Sites","Law Enforcement Requests","International","Government Requests","DMCA Subpoenas","Court Orders"]
-    date = date if date else datetime.datetime.utcnow() - datetime.timedelta(days=num_days) # now-2days
+    date = datetime.datetime.utcnow() - datetime.timedelta(days=int(float(num_days))) # now-2days
     l.archive_lumen_notices(topics, date)
 
 """
@@ -164,7 +164,7 @@ For all TwitterUserSnapshot.created_at older than x min, fetch another snapshot
 def fetch_twitter_snapshot_and_tweets(max_time_delta_min=60):
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
     now = datetime.datetime.utcnow()
-    date = now - datetime.timedelta(minutes=int(max_time_delta_min)) # now-1hour
+    date = now - datetime.timedelta(minutes=int(float(max_time_delta_min))) # now-1hour
     t.query_and_archive_user_snapshots_and_tweets(date)
 
 """

@@ -1,8 +1,11 @@
 {
     "database": "",
     "user": "",
+    "host": "",
     "password": "",
-    "client_id" : "",
-    "client_secret" : "",
-    "redirect_uri" : ""
+    "reddit_client_id" : "",
+    "reddit_client_secret" : "",
+    "reddit_redirect_uri" : "",
+    "twitter_consumer_key" : "",
+    "twitter_consumer_secret" : ""
 }
