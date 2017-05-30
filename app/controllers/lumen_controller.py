@@ -30,6 +30,10 @@ class LumenController():
                 #with open("tests/fixture_data/lumen_notices_0.json") as f:
                 #    data = json.loads(f.read())
                 
+                if not data:
+                    # error is already logged by get_notices_to_twitter
+                    return 
+
                 notices_json = data["notices"]
                 next_page = data["meta"]["next_page"]
 
@@ -109,7 +113,7 @@ class LumenController():
                 for url_obj in work["infringing_urls"]:
                     url = url_obj["url"]
                     try:
-                        username = helper_parse_url_for_username(url)    
+                        username = helper_parse_url_for_username(url, self.log)    
                     except utils.common.ParseUsernameSuspendedUserFound:
                         suspended_user_count += 1
                     except Exception as e:
@@ -176,7 +180,7 @@ class LumenController():
 # assume url is of the form 'https://twitter.com/sooos243/status/852942353321140224' 
 # OR check if a t.co url extends to a twitter.com url 
 # interesting later study: see how many t.co links resolve to twitter links?
-def helper_parse_url_for_username(url):
+def helper_parse_url_for_username(url, log):
     twitter_domain = "twitter.com"
     tco_domain = "t.co"
     username = None
@@ -186,7 +190,7 @@ def helper_parse_url_for_username(url):
     # TODO: how to resolve t.co urls without hitting twitter.com without auth tokens (since we're getting rate limited?) 
     # calling requests.get is very time inefficient
     if len(url_split) >= 3 and url_split[2] == tco_domain:
-        self.log.error("t.co url that we didn't attempt to resolve: {0}".format(url))
+        log.error("t.co url that we didn't attempt to resolve: {0}".format(url))
         # try to get request and unshorten the url
 
         #####r = None

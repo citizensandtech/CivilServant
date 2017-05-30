@@ -32,8 +32,9 @@ class LumenConnect():
                 return json.loads(r.text)
             else:
                 retries -= 1
-                self.log.error("Error querying usernames with notes. Status code {0}. Retrying ({1} retries left)".format(r.status_code, retries))
+                self.log.error("Error querying lumen url: {0}. Status code {1}. Retrying ({2} retries left)".format(url, r.status_code, retries))
                 time.sleep(30) # "If you do not have a researcher API token you will limited to 25 results per request and 3 requests per minute. "
+        self.log.error("Failed to query lumen url: {0}. Status code {1}.".format(url, r.status_code))
 
     def get_search(self, payload):
         return self.get("https://Lumendatabase.org/notices/search", payload)

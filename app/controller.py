@@ -137,6 +137,7 @@ def archive_experiment_submission_metadata(experiment_name):
 Archive lumen notices.
 """
 def fetch_lumen_notices(num_days=2):
+    log.info("Calling fetch_lumen_notices, num_days={0}".format(num_days))
     l = app.controllers.lumen_controller.LumenController(db_session, lumen_conn, log)
 
     topics = ["Copyright"]    # "Government Requests", #["Defamation","Protest, Parody and Criticism Sites","Law Enforcement Requests","International","Government Requests","DMCA Subpoenas","Court Orders"]
@@ -147,6 +148,7 @@ def fetch_lumen_notices(num_days=2):
 For all LumenNotices with CS_parsed_usernames=False, parse for twitter accounts
 """
 def parse_lumen_notices_for_twitter_accounts():
+    log.info("Calling parse_lumen_notices_for_twitter_accounts.")    
     l = app.controllers.lumen_controller.LumenController(db_session, lumen_conn, log)
     l.query_and_parse_notices_archive_users()
 
@@ -155,6 +157,7 @@ For all LumenNoticeToTwitterUser with CS_account_queried=False,
 archive Twitter accounts in TwitterUser objects,  and create 1st TwitterUserSnapshot 
 """
 def fetch_twitter_users():
+    log.info("Calling fetch_twitter_users.")    
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
     t.query_and_archive_new_users()
 
@@ -162,6 +165,7 @@ def fetch_twitter_users():
 For all TwitterUserSnapshot.created_at older than x min, fetch another snapshot 
 """
 def fetch_twitter_snapshot_and_tweets(max_time_delta_min=60):
+    log.info("Calling fetch_twitter_snapshot_and_tweets, max_time_delta_min={0}".format(max_time_delta_min))    
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
     now = datetime.datetime.utcnow()
     date = now - datetime.timedelta(minutes=int(float(max_time_delta_min))) # now-1hour
@@ -171,6 +175,7 @@ def fetch_twitter_snapshot_and_tweets(max_time_delta_min=60):
 For all TwitterUsers with CS_most_tweets_queried=False, fetch tweets
 """
 def fetch_twitter_tweets():
+    log.info("Calling fetch_twitter_tweets.")        
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
     t.query_and_archive_tweets()
 

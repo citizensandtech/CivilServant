@@ -241,7 +241,7 @@ class TwitterController():
                 # also create first TwitterUserSnapshot record
                 user_snapshot_record = TwitterUserSnapshot(
                     twitter_user_id = uid,
-                    twitter_not_found_id = None,
+                    twitter_not_found_id = uid,
                     record_created_at = now,
                     user_state = user_state.value,
                     user_json = None)
@@ -394,7 +394,7 @@ class TwitterController():
                                 not_found_id = None,
                                 screen_name = screen_name,
                                 created_at = created_at,
-                                record_created_at = now,
+                                record_created_at = now,    # uh 
                                 lang = user_json["lang"],
                                 user_state = user_state.value,                
                                 CS_oldest_tweets_archived = CS_JobState.NOT_PROCESSED.value)
@@ -408,7 +408,7 @@ class TwitterController():
                             user.id = uid
                             user.screen_name = screen_name
                             user.created_at = created_at
-                            user.record_updated_at = now
+                            user.record_updated_at = now    # TODO: fix this. models doesn't have this field right now
                             user.lang = user_json["lang"]
                             user.state = user_state.value
 
@@ -450,7 +450,7 @@ class TwitterController():
                 now = datetime.datetime.utcnow()
                 # update TwitterUser record 
                 user.not_found_id = user.not_found_id if user.not_found_id else utils.common.generate_not_found_twitter_user_id(user.screen_name) 
-                user.record_updated_at = now
+                user.record_updated_at = now        # TODO: fix this. models doesn't have this field right now
                 user.user_state = user_state.value
 
                 # create TwitterUserSnapshot record
