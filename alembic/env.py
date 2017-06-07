@@ -33,7 +33,7 @@ db_names = config.get_main_option('databases')
 #       'engine2':mymodel.metadata2
 #}
 
-import inspect, os, sys # first update the path to actually lode the base models
+import inspect, os, sys # first update the path to actually load the base models
 sys.path.append(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))) + "/..")
 # then import the models and load them
 from app import models

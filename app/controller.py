@@ -174,10 +174,10 @@ def fetch_twitter_snapshot_and_tweets(max_time_delta_min=60):
 """
 For all TwitterUsers with CS_most_tweets_queried=False, fetch tweets
 """
-def fetch_twitter_tweets():
-    log.info("Calling fetch_twitter_tweets.")        
+def fetch_twitter_tweets(backfill=False):
+    log.info("Calling fetch_twitter_tweets, backfill={0}.".format(backfill))        
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
-    t.query_and_archive_tweets()
+    t.query_and_archive_tweets(backfill)
 
 
 

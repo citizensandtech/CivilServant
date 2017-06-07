@@ -184,7 +184,7 @@ class LumenNotice(Base):
     CS_parsed_usernames = Column(Integer, default=1) # see CS_JobState Enum
 
 # twitter_username is the username parsed from the notice; may change later, but these changes will not be reflected in this record.
-# use twitter_use_id to join with TwitterUser, TwitterUserSnapshot, TwitterStatus
+# use twitter_use_id to join with TwitterUser, TwitterUserSnapshot, TwistterStatus
 class LumenNoticeToTwitterUser(Base):
     __tablename__ = 'lumen_notice_to_twitter_user'
     id                  = Column(Integer, primary_key = True)    
