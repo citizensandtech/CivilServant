@@ -145,6 +145,7 @@ class TwitterController():
                 # query twitter API for user info
                 users_info = []
                 this_users = user_names[prev_limit:limit]
+                users_info = []
                 try:
                     users_info = self.t.api.UsersLookup(screen_name=this_users)
                 except twitter.error.TwitterError as e:
@@ -215,6 +216,7 @@ class TwitterController():
                     else:
                         self.log.info("Saved {0} found twitter users' info.".format(len(users_info)))
 
+        added_users = 0
 
         # at end, for left_users (users not found), commit to db
         for name in left_users:
@@ -247,10 +249,11 @@ class TwitterController():
                     user_json = None)
                 self.db_session.add(user_snapshot_record)
 
+                added_users += 1
             except:
                 self.log.error("Error while updating TwitterUser, creating TwitterUserSnapshot object for user {0}".format(user_json["id"]), extra=sys.exc_info()[0])
                 failed_users.update(name)
-        if len(left_users) > 0:
+        if added_users > 0:
             try:
                 self.db_session.commit()
             except:
@@ -277,7 +280,7 @@ class TwitterController():
             elif e.message[0]['code'] == 63 and e.message[0]['message'] == 'User has been suspended.':
                 user_state = TwitterUserState.SUSPENDED
             else:
-                self.log.error("Unexpected twitter.error.TwitterError exception while calling api.GetUser on user {0}: {1}".format(screen_name, e))
+                self.log.error("Unexpected twitter.error.TwitterError exception while calling api.GetUser on user {0}: {1}".format(username, e))
         return user_state
 
     #########################################################   
@@ -394,7 +397,7 @@ class TwitterController():
                                 not_found_id = None,
                                 screen_name = screen_name,
                                 created_at = created_at,
-                                record_created_at = now,    # uh 
+                                record_created_at = now, 
                                 lang = user_json["lang"],
                                 user_state = user_state.value,                
                                 CS_oldest_tweets_archived = CS_JobState.NOT_PROCESSED.value)
@@ -408,7 +411,7 @@ class TwitterController():
                             user.id = uid
                             user.screen_name = screen_name
                             user.created_at = created_at
-                            user.record_updated_at = now    # TODO: fix this. models doesn't have this field right now
+                            #user.record_updated_at = now    # THIS SHOULDN'T BE UPDATED. old TwitterUser records probably have wrong record_updated_at
                             user.lang = user_json["lang"]
                             user.state = user_state.value
 
@@ -477,33 +480,46 @@ class TwitterController():
     ################### ARCHIVE TWEET CODE
     #########################################################
 
-    def query_and_archive_tweets(self):
-        unarchived_users = self.db_session.query(TwitterUser).filter(
-                TwitterUser.CS_oldest_tweets_archived == CS_JobState.NOT_PROCESSED.value).all()
+    def query_and_archive_tweets(self, backfill=False):
+        if backfill:
+            unarchived_users = self.db_session.query(TwitterUser).filter(
+                    TwitterUser.CS_oldest_tweets_archived != CS_JobState.PROCESSED.value).all()
+        else:
+            unarchived_users = self.db_session.query(TwitterUser).filter(
+                    TwitterUser.CS_oldest_tweets_archived == CS_JobState.NOT_PROCESSED.value).all()
 
-        self.with_user_records_archive_tweets(unarchived_users)
+        self.log.info("About to query and archive tweets {0} users; backfill={1}".format(len(unarchived_users), backfill))
+
+        batch_size = 100 # limit should be 100
+        # query batch_size at a time in order to update job states more often
+        prev_limit = 0
+        for i in range(1,int(len(unarchived_users)/batch_size)+2):
+            limit = min(i*batch_size, len(unarchived_users))
+            if limit > prev_limit:
+                this_users = unarchived_users[prev_limit:limit]
+                utils.common.update_CS_JobState(this_users, "CS_oldest_tweets_archived", CS_JobState.IN_PROGRESS, self.db_session, self.log)
+                user_to_state = self.with_user_records_archive_tweets(this_users, backfill=backfill) # backfill hacky
+                utils.common.update_all_CS_JobState(user_to_state, "CS_oldest_tweets_archived", self.db_session, self.log)
+                prev_limit = limit
+
+            self.log.info("Queried and archived tweets for {0} out of {1} users; backfill={2}".format(prev_limit, len(unarchived_users), backfill))
+
 
 
     """
         user_records: list of TwitterUser records
+
+        returns user_to_state
     """
-    def with_user_records_archive_tweets(self, user_records):
+    def with_user_records_archive_tweets(self, user_records, backfill=False):
         if len(user_records) == 0:
             return
 
-        # expect all CS_oldest_tweets_archived fields to be either CS_JobState.PROCESSED or .NOT_PROCESSED
-        oldest_tweets_archived = user_records[0].CS_oldest_tweets_archived == CS_JobState.PROCESSED
-
-        if not oldest_tweets_archived:
-            utils.common.update_CS_JobState(user_records, "CS_oldest_tweets_archived", CS_JobState.IN_PROGRESS, self.db_session, self.log)
-
         user_to_state = {}  # only need for when CS_JobState.NOT_PROCESSED...
         for user in user_records:
-            job_state = self.archive_user_tweets(user)
+            job_state = self.archive_user_tweets(user, backfill=backfill)
             user_to_state[user] = job_state
-
-        if not oldest_tweets_archived:
-            utils.common.update_all_CS_JobState(user_to_state, "CS_oldest_tweets_archived", self.db_session, self.log)
+        return user_to_state
 
     """
         returns (statuses, user_state, job_state)
@@ -523,11 +539,11 @@ class TwitterController():
             elif e.message[0]['code'] == 34: # message = "Sorry, that page does not exist."
                 user_state = TwitterUserState.NOT_FOUND
             else:
-                self.log.error("Unexpected twitter.error.TwitterError exception while calling api.GetUserTimeline on user {0}: {1}".format(screen_name, e))
+                self.log.error("Unexpected twitter.error.TwitterError exception while calling api.GetUserTimeline on user {0}: {1}".format(user_id, e))
                 job_state = CS_JobState.NEEDS_RETRY
         else:
             user_state = TwitterUserState.FOUND
-            job_state = CS_JobState.PROCESSED
+        job_state = CS_JobState.PROCESSED
         return (statuses, user_state, job_state)
 
 
@@ -535,7 +551,7 @@ class TwitterController():
         given TwitterUser user, archive user tweets.
         also updates TwitterUser record if unexpected user state, by calling self.archive_old_users
     """
-    def archive_user_tweets(self, user):
+    def archive_user_tweets(self, user, backfill=False):
         user_id = user.id
 
         if utils.common.NOT_FOUND_TWITTER_USER_STR in user_id or user.user_state is TwitterUserState.PROTECTED:
@@ -543,27 +559,38 @@ class TwitterController():
             job_state = CS_JobState.PROCESSED
             return job_state
 
-
         job_state = CS_JobState.FAILED
 
-        query_oldest_id = self.db_session.query(
-            func.max(TwitterStatus.id)).filter(
-            TwitterStatus.user_id == user_id).first()
+        if backfill:
+            # need to get all statuses
+            query_seen_statuses = self.db_session.query(
+                TwitterStatus.id).filter(
+                TwitterStatus.user_id == user_id).all()
+        else:
+            # believe that we have all statuses older than func.max(TwitterStatus.id),
+            # so we only need to get func.max(TwitterStatus.id)
+            query_seen_statuses = self.db_session.query(
+                func.max(TwitterStatus.id)).filter(
+                TwitterStatus.user_id == user_id).first()
 
-        oldest_id_queried = None if query_oldest_id is None else query_oldest_id[0]
-        seen_statuses = set([]) # set of ids added this time
+
+        seen_statuses = set([s[0] for s in query_seen_statuses]) # set of ids already in db; s = (872295416376823808,)
+        new_seen_statuses = set([]) # set of ids added this time
+
+        oldest_id_queried = None    # if query_oldest_id is None else query_oldest_id[0]
         count = 200
         while True:
 
             # get statuses and job_state from twitter API. don't use user_state
-            (statuses, user_state, job_state) = self.get_statuses_user_state(user_id, count, oldest_id_queried, user_state=user.user_state, job_state=CS_JobState.FAILED)
+            (statuses, user_state, sub_job_state) = self.get_statuses_user_state(user_id, count, oldest_id_queried, user_state=user.user_state, job_state=CS_JobState.FAILED)
 
-            if job_state is not CS_JobState.PROCESSED:
-                return job_state
-
-            if not statuses:
+            if sub_job_state is not CS_JobState.PROCESSED:
+                self.log.error("Unexpected error while calling api.GetUserTimeline on user_id {0}: sub_job_state is {1}".format(user_id, sub_job_state))
+                return sub_job_state
+            if statuses is None:
                 self.log.error("Unexpected error while calling api.GetUserTimeline on user_id {0}: nothing returned".format(user_id))
                 return job_state
+
             self.log.info("Queried total of {0} tweets for account {1}".format(len(statuses), user_id))
 
             if user_state is not TwitterUserState.FOUND:
@@ -577,12 +604,13 @@ class TwitterController():
             # store TwitterStatus es
             statuses_jsons = [json.loads(json.dumps(status._json).encode("utf-8", "replace")) if type(status) is twitter.models.Status else status for status in statuses] # to accomodate test fixture data]
             sorted_statuses_jsons = sorted(statuses_jsons, key=lambda s: datetime.datetime.strptime(s["created_at"], TWITTER_DATETIME_STR_FORMAT))
-            prev_seen_statuses_length = len(seen_statuses)
+            prev_new_seen_statuses_length = len(new_seen_statuses)
+            this_oldest_id = min([status_json["id"] for status_json in sorted_statuses_jsons])
             for i, status_json in enumerate(sorted_statuses_jsons): # go through statuses from oldest to newest
                 status_id = status_json["id"]
                 created_at = datetime.datetime.strptime(status_json["created_at"], TWITTER_DATETIME_STR_FORMAT)
                 # if status hasn't been stored before, store
-                if ((not oldest_id_queried) or (status_id > oldest_id_queried)) and (status_id not in seen_statuses):
+                if status_id not in seen_statuses and status_id not in new_seen_statuses:
                     try:
                         status_record = TwitterStatus(
                             id = status_id,
@@ -591,7 +619,7 @@ class TwitterController():
                             created_at = created_at, #"Sun Apr 16 17:11:30 +0000 2017"
                             status_data = json.dumps(status_json))
                         self.db_session.add(status_record)
-                        seen_statuses.add(status_id)
+                        new_seen_statuses.add(status_id)
                     except:
                         self.log.error("Error while creating TwitterStatus object for user {0}, status id {1}".format(status_json["user"]["id"]["screen_name"], status_id), extra=sys.exc_info()[0])
                         return job_state
@@ -599,14 +627,17 @@ class TwitterController():
                 self.db_session.commit()
             except:
                 self.log.error("Error while saving DB Session for {0} statuses for user {1}.".format(
-                    len(seen_statuses) - prev_seen_statuses_length, user_id), extra=sys.exc_info()[0])
+                    len(new_seen_statuses) - prev_new_seen_statuses_length, user_id), extra=sys.exc_info()[0])
                 return job_state
             else:
-                self.log.info("Saved {0} statuses for user {1}.".format(len(seen_statuses) - prev_seen_statuses_length, user_id))
-            if prev_seen_statuses_length == len(seen_statuses):
+                self.log.info("Saved {0} statuses for user {1}.".format(len(new_seen_statuses) - prev_new_seen_statuses_length, user_id))
+
+            if not backfill and this_oldest_id in seen_statuses:
+                # if not backfill, we don't try to go back in time beyond the newest status we've already stored
                 break
-            if oldest_id_queried is None or min(seen_statuses) < oldest_id_queried:
-                oldest_id_queried = min(seen_statuses)
+            elif oldest_id_queried is None or this_oldest_id < oldest_id_queried:
+                # else, keep looking back until we don't get anymore new statuses from our query
+                oldest_id_queried = this_oldest_id
             else:
                 break
 

@@ -16,6 +16,7 @@ import app.controllers.moderator_controller
 import app.controllers.sticky_comment_experiment_controller
 import app.controllers.lumen_controller
 import app.controllers.twitter_controller
+import app.controllers.twitter_observational_analysis_controller
 from utils.common import PageType, DbEngine
 import app.cs_logger
 from app.models import Base, SubredditPage, Subreddit, Post, ModAction, Experiment
@@ -174,12 +175,16 @@ def fetch_twitter_snapshot_and_tweets(max_time_delta_min=60):
 """
 For all TwitterUsers with CS_most_tweets_queried=False, fetch tweets
 """
-def fetch_twitter_tweets():
-    log.info("Calling fetch_twitter_tweets.")        
+def fetch_twitter_tweets(backfill=False):
+    log.info("Calling fetch_twitter_tweets, backfill={0}.".format(backfill))        
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
-    t.query_and_archive_tweets()
+    t.query_and_archive_tweets(backfill)
 
 
+def twitter_observational_analysis_basic_profiling():
+    to = app.controllers.twitter_observational_analysis_controller.TwitterObservationalAnalysisController(
+        "/home/mmou/Dropbox/Documents/Chronos/MIT/CM/CivilServant",db_session, log)
+    to.basic_profiling_create_dataset()
 
 if __name__ == "__main__":
     fnc = sys.argv[1]

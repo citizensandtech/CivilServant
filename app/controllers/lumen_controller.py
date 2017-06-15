@@ -19,12 +19,18 @@ class LumenController():
     def archive_lumen_notices(self, topics, date):
         nowish = datetime.datetime.utcnow() + datetime.timedelta(days=1)
 
-        recent_notices = self.db_session.query(LumenNotice).filter(LumenNotice.date_received >= date).all()
-        recent_notices_ids = set([notice.id for notice in recent_notices])
+        # notices already stored in db
+        added_notices = self.db_session.query(LumenNotice).filter(LumenNotice.date_received >= date).all()
+        added_notices_ids = set([notice.id for notice in recent_notices])
 
         for topic in topics:
             next_page = 1
             while next_page is not None:
+                # sleep for 2 seconds if we're calling page 2 or more
+                # for now, implement this here. In future add to connection library
+                if(next_page > 1): 
+                  time.sleep(2)
+
                 data = self.l.get_notices_to_twitter([topic], 50, next_page, date, nowish)
                 
                 #with open("tests/fixture_data/lumen_notices_0.json") as f:
@@ -36,14 +42,13 @@ class LumenController():
 
                 notices_json = data["notices"]
                 next_page = data["meta"]["next_page"]
-
-
-                added_notices_ids = set([])
+                max_date_received = None
                 prev_add_notices_size = len(added_notices_ids)
                 for notice in notices_json:
                     nid = notice["id"]
                     date_received = datetime.datetime.strptime(notice["date_received"], '%Y-%m-%dT%H:%M:%S.000Z') # expect string like "2017-04-15T22:28:26.000Z"
-                    if nid not in recent_notices_ids and date_received >= date and date_received <= nowish:
+                    max_date_received = max(date_received, max_date_received) if max_date_received else date_received
+                    if nid not in added_notices_ids and date_received >= date and date_received <= nowish:
                         try:
                             sender = (notice["sender_name"].encode("utf-8", "replace") if notice["sender_name"] else "")
                             principal = (notice["principal_name"].encode("utf-8", "replace") if notice["principal_name"] else "")
@@ -58,11 +63,11 @@ class LumenController():
                                 notice_data = json.dumps(notice).encode("utf-8", "replace"),
                                 CS_parsed_usernames = CS_JobState.NOT_PROCESSED.value)
                             self.db_session.add(notice_record)
-                            recent_notices_ids.add(nid)
                             added_notices_ids.add(nid)
                         except:
                             self.log.error("Error while creating LumenNotice object for notice {0}".format(notice["id"]), extra=sys.exc_info()[0])
-                if len(added_notices_ids) == prev_add_notices_size:
+                if max_date_received <= nowish and len(added_notices_ids) == prev_add_notices_size:
+                    # if we got lumen notices that are from at most nowish and we have seen them all before,
                     break
 
                 prev_add_notices_size = len(added_notices_ids)

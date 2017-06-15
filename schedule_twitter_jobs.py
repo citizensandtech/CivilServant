@@ -23,6 +23,8 @@ python schedule_twitter_jobs.py --function fetch_twitter_users                  
 python schedule_twitter_jobs.py --function fetch_twitter_snapshot_and_tweets    --snapshot_delta_min 1400   --interval 86400 --env development
 python schedule_twitter_jobs.py --function fetch_twitter_tweets                                             --interval 3600 --env development
 
+python schedule_twitter_jobs.py --function fetch_twitter_tweets                 --statuses_backfill          --interval 3600 --env development
+
 """
 
 
@@ -43,6 +45,12 @@ def main():
                         required = False,
                         default= None,
                         help="For fetch_twitter_snapshot_and_tweets; for all users older than snapshot_delta_min (in minutes), need to fetch new snapshots.")
+
+    parser.add_argument("--statuses_backfill",
+                        required = False,
+                        default= None,
+                        action='store_true',
+                        help="For fetch_twitter_tweets; if backfill, finds tweetes for all twitter users, disregarding TwitterUser.CS_oldest_tweets_archived job state.")
 
     parser.add_argument("--interval",
                         default = 3600, # default 60 min = 60*60 = 3600 seconds
@@ -106,7 +114,7 @@ def main():
         scheduler.schedule(
                 scheduled_time=datetime.utcnow(),
                 func=app.controller.fetch_twitter_tweets,
-                args=[],
+                args=[args.statuses_backfill],
                 interval=int(args.interval),
                 repeat=None,
                 result_ttl = ttl,
