@@ -2,10 +2,14 @@ import inspect, os, sys, pytz
 import simplejson as json
 import datetime
 import numpy as np
-from app.models import Base, TwitterUser, TwitterStatus
-from sqlalchemy import and_, func
+from app.models import Base, TwitterUser, TwitterStatus, LumenNotice, TwitterUserSnapshot, LumenNoticeToTwitterUser
+from sqlalchemy import and_, or_, func
 
 utc=pytz.UTC
+
+def append_to_csv(fname, row):
+    with open(fname, "a") as f:
+        f.write(",".join(row) + "\n")
 
 class TwitterObservationalAnalysisController:
     def __init__(self, output_dir, db_session, log):
@@ -13,35 +17,69 @@ class TwitterObservationalAnalysisController:
         self.db_session = db_session
         self.log = log
 
-        self.basic_profiling_header = ["user_id", "user_created_at_time", "num_tweets", "first_notice_time", "oldest_snapshot_status", "newest_snapshot_status", "oldest_tweet_time", "newest_tweet_time", \
-                  "first_notice-created_at_time", "first_notice-oldest_tweet_time", "newest_tweet-first_notice_time"]
+        self.basic_profiling_header = sorted(["user_id", "user_created_at_time", "num_tweets", "first_notice_time", "oldest_snapshot_status", "newest_snapshot_status", "oldest_tweet_time", "newest_tweet_time", \
+                  "first_notice-created_at_time", "first_notice-oldest_tweet_time", "newest_tweet-first_notice_time"])
+        self.basic_profiling_fname = "basic_profiling3.csv"
 
-    def basic_profiling_create_csv(self, dataset):
-        fname = "basic_profiling.csv"
-
-    def basic_profiling_get_statuses(self, dataset):
-        statuses_info = self.db_session.query(
-                TwitterStatus.user_id, func.count(TwitterStatus.id), 
-                func.min(TwitterStatus.created_at), func.max(TwitterStatus.created_at)).group_by(
-            TwitterStatus.user_id).all()
-
-        self.log.info(statuses_info)
-
-        #dataset[user.id]["num_tweets"] = statuses_info[0][0]
-        #dataset[user.id]["oldest_tweet_time"] = statuses_info[0][1]
-        #dataset[user.id]["newest_tweet_time"] = statuses_info[0][1]
+    def basic_profiling_create_csv(self):
+        with open(self.basic_profiling_fname, "w") as f:
+            f.write(",".join(self.basic_profiling_header) + "\n")
 
 
     def basic_profiling_create_dataset(self):
-        dataset = {}
+        self.basic_profiling_create_csv()
+        #dataset = {}
         all_users = self.db_session.query(TwitterUser).all()
 
         for user in all_users:
-            dataset[user.id] = {key:None for key in self.basic_profiling_header}
-            dataset[user.id]["user_id"] = user.id
-            dataset[user.id]["user_created_at_time"] = user.created_at
+            #data = dataset[user.id] 
+            data = {key:None for key in self.basic_profiling_header}
+            data["user_id"] = user.id
+            data["user_created_at_time"] = user.created_at
 
-        dataset = self.basic_profiling_get_statuses(dataset)
+            statuses_info = self.db_session.query(
+                func.count(TwitterStatus.id), 
+                func.min(TwitterStatus.created_at), 
+                func.max(TwitterStatus.created_at)).filter(
+                    or_(TwitterStatus.user_id == user.id,
+                TwitterStatus.user_id == user.not_found_id)).all()
+
+            data["num_tweets"] = statuses_info[0][0]
+            data["oldest_tweet_time"] = statuses_info[0][1]
+            data["newest_tweet_time"] = statuses_info[0][2]
+
+            snapshots = self.db_session.query(
+                TwitterUserSnapshot.user_state).filter(
+                or_(TwitterUserSnapshot.twitter_user_id == user.id, 
+                    TwitterUserSnapshot.twitter_user_id == user.not_found_id)).order_by(
+                TwitterUserSnapshot.record_created_at).all()
+
+            data["oldest_snapshot_status"] = snapshots[0][0]
+            data["newest_snapshot_status"] = snapshots[-1][0]
+
+            notice_ids = self.db_session.query(
+                LumenNoticeToTwitterUser.notice_id).filter(
+                or_(LumenNoticeToTwitterUser.twitter_user_id == user.id, 
+                    LumenNoticeToTwitterUser.twitter_user_id == user.not_found_id, 
+                    LumenNoticeToTwitterUser.twitter_username == user.screen_name)).all()
+
+            notice_ids = [n[0] for n in notice_ids]
+
+            notice_time = self.db_session.query(
+                func.min(LumenNotice.record_created_at)).filter(
+                LumenNotice.id.in_(notice_ids)).all()
+
+            data["first_notice_time"] = notice_time[0][0]
+
+            if data["first_notice_time"] is not None and data["user_created_at_time"] is not None:
+                data["first_notice-created_at_time"] = (data["first_notice_time"] - data["user_created_at_time"]).days
+            if data["first_notice_time"] is not None and data["oldest_tweet_time"] is not None:
+                data["first_notice-oldest_tweet_time"] = (data["first_notice_time"] - data["oldest_tweet_time"]).days 
+            if data["newest_tweet_time"] is not None and data["first_notice_time"] is not None:
+                data["newest_tweet-first_notice_time"] = (data["newest_tweet_time"] - data["first_notice_time"]).days                       
+
+            row = [str(data[k]) for k in self.basic_profiling_header]
+            append_to_csv(self.basic_profiling_fname, row)
 
         """
 
