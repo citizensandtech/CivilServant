@@ -490,7 +490,7 @@ class TwitterController():
 
         self.log.info("About to query and archive tweets {0} users; backfill={1}".format(len(unarchived_users), backfill))
 
-        batch_size = 100 # limit should be 100
+        batch_size = 100
         # query batch_size at a time in order to update job states more often
         prev_limit = 0
         for i in range(1,int(len(unarchived_users)/batch_size)+2):
@@ -503,8 +503,6 @@ class TwitterController():
                 prev_limit = limit
 
             self.log.info("Queried and archived tweets for {0} out of {1} users; backfill={2}".format(prev_limit, len(unarchived_users), backfill))
-
-
 
     """
         user_records: list of TwitterUser records
@@ -572,7 +570,6 @@ class TwitterController():
             query_seen_statuses = self.db_session.query(
                 func.max(TwitterStatus.id)).filter(
                 TwitterStatus.user_id == user_id).first()
-
 
         seen_statuses = set([s[0] for s in query_seen_statuses]) # set of ids already in db; s = (872295416376823808,)
         new_seen_statuses = set([]) # set of ids added this time

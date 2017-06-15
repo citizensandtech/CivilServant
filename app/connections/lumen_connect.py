@@ -37,7 +37,7 @@ class LumenConnect():
         self.log.error("Failed to query lumen url: {0}. Status code {1}.".format(url, r.status_code))
 
     def get_search(self, payload):
-        return self.get("https://Lumendatabase.org/notices/search", payload)
+        return self.get("https://lumendatabase.org/notices/search", payload)
 
     def get_notices_to_twitter(self, topics, count, page, from_date, to_date):
         payload = {

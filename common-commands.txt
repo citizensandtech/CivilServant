@@ -71,5 +71,6 @@ civilservant-error-handler.herokuapp.com
 redis-server &
 rqworker development &
 praw-multiprocess &
-rq-dashboard &
 rqscheduler &
+
+(rq-dashboard &)
