@@ -168,7 +168,6 @@ class CommentController:
                     self.db_session.commit()
                     comment_ids = comment_ids + db_comment_ids
                 except sqlalchemy.exc.DBAPIError as e:
-                    import pdb;pdb.set_trace()
                     self.log.error("Error saving {0} comments to database. Immediate attention needed. Error: {1}".format(len(db_comments),str(e)))
                 self.log.info("  New page fetched: total comments archived from {subreddit_name}: {num_comments}".format(
                     subreddit_name = subreddit.name,
