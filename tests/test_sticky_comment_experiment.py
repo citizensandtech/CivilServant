@@ -38,6 +38,7 @@ def clear_all_tables():
     db_session.query(ExperimentThing).delete()
     db_session.query(ExperimentAction).delete()
     db_session.query(ExperimentThingSnapshot).delete()
+    db_session.query(EventHook).delete()
     db_session.commit()    
 
 def setup_function(function):

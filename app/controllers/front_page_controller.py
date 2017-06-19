@@ -7,6 +7,7 @@ import reddit.praw_utils as praw_utils
 import reddit.queries
 from utils.common import PageType
 from app.models import Base, FrontPage
+#from app.event_handler import event_handler
 
 ALL_SUBREDDIT_NAME = "all"
 
@@ -16,6 +17,10 @@ class FrontPageController:
     self.log = log
     self.all_sub = r.get_subreddit(ALL_SUBREDDIT_NAME)
 
+    ## for event_handler
+    #self.posts = []
+
+  #@event_handler
   def fetch_reddit_front_page(self, pg_type, limit=100):
       posts = []
       fetched = []
@@ -47,6 +52,8 @@ class FrontPageController:
             }
           posts.append(pruned_post)
       self.log.info("Queried reddit {0} page".format(pg_type.name))
+
+      #self.posts = posts
       return posts
 
   def archive_reddit_front_page(self, pg_type = PageType.TOP):

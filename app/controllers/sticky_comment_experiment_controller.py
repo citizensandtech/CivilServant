@@ -10,6 +10,7 @@ from dateutil import parser
 from utils.common import *
 from app.models import Base, SubredditPage, Subreddit, Post, ModAction, PrawKey, Comment
 from app.models import Experiment, ExperimentThing, ExperimentAction, ExperimentThingSnapshot
+from app.models import EventHook
 from sqlalchemy import and_, or_
 from app.controllers.subreddit_controller import SubredditPageController
 import numpy as np
@@ -26,8 +27,7 @@ class StickyCommentExperimentController:
         self.r = r
         self.load_experiment_config(required_keys, experiment_name)
         
-        
-    def load_experiment_config(self, required_keys, experiment_name):
+    def get_experiment_config(self, required_keys, experiment_name):        
         experiment_file_path = os.path.join(BASE_DIR, "config", "experiments", experiment_name) + ".yml"
         with open(experiment_file_path, 'r') as f:
             try:
@@ -44,7 +44,10 @@ class StickyCommentExperimentController:
             if key not in experiment_config.keys():
                 self.log.error("Value missing from {0}: {1}".format(experiment_file_path, key))
                 sys.exit(1)
-        
+        return experiment_config
+
+    def load_experiment_config(self, required_keys, experiment_name):
+        experiment_config = self.get_experiment_config(required_keys, experiment_name)
         experiment = self.db_session.query(Experiment).filter(Experiment.name == experiment_name).first()
         if(experiment is None):
 
@@ -84,6 +87,43 @@ class StickyCommentExperimentController:
 
         ## LOAD SUBREDDIT PAGE CONTROLLER
         self.subreddit_page_controller = SubredditPageController(self.subreddit,self.db_session, self.r, self.log)
+
+        # LOAD EVENT HOOKS
+        self.load_event_hooks(experiment_config)
+
+    def load_event_hooks(self, experiment_config):
+        if 'event_hooks' not in experiment_config:
+            return
+
+        hooks = experiment_config['event_hooks']
+
+        now = datetime.datetime.utcnow()
+        for hook_name in hooks:
+            hook = self.db_session.query(EventHook).filter(
+                EventHook.name == hook_name).first()
+            if not hook:
+                call_when_str = hooks[hook_name]['call_when']
+                if call_when_str == "EventWhen.BEFORE":
+                    call_when = EventWhen.BEFORE.value
+                elif call_when_str == "EventWhen.AFTER":
+                    call_when = EventWhen.AFTER.value
+                else:
+                    self.log.error("call_when string incorrectly formatted: {0}".format(call_when_str))
+                    sys.exit(1)
+
+                hook_record = EventHook(
+                    name = hook_name,
+                    created_at = now,
+                    experiment_id = self.experiment.id,
+                    is_active = hooks[hook_name]['is_active'],
+                    call_when = call_when,
+                    caller_controller = hooks[hook_name]['caller_controller'],
+                    caller_method = hooks[hook_name]['caller_method'],
+                    callee_module = hooks[hook_name]['callee_module'],
+                    callee_controller = hooks[hook_name]['callee_controller'],
+                    callee_method = hooks[hook_name]['callee_method'])
+                self.db_session.add(hook_record)
+                self.db_session.commit()
 
     ## main scheduled job
     def update_experiment(self):
@@ -457,6 +497,7 @@ class AMAStickyCommentExperimentController(StickyCommentExperimentController):
 
     ###############################
     ### EXPERIMENT-SPECIFIC METHODS
+    ###############################
 
     def is_ama(self, submission):
         flair = []
@@ -511,3 +552,49 @@ class SubsetStickyCommentExperimentController(StickyCommentExperimentController)
     def intervene_considered_domain_arm_2(self, experiment_thing, submission):
         return self.make_sticky_post(experiment_thing, submission)
     
+
+
+
+class ChangingStickyCommentExperimentController(StickyCommentExperimentController):
+
+    def __init__(self, experiment_name, db_session, r, log):
+        required_keys = ['subreddit', 'subreddit_id', 'username', 
+                         'start_time', 'end_time',
+                         'max_eligibility_age', 'min_eligibility_age',
+                         'conditions', 'event_hooks']
+
+        super().__init__(experiment_name, db_session, r, log, required_keys)
+
+
+    #######################################################
+    ## CODE FOR FRONTPAGE CALLBACK
+    #######################################################
+
+    """
+    callback function for FrontPageController.fetch_reddit_front_page
+    args:
+        instance: instance of caller class (all callback functions must only pass in instance)
+    """
+    def change_sticky_comment_text(self, instance):  
+        post_ids = self.sub_posts_on_frontpage(instance)
+        for pid in post_ids:
+            # TODO: change text... which really means, change treatment condition/bucket?
+            # needed: an example yml for this kind of experiment
+            pass
+
+    """
+    returns all post ids in subreddit that are in front page's "posts" variable
+    """
+    def sub_posts_on_frontpage(self, instance):
+        frontpage_posts = instance.posts
+
+        # get all frontpage posts that are from the subreddit 
+        sub_posts = self.db_session.query(Post.id).filter(
+            Post.subreddit_id == self.subreddit_id).all()
+        sub_posts = set([p[0] for p in sub_posts])
+
+        post_ids = [p['id'] for p in frontpage_posts if p['id'] in sub_posts]
+        return post_ids
+
+
+

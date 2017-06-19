@@ -173,6 +173,16 @@ class ExperimentAction(Base):
     metadata_json       = Column(MEDIUMTEXT)
 
     
-
-
-
+class EventHook(Base):
+    __tablename__ = "event_hooks"
+    id                  = Column(Integer, primary_key=True)
+    name                = Column(String(256), index=True) 
+    created_at          = Column(DateTime, default=datetime.datetime.utcnow)
+    experiment_id       = Column(Integer, index=True)
+    is_active           = Column(Boolean, default=False)
+    call_when           = Column(Integer) # see utils/common.py EventWhen Enum 
+    caller_controller   = Column(String(256), nullable=False)
+    caller_method       = Column(String(256), nullable=False)   
+    callee_module       = Column(String(256), nullable=False) # module, e.g. "app.controllers.sticky_comment_experiment_controller"    
+    callee_controller   = Column(String(256), nullable=False) # class, e.g. "ChangingStickyCommentExperimentController"
+    callee_method       = Column(String(256), nullable=False) # method, e.g. "change_sticky_comment_text"

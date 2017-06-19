@@ -1,0 +1,58 @@
+test:
+  subreddit: subfoo
+  subreddit_id: subfoo
+  username: CivilServantBot
+  conditions: 
+    ama:
+        randomizations: sticky_comment_science_0_ama.conditions.csv
+        next_randomization: 0 
+        arms:
+            arm_0: null
+            arm_1: |
+                This is arm 1 of the ama condition
+    nonama:
+        randomizations: sticky_comment_science_0_nonama.conditions.csv
+        next_randomization: 0 
+        arms:
+            arm_0: null
+            arm_1: |
+                This is arm 1 of the nonama condition  
+  controller: StickyCommentExperimentTestController
+  start_time: 01/01/2016 00:00:00 UTC
+  end_time: 01/01/3016 23:59:59 UTC
+  max_eligibility_age: 300
+  min_eligibility_age: 120
+  event_hooks:
+    test_before_hook:
+      is_active: True
+      call_when: EventWhen.BEFORE
+      caller_controller: SomeTestController
+      caller_method: test_set_data
+      callee_module: app.controllers.test_controller
+      callee_controller: StickyCommentExperimentTestController
+      callee_method: test_before_hook
+    test_after_hook:
+      is_active: True
+      call_when: EventWhen.AFTER
+      caller_controller: SomeTestController
+      caller_method: test_set_data
+      callee_module: app.controllers.test_controller
+      callee_controller: StickyCommentExperimentTestController
+      callee_method: test_after_hook
+    test_after_count_hook:
+      is_active: True
+      call_when: EventWhen.AFTER
+      caller_controller: SomeTestController
+      caller_method: test_set_data
+      callee_module: app.controllers.test_controller
+      callee_controller: StickyCommentExperimentTestController
+      callee_method: test_after_count_hook      
+    test_before_inactive_hook:
+      is_active: False
+      call_when: EventWhen.BEFORE
+      caller_controller: SomeTestController
+      caller_method: test_set_data
+      callee_module: app.controllers.test_controller
+      callee_controller: StickyCommentExperimentTestController
+      callee_method: test_before_hook      
+            
