@@ -182,9 +182,21 @@ def fetch_twitter_tweets(backfill=False):
 
 
 def twitter_observational_analysis_basic_profiling():
+    tb = app.controllers.twitter_observational_analysis_controller.TwitterBasicProfilingController(
+        "/home/mmou/Dropbox/Documents/Chronos/MIT/CM/CivilServant", db_session, log)
+    tb.basic_profiling_create_dataset()
+
+
+# python app/controller.py twitter_observational_analysis 2017-05-31 2017-06-02 7 /home/mmou/Dropbox/Documents/Chronos/MIT/CM/CivilServant
+def twitter_observational_analysis(start_date, end_date, min_observed_days, output_dir):
+    start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+    end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")    
+    min_observed_days = int(min_observed_days)
+
     to = app.controllers.twitter_observational_analysis_controller.TwitterObservationalAnalysisController(
-        "/home/mmou/Dropbox/Documents/Chronos/MIT/CM/CivilServant",db_session, log)
-    to.basic_profiling_create_dataset()
+        start_date, end_date, min_observed_days, output_dir, db_session, log)
+    to.create_csvs()
+
 
 if __name__ == "__main__":
     fnc = sys.argv[1]
