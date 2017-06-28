@@ -13,6 +13,8 @@ import datetime
 import numpy as np
 from app.models import Base, TwitterUser, TwitterStatus, LumenNotice, TwitterUserSnapshot, LumenNoticeToTwitterUser
 from sqlalchemy import and_, or_, func
+from utils.common import TwitterUserState, NOT_FOUND_TWITTER_USER_STR
+import copy
 
 utc=pytz.UTC
 TWITTER_DATETIME_STR_FORMAT = "%a %b %d %H:%M:%S %z %Y"
@@ -21,8 +23,13 @@ TWITTER_DATETIME_STR_FORMAT = "%a %b %d %H:%M:%S %z %Y"
 def append_rows_to_csv(dataframe, header, output_dir, fname):
     with open(os.path.join(output_dir, fname), "a") as f:
         for uid in dataframe:
-            row = [str(dataframe[uid][label]) for label in header[1:]]
-            f.write(",".join(row) + "\n")
+            if "tweet_day" in fname:    # hacky but works...
+                for dn in dataframe[uid]:
+                    row = [str(dataframe[uid][dn][label]) for label in header]
+                    f.write(",".join(row) + "\n")
+            elif "user" in fname:
+                row = [str(dataframe[uid][label]) for label in header]
+                f.write(",".join(row) + "\n")
 
 def date_to_str(date):
     return "{0}-{1}-{2}".format(date.year, date.month, date.day)
@@ -34,36 +41,28 @@ class TwitterObservationalAnalysisController:
 
         self.min_observed_days = min_observed_days
         now = utc.localize(datetime.datetime.utcnow())
-        self.end_date_utc = min(
-            self.end_date_utc, now - datetime.timedelta(days=self.min_observed_days))
+        #self.end_date_utc = min(self.end_date_utc, now - datetime.timedelta(days=self.min_observed_days))
 
         self.output_dir = output_dir
         self.db_session = db_session
         self.log = log
 
-        # basic_profiling was used for initial data exploration
-        self.basic_profiling_header = sorted(["user_id", "user_created_at_time", "num_tweets", "first_notice_time", "oldest_snapshot_status", "newest_snapshot_status", "oldest_tweet_time", "newest_tweet_time", \
-                  "first_notice-created_at_time", "first_notice-oldest_tweet_time", "newest_tweet-first_notice_time"])
-        self.basic_profiling_fname = "basic_profiling3.csv"
+        self.user_ids_to_not_found_ids = {}
 
-
-
-        self.user_ids = []
-
-        self.tweet_day_header = ["id", "created_at", "user_language", "user_default_profile", \
+        self.tweet_day_header = ["id", "not_found_id", "created_at", "user_language", "user_default_profile", \
             "user_verified", "date_first_notice_received", "notices_received", \
             "notices_received_on_day", "day_num", "before_first_notice", \
             "after_first_notice", "num_tweets", "num_media_tweets", "hours_unavailable", \
-            "account_suspended", "account_deleted", "account_protected"]
+            "account_suspended", "account_deleted", "account_protected", "total_tweets", "total_past_tweets"]
         self.tweet_day_fname = "{0}_obs_analysis_tweet_day_{1}-{2}_n={3}.csv".format(
             date_to_str(now), 
             date_to_str(self.start_date_utc), date_to_str(self.end_date_utc),
             self.min_observed_days) 
 
-        self.user_header = ["id", "created_at", "user_language", "user_default_profile", 
-            "user_verified", "date_first_notice_received", "notices_received", "tweets_per_day_before_first_notice", 
+        self.user_header = ["id", "not_found_id", "created_at", "user_language", "user_default_profile", 
+            "user_verified", "date_first_notice_received", "tweets_per_day_before_first_notice", 
             "tweets_per_day_after_first_notice", "hours_unavailable", "account_suspended", 
-            "account_deleted", "account_protected", "notices_received"]
+            "account_deleted", "account_protected", "notices_received", "total_tweets", "total_past_tweets"]
         self.user_fname = "{0}_obs_analysis_user_{1}-{2}_n={3}.csv".format(
             date_to_str(now), 
             date_to_str(self.start_date_utc), date_to_str(self.end_date_utc),
@@ -116,43 +115,72 @@ class TwitterObservationalAnalysisController:
 
         self.create_datasets()
 
-        append_rows_to_csv(self.tweet_day_dataframe, self.tweet_day_header, self.output_dir, self.tweet_day_fname)
-        append_rows_to_csv(self.user_dataframe, self.user_header, self.output_dir, self.user_fname)
-
 
     # Returns Two Lists of Dicts, Where Each Dict Contains One Row
     def create_datasets(self):
 
-        # For all lumen notices received in [range of time] and were at least [x] days ago,
+        # For all lumen notices received in [range of time]
         self.log.info("Getting notice dates...")
         self.twitter_users_to_notice_dates = self.get_users_to_notice_dates()   # {user_id: [notice_date_received_day]}
-        self.user_ids = self.twitter_users_to_notice_dates.keys()
+        self.user_ids_to_not_found_ids = {uid: None for uid in self.twitter_users_to_notice_dates.keys()}
 
         # Get user info
         # Get twitter users (use first snapshot for user info)
         self.log.info("Getting user snapshots...")
-        self.twitter_users_to_snapshots = self.get_users_to_snapshots()
-
-        #Get tweets
-        #Need to do something about tweet deletion
-        self.log.info("Getting user tweets...")        
-        self.twitter_users_to_tweets = self.get_users_to_tweets()   # {user_id: [tweet_created_at_day]}
-
-        #Calculate day_num relative to 1st notice day
-        #Get user state per day, suspended/deleted/protected
-        self.log.info("Getting user day nums...")        
-        self.twitter_users_day_nums = self.get_users_day_nums()
-
-        #Calculate aggregates
-        self.log.info("Getting user aggregates...")        
-        self.twitter_users_aggregates = self.get_aggregates()
+        self.twitter_users_to_snapshots = self.get_users_to_snapshots() # get all snapshots, modifies self.user_ids_to_not_found_ids!!!
 
 
-        self.log.info("Creating dataframes...")        
-        self.create_dataframes()
+        ####        
+        uids = [id for id in self.user_ids_to_not_found_ids if "NOT_FOUND" not in id]
+        self.log.info("Out of total {0} users, {1} have found ids".format(len(self.user_ids_to_not_found_ids), len(uids)))
+        partially_unavailable_ids = {id: self.user_ids_to_not_found_ids[id] for id in uids if self.user_ids_to_not_found_ids[id] is not None}
+        self.log.info("Out of {0} found ids, {1} also have corresponding not_found_ids: {2}".format(len(uids), len(partially_unavailable_ids), partially_unavailable_ids))
+
+
+
+        # query batch_size at a time in order to update job states more often
+        batch_size = 20
+        prev_limit = 0
+        for i in range(1,int(len(uids)/batch_size)+2):
+            limit = min(i*batch_size, len(uids))
+            self.log.info("Now about to process users indexed {0}-{1}, out of {2} users".format(prev_limit, limit, len(uids)))
+            if limit > prev_limit:
+                this_uids = uids[prev_limit:limit]
+
+
+                #Get tweets
+                #Need to do something about tweet deletion
+                self.log.info("> Getting user tweets...")        
+                self.twitter_users_to_tweets = self.get_users_to_tweets(this_uids)   # {user_id: [tweet_created_at_day]}
+
+                #Calculate day_num relative to 1st notice day
+                #Get user state per day, suspended/deleted/protected
+                self.log.info("> Getting user day nums...")        
+                self.twitter_users_day_nums = self.get_users_day_nums(this_uids)
+
+                #Calculate aggregates
+                self.log.info("> Getting user aggregates...")        
+                self.twitter_users_aggregates = self.get_aggregates(this_uids)
+
+
+                self.log.info("> Creating dataframes...")        
+                self.create_dataframes(this_uids)
+
+                append_rows_to_csv(self.tweet_day_dataframe, self.tweet_day_header, self.output_dir, self.tweet_day_fname)
+                append_rows_to_csv(self.user_dataframe, self.user_header, self.output_dir, self.user_fname)
+
+                self.tweet_day_dataframe = {}
+                self.user_dataframe = {}
+
+                prev_limit = limit
+
+            self.log.info("Processed {0} out of {1} users".format(prev_limit, len(uids)))
+
+
+
+
 
     def get_users_to_notice_dates(self):
-
         twitter_users_to_notice_dates = {} # {user_id: [notice_date_received_day]}
         notices = self.db_session.query(LumenNotice).filter(
             and_(LumenNotice.date_received >= self.start_date_utc,
@@ -168,6 +196,8 @@ class TwitterObservationalAnalysisController:
 
         for ntu in notice_to_twitter_users:
             uid = ntu.twitter_user_id
+
+            # remove None because that means 
             if uid not in twitter_users_to_notice_dates:
                 twitter_users_to_notice_dates[uid] = []
             notice_date = notice_id_to_date[ntu.notice_id]
@@ -179,33 +209,60 @@ class TwitterObservationalAnalysisController:
     def get_users_to_snapshots(self):
         twitter_users_to_snapshots = {} # {user_id: [snapshot]}
         num_snapshots = 0
-        for uid in self.user_ids:
+        for uid in self.user_ids_to_not_found_ids:
             snapshots = self.db_session.query(TwitterUserSnapshot).filter(
                 or_(TwitterUserSnapshot.twitter_user_id == uid,
                     TwitterUserSnapshot.twitter_not_found_id == uid)).order_by(
                 TwitterUserSnapshot.record_created_at).all()
+
+
+            for snapshot in snapshots:
+                if snapshot.twitter_user_id and snapshot.twitter_not_found_id and snapshot.twitter_user_id != snapshot.twitter_not_found_id:
+                    if snapshot.twitter_not_found_id==uid and NOT_FOUND_TWITTER_USER_STR in uid:
+                        # only 2 class attributes that are set before get_users_to_snapshots is run:
+                        self.user_ids_to_not_found_ids.pop(uid, None)
+                        self.user_ids_to_not_found_ids[snapshot.twitter_user_id] = uid
+
+                        self.twitter_users_to_notice_dates[snapshot.twitter_user_id] = copy.deepcopy(self.twitter_users_to_notice_dates[uid])
+                        self.twitter_users_to_notice_dates.pop(uid, None)
+
+                        uid = snapshot.twitter_user_id
+
+                    elif snapshot.twitter_user_id==uid:
+                        if self.user_ids_to_not_found_ids[uid] is not None and self.user_ids_to_not_found_ids[uid] != snapshot.twitter_not_found_id:
+                            self.log.info("Unexpected multiple-id-switches= uid: {0}, not_found: {1}, new_not_found: {2}".format(
+                                uid, self.user_ids_to_not_found_ids[uid], snapshot.twitter_not_found_id))
+                        self.user_ids_to_not_found_ids[uid] = snapshot.twitter_not_found_id
+                        # and this doesn't change self.twitter_users_to_notice_dates keys
+
             twitter_users_to_snapshots[uid] = snapshots
             num_snapshots += len(snapshots)
+
         self.log.info("Retrieved {0} TwitterUserSnapshot.".format(num_snapshots))
         return twitter_users_to_snapshots
 
-    def get_users_to_tweets(self):
+    def get_users_to_tweets(self, this_uids):
         twitter_users_to_tweets = {}    # {user_id: [tweet_created_at_day]}
+        
+        ###
+        batch_size = 20/2
 
         num_tweets = 0
-        for uid in self.user_ids:
-            tweets = self.db_session(TwitterStatus).filter(
-                TwitterStatus.user_id == uid).order_by(
-                TwitterUserSnapshot.created_at).all()
+        for (i, uid) in enumerate(this_uids):
+            tweets = self.db_session.query(TwitterStatus).filter(
+                or_(TwitterStatus.user_id == uid,
+                    TwitterStatus.user_id == self.user_ids_to_not_found_ids[uid])).all()
             twitter_users_to_tweets[uid] = tweets
             num_tweets += len(tweets)
+            if i % batch_size == 0 and i != 0:
+                self.log.info("...{0} of {1} users; retrieved {2} TwitterStatus so far".format(i, len(this_uids), num_tweets))
         self.log.info("Retrieved {0} TwitterStatus.".format(num_tweets))
         return twitter_users_to_tweets
 
-    def get_users_day_nums(self):
+    def get_users_day_nums(self, this_uids):
         #??? should we remove day_nums that are too large/small?
         twitter_users_day_nums = {}
-        for uid in self.user_ids:
+        for uid in this_uids:
             twitter_users_day_nums[uid] = {}
             first_notice_date = self.twitter_users_to_notice_dates[uid][0]
             day_0 = datetime.datetime(first_notice_date.year, first_notice_date.month, first_notice_date.day)
@@ -213,89 +270,134 @@ class TwitterObservationalAnalysisController:
             # num_notices
             for notice_date in self.twitter_users_to_notice_dates[uid]:
                 day_num = (notice_date - day_0).days
-                if day_num not in twitter_users_day_nums:
-                    twitter_users_day_nums[day_num] = copy.deepcopy(self.default_day_num_dict_template)
-                twitter_users_day_nums[day_num]["num_notices"] += 1
+                if day_num not in twitter_users_day_nums[uid]:
+                    twitter_users_day_nums[uid][day_num] = copy.deepcopy(self.default_day_num_dict_template)
+                twitter_users_day_nums[uid][day_num]["num_notices"] += 1
 
             # num_tweets, num_media_tweets 
             tweets = self.twitter_users_to_tweets[uid] if uid in self.twitter_users_to_tweets else []
             for tweet in tweets:
                 day_num = (tweet.created_at - day_0).days
-                if day_num not in twitter_users_day_nums:                 
-                    twitter_users_day_nums[day_num] = copy.deepcopy(self.default_day_num_dict_template)
-                twitter_users_day_nums[day_num]["num_tweets"] += 1
+                if day_num not in twitter_users_day_nums[uid]:                 
+                    twitter_users_day_nums[uid][day_num] = copy.deepcopy(self.default_day_num_dict_template)
+                twitter_users_day_nums[uid][day_num]["num_tweets"] += 1
 
                 # look for media entities
                 # https://dev.twitter.com/overview/api/entities-in-twitter-objects
                 status_data_json = json.loads(tweet.status_data)
-                if "entities" in status_data_json and "media" in status_data_json["entities"]["media"]:
-                    twitter_users_day_nums[day_num]["num_media_tweets"] += 1                    
+                if "entities" in status_data_json and "media" in status_data_json["entities"]:
+                    twitter_users_day_nums[uid][day_num]["num_media_tweets"] += 1                    
 
             # suspended, deleted, protected
-            for snapshot in self.twitter_users_to_snapshots:
+            for snapshot in self.twitter_users_to_snapshots[uid]:
                 day_num = (snapshot.record_created_at - day_0).days
-                if day_num not in twitter_users_day_nums:
-                    twitter_users_day_nums[day_num] = copy.deepcopy(self.default_day_num_dict_template)
-                if snapshot.user_state == TwitterUserState.NOT_FOUND:
-                    twitter_users_day_nums[day_num]["deleted"] = True
-                if snapshot.user_state == TwitterUserState.SUSPENDED:
-                    twitter_users_day_nums[day_num]["suspended"] = True
-                if snapshot.user_state == TwitterUserState.PROTECTED:
-                    twitter_users_day_nums[day_num]["protected"] = True                  
+
+                if day_num not in twitter_users_day_nums[uid]:
+                    twitter_users_day_nums[uid][day_num] = copy.deepcopy(self.default_day_num_dict_template)
+                
+                twitter_users_day_nums[uid][day_num]["deleted"] = (snapshot.user_state == TwitterUserState.NOT_FOUND.value)
+                twitter_users_day_nums[uid][day_num]["suspended"] = (snapshot.user_state == TwitterUserState.SUSPENDED.value)
+                twitter_users_day_nums[uid][day_num]["protected"] = (snapshot.user_state == TwitterUserState.PROTECTED.value)                  
 
         return twitter_users_day_nums
 
-    def get_aggregates(self):
+    def get_aggregates(self, this_uids, prune=True):
         #Calculate aggregates
         #prune ids. ???? should we do this?
-        pruned_user_ids = []
+        qualifying_user_ids = set([])
         twitter_users_aggregates = {}
-        for uid in self.user_ids:
+        for uid in this_uids:
             aggregates = {
                 "total_unavailable_hours": 0,   # how to calculate this ????
                 "num_days_before_day_0": 0,
                 "num_days_after_day_0": 0,
                 "ave_tweets_before_day_0": 0,
                 "ave_tweets_after_day_0": 0,
+                "total_tweets": 0,
                 "account_suspended": False, # ever
                 "account_deleted": False, # ever
-                "account_protected": False, # ever           
+                "account_protected": False, # ever         
             }
 
-            aggregates["num_days_before_day_0"] = min(0, 0 - min(self.twitter_users_day_nums[uid]))
-            aggregates["num_days_after_day_0"] = max(0, max(self.twitter_users_day_nums[uid]))
-            if aggregates["num_days_before_day_0"] >= self.min_observed_days and aggregates["num_days_after_day_0"] >= self.min_observed_days:
-                pruned_user_ids.append(uid)
+            this_day_nums = [dn for dn in self.twitter_users_day_nums[uid].keys()]
+            if min(this_day_nums) <= -self.min_observed_days and max(this_day_nums) >= self.min_observed_days:
+                qualifying_user_ids.add(uid)
+            else:
+                # not best design...
+                self.user_ids_to_not_found_ids.pop(uid, None) 
 
-            aggregates["total_unavailable_hours"] = 24*sum([1 for dn in self.twitter_users_day_nums[uid] if (dn["suspended"] or dn["deleted"] or dn["protected"])])
-            aggregates["ave_tweets_before_day_0"] = sum(
-                    [self.twitter_users_day_nums[uid][dn]["num_tweets"] 
-                    for dn in self.twitter_users_day_nums[uid] if dn < 0]
-                ) / aggregates["num_days_before_day_0"]
-            aggregates["ave_tweets_after_day_0"] = sum(
-                    [self.twitter_users_day_nums[uid][dn]["num_tweets"] 
-                    for dn in self.twitter_users_day_nums[uid] if dn > 0]
-                ) / aggregates["num_days_after_day_0"]
+            if (prune and uid in qualifying_user_ids) or (not prune):
+                # prune this_day_nums so that aggregate calculations are accurate
+                if prune:
+                    this_day_num_dicts = {dn: self.twitter_users_day_nums[uid][dn] for dn in self.twitter_users_day_nums[uid] if dn >= -self.min_observed_days and dn <= self.min_observed_days}
+                else:
+                    this_day_num_dicts = self.twitter_users_day_nums[uid]
 
-            aggregates["account_suspended"] = any([self.twitter_users_day_nums[uid][dn]["suspended"] for dn in self.twitter_users_day_nums[uid]])
-            aggregates["account_deleted"] = any([self.twitter_users_day_nums[uid][dn]["deleted"] for dn in self.twitter_users_day_nums[uid]])
-            aggregates["account_protected"] = any([self.twitter_users_day_nums[uid][dn]["protected"] for dn in self.twitter_users_day_nums[uid]])                        
+                #if uid in ['851658170455994368', '788958311714398208', '846706659732865025', '784022010456182785', '772763098239283201', '859037528858304513', '847768318232494080']:
+                #    self.log.info(uid)
+                #    self.log.info(this_day_num_dicts)
 
-            twitter_users_aggregates[user] = aggregates
+                aggregates["num_days_before_day_0"] = max(0, 0 - min(this_day_num_dicts)) if len(this_day_num_dicts) > 0 else 0
+                aggregates["num_days_after_day_0"] = max(0, max(this_day_num_dicts)) if len(this_day_num_dicts) > 0 else 0
 
-        self.log.info("Pruned user_ids. {0} qualifying user_ids from {1} total.".format(len(pruned_user_ids), len(self.user_ids)))
-        self.user_ids = pruned_user_ids
 
+                aggregates["total_unavailable_hours"] = 24*sum([1 for dn in this_day_num_dicts if (this_day_num_dicts[dn]["suspended"] or this_day_num_dicts[dn]["deleted"] or this_day_num_dicts[dn]["protected"])])
+
+                ###### why do these 2 fields have identical values??? #####
+                aggregates["ave_tweets_before_day_0"] = round(sum([this_day_num_dicts[dn]["num_tweets"] for dn in this_day_num_dicts if dn < 0]) / aggregates["num_days_before_day_0"], 2) if aggregates["num_days_before_day_0"] > 0 else 0 
+                aggregates["ave_tweets_after_day_0"] = round(sum([this_day_num_dicts[dn]["num_tweets"] for dn in this_day_num_dicts if dn > 0]) / aggregates["num_days_after_day_0"], 2) if aggregates["num_days_after_day_0"] > 0 else 0
+                aggregates["total_tweets"] = sum([this_day_num_dicts[dn]["num_tweets"] for dn in this_day_num_dicts])
+
+                aggregates["account_suspended"] = any([this_day_num_dicts[dn]["suspended"] for dn in this_day_num_dicts])
+                aggregates["account_deleted"] = any([this_day_num_dicts[dn]["deleted"] for dn in this_day_num_dicts])
+                aggregates["account_protected"] = any([this_day_num_dicts[dn]["protected"] for dn in this_day_num_dicts])                        
+
+                twitter_users_aggregates[uid] = aggregates
+
+        self.log.info("Pruned user_ids (prune={3}). {0} qualifying user_ids from {1} in this batch, {2} total.".format(len(qualifying_user_ids), len(this_uids), len(self.user_ids_to_not_found_ids), prune))
+        
         return twitter_users_aggregates
 
-    def create_dataframes(self):
-        for uid in self.user_ids:
-            user_json = json.loads(self.twitter_users_to_snapshots[uid][0].user_json)
-            self.tweet_day_dataframe[uid] = {label: None for label in self.tweet_day_header}
+    def create_dataframes(self, this_uids):
+        for uid in this_uids:
+            if uid not in self.user_ids_to_not_found_ids:
+                # was pruned
+                continue
+
+            user_json = None
+            for snapshot in self.twitter_users_to_snapshots[uid]:
+                if snapshot.user_json and snapshot.user_json != "":
+                    user_json = json.loads(snapshot.user_json)
+                    break
+
+            self.tweet_day_dataframe[uid] = {}
+            user_tweet_day = {
+                "id": uid, 
+                "not_found_id": self.user_ids_to_not_found_ids[uid],
+                "created_at": None, 
+                "user_language": None, 
+                "user_default_profile": None, 
+                "user_verified": None, 
+                "date_first_notice_received": None, 
+                "notices_received": 0, 
+                "notices_received_on_day": 0, 
+                "day_num": None, 
+                "before_first_notice": None, 
+                "after_first_notice": None, 
+                "total_tweets": self.twitter_users_aggregates[uid]["total_tweets"],
+                "total_past_tweets": 0,                
+                "num_tweets": 0, 
+                "num_media_tweets": 0, 
+                "hours_unavailable": 0, 
+                "account_suspended": False, 
+                "account_deleted": False, 
+                "account_protected": False            
+            }
 
             self.user_dataframe[uid] = {label: None for label in self.user_header}            
             self.user_dataframe[uid] = {
-                "id": None,
+                "id": uid,
+                "not_found_id": self.user_ids_to_not_found_ids[uid],                
                 "created_at": None,
                 "user_language": None,
                 "user_default_profile": None,
@@ -303,58 +405,51 @@ class TwitterObservationalAnalysisController:
                 "date_first_notice_received": self.twitter_users_to_notice_dates[uid][0],
                 "notices_received": len(self.twitter_users_to_notice_dates[uid]),
                 "tweets_per_day_before_first_notice": self.twitter_users_aggregates[uid]["ave_tweets_before_day_0"], 
-                "tweets_per_day_after_first_notice": self.twitter_users_aggregates[uid]["ave_tweets_before_day_0"], 
+                "tweets_per_day_after_first_notice": self.twitter_users_aggregates[uid]["ave_tweets_after_day_0"], 
+                "total_tweets": self.twitter_users_aggregates[uid]["total_tweets"],
                 "hours_unavailable": self.twitter_users_aggregates[uid]["total_unavailable_hours"], 
                 "account_suspended": self.twitter_users_aggregates[uid]["account_suspended"], 
                 "account_deleted": self.twitter_users_aggregates[uid]["account_deleted"], 
                 "account_protected": self.twitter_users_aggregates[uid]["account_protected"], 
             }
 
-            if user_json is not None:
-                self.tweet_day_dataframe[uid]["id"] = uid
-                self.tweet_day_dataframe[uid]["created_at"] = datetime.datetime.strptime(user_json["created_at"], TWITTER_DATETIME_STR_FORMAT)
-                self.tweet_day_dataframe[uid]["user_language"] = user_json["lang"]
-                self.tweet_day_dataframe[uid]["user_default_profile"] = user_json["default_profile"] and user_json["default_profile_image"] #???? profile and/or profile_image? 
-                self.tweet_day_dataframe[uid]["user_verified"] = user_json["verified"]
 
-                self.user_dataframe[uid]["id"] =  uid
+            if user_json is not None:
+                user_tweet_day["created_at"] = datetime.datetime.strptime(user_json["created_at"], TWITTER_DATETIME_STR_FORMAT)
+                user_tweet_day["user_language"] = user_json["lang"]
+                user_tweet_day["user_default_profile"] = user_json["default_profile_image"] 
+                user_tweet_day["user_verified"] = user_json["verified"]
+                user_tweet_day["total_past_tweets"] = user_json["statuses_count"]
+
                 self.user_dataframe[uid]["created_at"] =  datetime.datetime.strptime(user_json["created_at"], TWITTER_DATETIME_STR_FORMAT)
                 self.user_dataframe[uid]["user_language"] =  user_json["lang"]
-                self.user_dataframe[uid]["user_default_profile"] =  user_json["default_profile"] and user_json["default_profile_image"] #???? profile and/or profile_image? 
+                self.user_dataframe[uid]["user_default_profile"] =  user_json["default_profile_image"] 
                 self.user_dataframe[uid]["user_verified"] =  user_json["verified"]
+                self.user_dataframe[uid]["total_past_tweets"] =  user_json["statuses_count"]
 
-            self.tweet_day_dataframe[uid]["date_first_notice_received"] = self.twitter_users_to_notice_dates[uid][0] 
-            self.tweet_day_dataframe[uid]["notices_received"] = len(self.twitter_users_to_notice_dates[uid]) 
+            user_tweet_day["date_first_notice_received"] = self.twitter_users_to_notice_dates[uid][0] 
+            user_tweet_day["notices_received"] = len(self.twitter_users_to_notice_dates[uid]) 
 
-            for i in range(-self.twitter_users_aggregates[uid]["num_days_before_day_0"], self.twitter_users_aggregates[uid]["num_days_after_day_0"]+1):
-                self.tweet_day_dataframe[uid]["day_num"] = i 
-                self.tweet_day_dataframe[uid]["notices_received_on_day"] = 0 
-                self.tweet_day_dataframe[uid]["before_first_notice"] = i < 0 
-                self.tweet_day_dataframe[uid]["after_first_notice"] = i > 0
-                self.tweet_day_dataframe[uid]["num_tweets"] = 0 
-                self.tweet_day_dataframe[uid]["num_media_tweets"] = 0 
-                self.tweet_day_dataframe[uid]["hours_unavailable"] = 0 # ???? how to count number of hours during this day?
-                self.tweet_day_dataframe[uid]["account_suspended"] = False
-                self.tweet_day_dataframe[uid]["account_deleted"] = False 
-                self.tweet_day_dataframe[uid]["account_protected"] = False
+            # only include day_nums of interest
+            for i in range(-self.min_observed_days, self.min_observed_days+1):
+                this_user_tweet_day = copy.deepcopy(user_tweet_day)
+                this_user_tweet_day["day_num"] = i 
+                this_user_tweet_day["before_first_notice"] = i < 0 
+                this_user_tweet_day["after_first_notice"] = i > 0
 
+                this_user_tweet_day["hours_unavailable"] = 0 # ???? how to count number of hours during this day?  
                 if i in self.twitter_users_day_nums[uid]:
-                    self.tweet_day_dataframe[uid]["notices_received_on_day"] = self.twitter_users_day_nums[uid][i]["num_notices"]
-                    self.tweet_day_dataframe[uid]["before_first_notice"] = i < 0
-                    self.tweet_day_dataframe[uid]["after_first_notice"] = i > 0
-                    self.tweet_day_dataframe[uid]["num_tweets"] = self.twitter_users_day_nums[uid][i]["num_tweets"] 
-                    self.tweet_day_dataframe[uid]["num_media_tweets"] = self.twitter_users_day_nums[uid][i]["num_media_tweets"] 
+                    this_user_tweet_day["notices_received_on_day"] = self.twitter_users_day_nums[uid][i]["num_notices"]
+                    this_user_tweet_day["num_tweets"] = self.twitter_users_day_nums[uid][i]["num_tweets"] 
+                    this_user_tweet_day["num_media_tweets"] = self.twitter_users_day_nums[uid][i]["num_media_tweets"] 
 
-                    self.tweet_day_dataframe[uid]["account_suspended"] = self.twitter_users_day_nums[uid][i]["suspended"]
-                    self.tweet_day_dataframe[uid]["account_deleted"] = self.twitter_users_day_nums[uid][i]["deleted"]
-                    self.tweet_day_dataframe[uid]["account_protected"] = self.twitter_users_day_nums[uid][i]["protected"]
+                    this_user_tweet_day["account_suspended"] = self.twitter_users_day_nums[uid][i]["suspended"]
+                    this_user_tweet_day["account_deleted"] = self.twitter_users_day_nums[uid][i]["deleted"]
+                    this_user_tweet_day["account_protected"] = self.twitter_users_day_nums[uid][i]["protected"]
 
-                    self.tweet_day_dataframe[uid]["hours_unavailable"] = 24 if (
-                        self.twitter_users_day_nums[uid][i]["suspended"] or 
-                        self.twitter_users_day_nums[uid][i]["deleted"] or 
-                        self.twitter_users_day_nums[uid][i]["protected"]) else 0 # ???? how to count number of hours during this day?
-
-
+                    this_user_tweet_day["hours_unavailable"] = 24 if (self.twitter_users_day_nums[uid][i]["suspended"] or self.twitter_users_day_nums[uid][i]["deleted"] or self.twitter_users_day_nums[uid][i]["protected"]) else 0 # ???? how to count number of hours during this day?  
+                
+                self.tweet_day_dataframe[uid][i] = this_user_tweet_day
 
 ################################################
 ############## basic_profiling

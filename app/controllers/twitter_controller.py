@@ -5,7 +5,7 @@ from app.models import Base, TwitterUser, TwitterStatus, LumenNoticeToTwitterUse
 import utils.common
 import requests
 import sqlalchemy
-from sqlalchemy import and_, func
+from sqlalchemy import and_, or_, func
 import utils.common
 from utils.common import TwitterUserState, NOT_FOUND_TWITTER_USER_STR, CS_JobState
 import sys
@@ -72,22 +72,30 @@ class TwitterController():
     #########################################################
 
     def query_and_archive_new_users(self):
+        # get unprocessed LumenNoticeToTwitterUser records with real twitter usernames
         unarchived_notice_users = self.db_session.query(LumenNoticeToTwitterUser).filter(
-            LumenNoticeToTwitterUser.CS_account_archived == CS_JobState.NOT_PROCESSED.value).filter(
-            LumenNoticeToTwitterUser.twitter_username != utils.common.NOT_FOUND_TWITTER_USER_STR).all()
+            #or_(
+                LumenNoticeToTwitterUser.CS_account_archived == CS_JobState.NOT_PROCESSED.value #,
+                #LumenNoticeToTwitterUser.CS_account_archived == CS_JobState.IN_PROGRESS.value)
+                ).filter(
+            LumenNoticeToTwitterUser.twitter_username != utils.common.NOT_FOUND_TWITTER_USER_STR    # you may get these from t.co links
+            ).all()
 
         unarchived_names = [nu.twitter_username for nu in unarchived_notice_users] 
 
-        # don't process these users
+        # process all usernames that DON'T have TwitterUser records OR have records but don't have real ids
         existing_users = []
         if len(unarchived_names) > 0:
-            existing_users = self.db_session.query(TwitterUser).filter(TwitterUser.screen_name.in_(list(unarchived_names))).all()
+            existing_users = self.db_session.query(TwitterUser).filter(
+                TwitterUser.screen_name.in_(list(unarchived_names))).filter(
+            ).all()
 
-        processed_unarchived_notice_users = [nu for nu in unarchived_notice_users if nu.twitter_username in existing_users]
+        existing_usernames = set([e.screen_name for e in existing_users if utils.common.NOT_FOUND_TWITTER_USER_STR not in e.id])
+        
+        processed_unarchived_notice_users = [nu for nu in unarchived_notice_users if nu.twitter_username in existing_usernames]
         utils.common.update_CS_JobState(processed_unarchived_notice_users, "CS_account_archived", CS_JobState.PROCESSED, self.db_session, self.log)
 
-
-        unprocessed_unarchived_notice_users = [nu for nu in unarchived_notice_users if nu.twitter_username not in existing_users]
+        unprocessed_unarchived_notice_users = [nu for nu in unarchived_notice_users if nu.twitter_username not in existing_usernames]
         utils.common.update_CS_JobState(unprocessed_unarchived_notice_users, "CS_account_archived", CS_JobState.IN_PROGRESS, self.db_session, self.log)
 
         (user_name_to_id, noticeuser_to_state) = self.archive_new_users(unprocessed_unarchived_notice_users)
@@ -116,7 +124,7 @@ class TwitterController():
     """
     def archive_new_users(self, unarchived_notice_users):
         if len(unarchived_notice_users) == 0:
-            return None, None
+            return (None, None)
 
         is_test = type(unarchived_notice_users[0]) is not LumenNoticeToTwitterUser
         if len(unarchived_notice_users) <= 0:
@@ -134,8 +142,6 @@ class TwitterController():
         left_users = unarchived_user_names # reference
         failed_users = set([])
 
-
-
         all_found_ids = set([]) # all ids returned by UsersLookup
         all_existing_ids = set([]) # all ids already stored in db
 
@@ -143,7 +149,6 @@ class TwitterController():
             limit = min(i*batch_size, len(user_names))
             if limit > prev_limit:
                 # query twitter API for user info
-                users_info = []
                 this_users = user_names[prev_limit:limit]
                 users_info = []
                 try:
@@ -162,7 +167,7 @@ class TwitterController():
 
                 this_found_ids = set([user_json["id"] for user_json in users_json])
                 all_found_ids.update(this_found_ids)
-                existing_ids = self.db_session.query(TwitterUser).filter(TwitterUser.id.in_(list(this_found_ids))).all()
+                existing_ids = [uid[0] for uid in self.db_session.query(TwitterUser.id).filter(TwitterUser.id.in_(list(this_found_ids))).all()]
                 all_existing_ids.update(existing_ids)
 
                 for user_json in users_json:
@@ -185,7 +190,7 @@ class TwitterController():
                             user_record = TwitterUser(
                                 id = uid,
                                 not_found_id = None,
-                                screen_name = screen_name, #usernames change! index/search on id when possible
+                                screen_name = screen_name, #usernames change! index/search on id when possible.
                                 created_at = created_at,   # is UTC; expected string format: "Mon Nov 29 21:18:15 +0000 2010"
                                 record_created_at = now,
                                 lang = user_json["lang"],
@@ -202,6 +207,7 @@ class TwitterController():
                                 user_json = json.dumps(user_json)) #already encoded
                             self.db_session.add(user_snapshot_record)
 
+                            all_existing_ids.add(uid)
                             left_users.discard(screen_name) # discard doesn't throw an error
                         except:
                             self.log.error("Error while creating TwitterUser, TwitterUserSnapshot objects for user {0}".format(user_json["id"]), extra=sys.exc_info()[0])
@@ -571,7 +577,7 @@ class TwitterController():
                 func.max(TwitterStatus.id)).filter(
                 TwitterStatus.user_id == user_id).first()
 
-        seen_statuses = set([s[0] for s in query_seen_statuses]) # set of ids already in db; s = (872295416376823808,)
+        seen_statuses = set([s[0] for s in query_seen_statuses if s is not None]) # set of ids already in db; s = (872295416376823808,)
         new_seen_statuses = set([]) # set of ids added this time
 
         oldest_id_queried = None    # if query_oldest_id is None else query_oldest_id[0]

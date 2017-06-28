@@ -7,7 +7,9 @@ from utils.common import CS_JobState
 import requests
 import app.controllers.twitter_controller
 import sqlalchemy
+from sqlalchemy import or_
 import sys
+
 
 class LumenController():
     def __init__(self, db_session, l, log):
