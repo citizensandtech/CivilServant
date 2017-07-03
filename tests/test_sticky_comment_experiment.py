@@ -179,8 +179,6 @@ def test_get_eligible_objects(mock_subreddit, mock_reddit):
         assert len(eligible_objects) == 50
         clear_all_tables()    
 
-
-####################################
 @patch('praw.Reddit', autospec=True)
 @patch('praw.objects.Subreddit', autospec=True)
 def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
@@ -226,65 +224,73 @@ def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
         eligible_objects = controller_instance.get_eligible_objects(objs)
         assert len(eligible_objects) == 100 ####
 
-        ####################################
+
+        experiment_action_count = db_session.query(ExperimentAction).count()
+        experiment_settings = json.loads(controller_instance.experiment.settings_json)
+        for condition_name in experiment_settings['conditions']:
+            assert experiment_settings['conditions'][condition_name]['next_randomization']    == 0            
+        assert db_session.query(ExperimentThing).count()    == 0
+
+        controller_instance.assign_randomized_conditions(eligible_objects)
+        assert db_session.query(ExperimentThing).count() == 100 
+        assert len(db_session.query(Experiment).all()) == 1
+        experiment = db_session.query(Experiment).first()
+        experiment_settings = json.loads(experiment.settings_json)
+
+
         if controller_instance.__class__ is AMAStickyCommentExperimentController:
-            experiment_action_count = db_session.query(ExperimentAction).count()
-            experiment_settings = json.loads(controller_instance.experiment.settings_json)
-            assert experiment_settings['conditions']['ama']['next_randomization']    == 0
-            assert experiment_settings['conditions']['nonama']['next_randomization'] == 0
-            assert db_session.query(ExperimentThing).count()    == 0
-
-            controller_instance.assign_randomized_conditions(eligible_objects)
-            assert db_session.query(ExperimentThing).count() == 100 
-
-            assert len(db_session.query(Experiment).all()) == 1
-            experiment = db_session.query(Experiment).first()
-            experiment_settings = json.loads(experiment.settings_json)
             assert experiment_settings['conditions']['ama']['next_randomization'] == 2
             assert experiment_settings['conditions']['nonama']['next_randomization'] == 98
             assert sum([x['next_randomization'] for x in list(experiment_settings['conditions'].values())]) == 100
+        else:
+            assert experiment_settings['conditions']['frontpage_post']['next_randomization'] == 100
             
-            for experiment_thing in db_session.query(ExperimentThing).all():
-                assert experiment_thing.id != None
-                assert experiment_thing.object_type == ThingType.SUBMISSION.value
-                assert experiment_thing.experiment_id == controller_instance.experiment.id
-                assert "randomization" in json.loads(experiment_thing.metadata_json).keys()
-                assert "condition" in json.loads(experiment_thing.metadata_json).keys()
+        for experiment_thing in db_session.query(ExperimentThing).all():
+            assert experiment_thing.id != None
+            assert experiment_thing.object_type == ThingType.SUBMISSION.value
+            assert experiment_thing.experiment_id == controller_instance.experiment.id
+            assert "randomization" in json.loads(experiment_thing.metadata_json).keys()
+            assert "condition" in json.loads(experiment_thing.metadata_json).keys()
             
-            ## TEST THE CASE WHERE THE AMA EXPERIMENT HAS CONCLUDED
-            ### first step: set the condition counts to have just one remaining condition left 
-            experiment_settings['conditions']['ama']['next_randomization'] = len(experiment_settings['conditions']['ama']['randomizations']) - 1
-            controller_instance.experiment_settings['conditions']['ama']['next_randomization'] = experiment_settings['conditions']['ama']['next_randomization']
-            experiment_settings['conditions']['nonama']['next_randomization'] = len(experiment_settings['conditions']['nonama']['randomizations']) - 1
-            controller_instance.experiment_settings['conditions']['nonama']['next_randomization'] = experiment_settings['conditions']['nonama']['next_randomization']
+        ## TEST THE CASE WHERE THE AMA EXPERIMENT HAS CONCLUDED
+        ### first step: set the condition counts to have just one remaining condition left 
+        for condition_name in experiment_settings['conditions']:
+            experiment_settings['conditions'][condition_name]['next_randomization'] = len(experiment_settings['conditions'][condition_name]['randomizations']) - 1
+            controller_instance.experiment_settings['conditions'][condition_name]['next_randomization'] = experiment_settings['conditions'][condition_name]['next_randomization']
             experiment_settings_json = json.dumps(experiment_settings)
             db_session.commit()
 
-            posts = []
-            posts = posts + [x for x in sub_data if "ama" in x.link_flair_css_class][0:2]
-            posts = posts + [x for x in sub_data if "ama" not in x.link_flair_css_class][0:2]
-            
-            ## generate new fake ids for these fixture posts, 
-            ## which would otherwise be duplicates
-            new_posts = []
-            for post in posts:
-                post = post.json_dict
-                post['id'] = ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(7))
-                new_posts.append(json2obj(json.dumps(post)))
 
-            experiment_things = controller_instance.assign_randomized_conditions(new_posts)
-            ## assert that only two of the items went through
-            assert len(experiment_things) == 2
-            for thing in experiment_things:
-                assert thing.id in [x.id for x in new_posts]
-            
-            ## CHECK THE EMPTY CASE
-            ## make sure that no actions are taken if the list is empty
-            experiment_action_count = db_session.query(ExperimentAction).count()
-            controller_instance.assign_randomized_conditions([])
-            assert db_session.query(ExperimentAction).count() == experiment_action_count
+        posts = []  
+        if controller_instance.__class__ is AMAStickyCommentExperimentController:        
+            posts += [x for x in sub_data if "ama" in x.link_flair_css_class][0:2]
+            posts += [x for x in sub_data if "ama" not in x.link_flair_css_class][0:2]
+        else:
+            posts += sub_data[0:2]
+
+        ## generate new fake ids for these fixture posts, 
+        ## which would otherwise be duplicates
+        new_posts = []
+        for post in posts:
+            post = post.json_dict
+            post['id'] = ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(7))
+            new_posts.append(json2obj(json.dumps(post)))
+
+        assert len(new_posts) == (4 if controller_instance.__class__ is AMAStickyCommentExperimentController else 2)
+        experiment_things = controller_instance.assign_randomized_conditions(new_posts)
+        ## assert that only 1 item from each condition went through
+        assert len(experiment_things) == len(experiment_settings['conditions'])
+        for thing in experiment_things:
+            assert thing.id in [x.id for x in new_posts]
+        
+        ## CHECK THE EMPTY CASE
+        ## make sure that no actions are taken if the list is empty
+        experiment_action_count = db_session.query(ExperimentAction).count()
+        controller_instance.assign_randomized_conditions([])
+        assert db_session.query(ExperimentAction).count() == experiment_action_count
 
         clear_all_tables()
+
 
 @patch('praw.Reddit', autospec=True)
 @patch('praw.objects.Subreddit', autospec=True)
@@ -891,60 +897,3 @@ def test_archive_experiment_submission_metadata(mock_comment, mock_submission, m
         assert ets.object_type          == ThingType.SUBMISSION.value
 
         clear_all_tables()
-
-
-# test FrontPageStickyCommentExperimentController by
-# making FrontPageController, call (caller method)
-# with test fixture of FrontPage with some qualifying posts
-# see if qualifying posts get added as ExperimentThing, ExperimentAction
-
-@patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Subreddit', autospec=True)    
-@patch('praw.objects.Submission', autospec=True)
-def test_front_page_sticky_comment_experiment_controller(mock_submission, mock_subreddit, mock_reddit):
-    ### TEST THE MOCK SETUP AND MAKE SURE IT WORKS
-    ## TODO: I should not be mocking SQLAlchemy
-    ## I should just be mocking the reddit API
-
-    r = mock_reddit.return_value
-    log = app.cs_logger.get_logger(ENV, BASE_DIR)
-
-    # for FrontPageController
-    sub_data = []
-    with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
-        fixture = [x['data'] for x in json.loads(f.read())['data']['children']]
-        for post in fixture:
-            json_dump = json.dumps(post)
-            postobj = json2obj(json_dump)
-            sub_data.append(postobj)
-
-    mock_subreddit.get_top.return_value = sub_data
-    patch('praw.')
-
-    r.get_subreddit.return_value = mock_subreddit   
-
-    # for FrontPageStickyCommentExperimentController
-    test_experiment_name = "sticky_comment_frontpage_test"
-    with open(os.path.join(BASE_DIR,"config", "experiments", test_experiment_name + ".yml"), "r") as f:
-        experiment_config = yaml.load(f)['test']
-
-
-    # set up FrontPageStickyCommentExperimentController
-    FrontPageStickyCommentExperimentController(test_experiment_name, db_session, r, log)
-    assert(len(db_session.query(Experiment).all()) == 1)
-    assert(len(db_session.query(EventHook).all()) == 1)
-    assert(len(db_session.query(EventHook).filter(EventHook.call_when == EventWhen.AFTER.value).all()) == 1)
-
-    # set up FrontPageController
-    fp = app.controllers.front_page_controller.FrontPageController(db_session, r, log)
-
-    # run main scheduled job, which calls the caller method (fetch_reddit_front_page)
-    fp.archive_reddit_front_page(PageType.TOP)
-    assert(len(db_session.query(FrontPage).all()) == 1)
-    assert(len(db_session.query(FrontPage).filter(FrontPage.page_type == PageType.TOP.value).all()) == 1)
-
-    # caller method called update_experiment...
-    # assert that archive_reddit_front_page created the appropriate ExperimentThings
-    assert(len(db_session.query(Post).all()) == 100)
-    assert(len(db_session.query(ExperimentThing).all()) == 100)
-    assert(db_session.query(ExperimentAction).count() == 100)    
