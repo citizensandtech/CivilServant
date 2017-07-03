@@ -7,7 +7,8 @@ import reddit.praw_utils as praw_utils
 import reddit.queries
 from utils.common import PageType
 from app.models import Base, FrontPage
-#from app.event_handler import event_handler
+from app.event_handler import event_handler, initialize_callee_controllers
+import app.event_handler
 
 ALL_SUBREDDIT_NAME = "all"
 
@@ -15,12 +16,18 @@ class FrontPageController:
   def __init__(self, db_session, r, log):
     self.db_session = db_session
     self.log = log
-    self.all_sub = r.get_subreddit(ALL_SUBREDDIT_NAME)
+    self.r = r
+    self.all_sub = self.r.get_subreddit(ALL_SUBREDDIT_NAME)
 
-    ## for event_handler
-    #self.posts = []
+    # for event_handler, a list of praw post submission objects, set in fetch_reddit_front_page
+    self.posts = []
 
-  #@event_handler
+    # for event_handler, need a dictionary of {experiment id: experiment controller instance}.
+    # if you forget this line, it's okay because when we run event_handler, it will look for this attr
+    self.experiment_to_controller = initialize_callee_controllers(self)
+
+
+
   def fetch_reddit_front_page(self, pg_type, limit=100):
       posts = []
       fetched = []
@@ -48,14 +55,16 @@ class FrontPageController:
             'downs': new_post['downs'],
             'ups': new_post['ups'], 
             'score': new_post['score'],
-            'created_utc': new_post['created_utc']
+            'created_utc': new_post['created_utc'],
+            'subreddit_id': new_post['subreddit_id']
             }
           posts.append(pruned_post)
       self.log.info("Queried reddit {0} page".format(pg_type.name))
 
-      #self.posts = posts
+      self.posts = fetched # praw submission objects
       return posts
 
+  @app.event_handler.event_handler
   def archive_reddit_front_page(self, pg_type = PageType.TOP):
       posts = self.fetch_reddit_front_page(pg_type)
       front_page = FrontPage(created_at = datetime.datetime.utcnow(),

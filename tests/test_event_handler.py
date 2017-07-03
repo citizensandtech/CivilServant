@@ -26,7 +26,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import and_, or_
 import glob, datetime, time, pytz
 
-from app.event_handler import event_handler
+from app.event_handler import event_handler, initialize_callee_controllers
 from app.controllers.sticky_comment_experiment_controller import StickyCommentExperimentController # import * ?
 from utils.common import *
 
@@ -72,18 +72,23 @@ class StickyCommentExperimentTestController(StickyCommentExperimentController):
             instance: an instance of caller class
     """
     def test_before_hook(self, instance):
+        assert(instance.num_callbacks_run == 0)
         instance.num_callbacks_run += 1
         assert(self.experiment_name == EXPERIMENT_NAME)
         assert(instance.data is None)
 
+    def test_before_inactive_hook(self, instance):
+        assert(False)   # should never get here
+
     def test_after_hook(self, instance):
-        assert(instance.num_callbacks_run == 1)
         instance.num_callbacks_run += 1        
         assert(self.experiment_name == EXPERIMENT_NAME)
         assert(instance.data is DATA_TEXT)
 
     def test_after_count_hook(self, instance):
-        assert(instance.num_callbacks_run == 2)        
+        instance.num_callbacks_run += 1        
+        assert(self.experiment_name == EXPERIMENT_NAME)
+        assert(instance.data is DATA_TEXT)
 
 ####################################
 #########   CALLER     #############
@@ -92,27 +97,24 @@ class StickyCommentExperimentTestController(StickyCommentExperimentController):
 
 class SomeTestController:
 
-    """
-        caller_controller must pass in an instance of callee_controller, 
-        with argument name formatted as "instance_[ClassNameOfController]"    
-    """
-    def __init__(self, db_session, r, log, instance_StickyCommentExperimentTestController):
+    def __init__(self, db_session, r, log):
         self.db_session = db_session
         self.log = log 
+        self.r = r
 
         # all variables that are passed between callee and caller instances must be class attributes
         self.data = None
         self.num_callbacks_run = 0
 
-        # caller controller must pass in instances of callee controllers
-        self.instance_StickyCommentExperimentTestController = instance_StickyCommentExperimentTestController 
+        # for event_handler, need a dictionary of {experiment id: experiment controller instance}.
+        # if you forget this line, it's okay because when we run event_handler, it will look for this attr
+        self.experiment_to_controller = initialize_callee_controllers(self)
 
     """
         sets self.data to be DATA_TEXT
     """
     @event_handler   
     def test_set_data(self):
-        self.log.info("in test_set_data")
         assert(self.data is None)
         self.data = DATA_TEXT
         return self.data
@@ -124,7 +126,7 @@ class SomeTestController:
 
 
 DATA_TEXT = "HERE'S THE DATA!!!"
-EXPERIMENT_NAME = "sticky_comment_1_ex"
+EXPERIMENT_NAME = "sticky_comment_event_handler_test"
 
 
 # initialize experiment, load hooks
@@ -158,9 +160,16 @@ def test_event_handler(mock_reddit):
     patch('praw.')
 
     test_experiment_name = EXPERIMENT_NAME
+
+    # must create callee_controller instance first, to ensure that Experiment db record exists for it
+    # when calling controllers from app/controller.py, you won't write this line. instead,
+    # you need to just run initialize_sticky_comment_experiment(experiment_name), 
+    # in order to store the Experiment db record. don't run conduct_sticky_comment_experiment,
+    # unless the experiment needs a scheduled task that isn't being run in a callback (which is already scheduled)
     callee_controller = StickyCommentExperimentTestController(test_experiment_name, db_session, r, log)
-    caller_controller = SomeTestController(db_session, r, log, 
-        instance_StickyCommentExperimentTestController = callee_controller)
+
+    caller_controller = SomeTestController(db_session, r, log)
 
     data = caller_controller.test_set_data()
     assert(data == DATA_TEXT)
+    assert(caller_controller.num_callbacks_run == 2)

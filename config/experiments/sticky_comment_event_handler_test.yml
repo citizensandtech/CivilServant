@@ -4,14 +4,14 @@ test:
   username: CivilServantBot
   conditions: 
     ama:
-        randomizations: sticky_comment_science_0_ama.conditions.csv
+        randomizations: sticky_comment_frontpage.conditions.csv
         next_randomization: 0 
         arms:
             arm_0: null
             arm_1: |
                 This is arm 1 of the ama condition
     nonama:
-        randomizations: sticky_comment_science_0_nonama.conditions.csv
+        randomizations: sticky_comment_frontpage.conditions.csv
         next_randomization: 0 
         arms:
             arm_0: null
@@ -28,7 +28,7 @@ test:
       call_when: EventWhen.BEFORE
       caller_controller: SomeTestController
       caller_method: test_set_data
-      callee_module: app.controllers.test_controller
+      callee_module: tests.test_event_handler
       callee_controller: StickyCommentExperimentTestController
       callee_method: test_before_hook
     test_after_hook:
@@ -36,7 +36,7 @@ test:
       call_when: EventWhen.AFTER
       caller_controller: SomeTestController
       caller_method: test_set_data
-      callee_module: app.controllers.test_controller
+      callee_module: tests.test_event_handler
       callee_controller: StickyCommentExperimentTestController
       callee_method: test_after_hook
     test_after_count_hook:
@@ -44,7 +44,7 @@ test:
       call_when: EventWhen.AFTER
       caller_controller: SomeTestController
       caller_method: test_set_data
-      callee_module: app.controllers.test_controller
+      callee_module: tests.test_event_handler
       callee_controller: StickyCommentExperimentTestController
       callee_method: test_after_count_hook      
     test_before_inactive_hook:
@@ -52,7 +52,7 @@ test:
       call_when: EventWhen.BEFORE
       caller_controller: SomeTestController
       caller_method: test_set_data
-      callee_module: app.controllers.test_controller
+      callee_module: tests.test_event_handler
       callee_controller: StickyCommentExperimentTestController
       callee_method: test_before_hook      
             
