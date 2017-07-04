@@ -144,17 +144,18 @@ def test_get_eligible_objects(mock_subreddit, mock_reddit):
         ### TEST THE METHOD FOR FETCHING ELIGIBLE OBJECTS
         ### FIRST TIME AROUND
         assert len(db_session.query(Post).all()) == 0
-        
+
         if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
             objs = controller_instance.set_eligible_objects(instance)
-        else:
+        elif controller_instance.__class__ is AMAStickyCommentExperimentController:
             objs = controller_instance.set_eligible_objects()            
         eligible_objects = controller_instance.get_eligible_objects(objs)
-
         assert len(eligible_objects) == 100
 
-        if controller_instance.__class__ is AMAStickyCommentExperimentController:
-            assert len(db_session.query(Post).all()) == 100
+        if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
+            eligible_submissions = {sub.id: sub for sub in eligible_objects}
+            controller_instance.archive_eligible_submissions(eligible_submissions)
+        assert len(db_session.query(Post).all()) == 100
 
         ### TEST THE METHOD FOR FETCHING ELIGIBLE OBJECTS
         ### SECOND TIME AROUND, WITH SOME ExperimentThing objects stored
@@ -173,7 +174,7 @@ def test_get_eligible_objects(mock_subreddit, mock_reddit):
 
         if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
             objs = controller_instance.set_eligible_objects(instance)
-        else:
+        elif controller_instance.__class__ is AMAStickyCommentExperimentController:
             objs = controller_instance.set_eligible_objects()
         eligible_objects = controller_instance.get_eligible_objects(objs)
         assert len(eligible_objects) == 50
@@ -219,7 +220,7 @@ def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
         ## TEST THE BASE CASE OF RANDOMIZATION
         if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
             objs = controller_instance.set_eligible_objects(instance)
-        else:
+        elif controller_instance.__class__ is AMAStickyCommentExperimentController:
             objs = controller_instance.set_eligible_objects()            
         eligible_objects = controller_instance.get_eligible_objects(objs)
         assert len(eligible_objects) == 100 ####
@@ -242,7 +243,7 @@ def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
             assert experiment_settings['conditions']['ama']['next_randomization'] == 2
             assert experiment_settings['conditions']['nonama']['next_randomization'] == 98
             assert sum([x['next_randomization'] for x in list(experiment_settings['conditions'].values())]) == 100
-        else:
+        elif controller_instance.__class__ is FrontPageStickyCommentExperimentController:
             assert experiment_settings['conditions']['frontpage_post']['next_randomization'] == 100
             
         for experiment_thing in db_session.query(ExperimentThing).all():
@@ -265,8 +266,8 @@ def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
         if controller_instance.__class__ is AMAStickyCommentExperimentController:        
             posts += [x for x in sub_data if "ama" in x.link_flair_css_class][0:2]
             posts += [x for x in sub_data if "ama" not in x.link_flair_css_class][0:2]
-        else:
-            posts += sub_data[0:2]
+        elif controller_instance.__class__ is FrontPageStickyCommentExperimentController:
+            posts += sub_data[0:4]
 
         ## generate new fake ids for these fixture posts, 
         ## which would otherwise be duplicates
@@ -276,7 +277,8 @@ def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
             post['id'] = ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(7))
             new_posts.append(json2obj(json.dumps(post)))
 
-        assert len(new_posts) == (4 if controller_instance.__class__ is AMAStickyCommentExperimentController else 2)
+        # Only 1 randomization left for each condition, while there are >1 new_posts
+        assert len(new_posts) == 4
         experiment_things = controller_instance.assign_randomized_conditions(new_posts)
         ## assert that only 1 item from each condition went through
         assert len(experiment_things) == len(experiment_settings['conditions'])
@@ -368,7 +370,7 @@ def test_update_experiment(intervene_ama_arm_1, intervene_ama_arm_0,
 
         if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
             experiment_return = controller_instance.update_experiment(instance)
-        else:
+        elif controller_instance.__class__ is AMAStickyCommentExperimentController:
             experiment_return = controller_instance.update_experiment()
 
 
@@ -376,7 +378,7 @@ def test_update_experiment(intervene_ama_arm_1, intervene_ama_arm_0,
         if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
             assert intervene_frontpage_post_arm_0.called == True
             assert intervene_frontpage_post_arm_1.called == True
-        else:
+        elif controller_instance.__class__ is AMAStickyCommentExperimentController:
             assert intervene_nonama_arm_0.called == True
             assert intervene_nonama_arm_1.called == True
             assert intervene_ama_arm_0.called == True
@@ -388,7 +390,7 @@ def test_update_experiment(intervene_ama_arm_1, intervene_ama_arm_0,
 @patch('praw.Reddit', autospec=True)
 @patch('praw.objects.Submission', autospec=True)
 @patch('praw.objects.Comment', autospec=True)
-def test_submission_acceptable(mock_comment,mock_submission, mock_reddit):
+def test_submission_acceptable(mock_comment, mock_submission, mock_reddit):
     r = mock_reddit.return_value
 
 
@@ -401,15 +403,29 @@ def test_submission_acceptable(mock_comment,mock_submission, mock_reddit):
 
     with open("{script_dir}/fixture_data/submission_0_comments.json".format(script_dir=TEST_DIR)) as f:
         comments = json2obj(f.read())
+        len_comments = len(comments)
+
+    with open("{script_dir}/fixture_data/submission_0_treatment.json".format(script_dir=TEST_DIR)) as f:
+        treatment_json = f.read()
+        treatment = json2obj(treatment_json)
+        treatment_dict = json.loads(treatment_json)
+        treatment_dict['stickied']=True
+        stickied_treatment = json2obj(json.dumps(treatment_dict))
+        mock_comment.id = treatment.id
+        mock_comment.created_utc = treatment.created_utc
+        mock_submission.add_comment.return_value = mock_comment
+
+    with open("{script_dir}/fixture_data/submission_0_treatment_distinguish.json".format(script_dir=TEST_DIR)) as f:
+        distinguish = json.loads(f.read())
+        mock_comment.distinguish.return_value = distinguish
     
     patch('praw.')
 
 
     experiment_name_to_controller = {
-        "sticky_comment_0": AMAStickyCommentExperimentController,
-        "sticky_comment_frontpage_test": FrontPageStickyCommentExperimentController
+        "sticky_comment_frontpage_test": FrontPageStickyCommentExperimentController,
+        "sticky_comment_0": AMAStickyCommentExperimentController
         }
-
 
     for experiment_name in experiment_name_to_controller:
         with open(os.path.join(BASE_DIR, "config", "experiments") + "/"+ experiment_name + ".yml", "r") as f:
@@ -419,27 +435,7 @@ def test_submission_acceptable(mock_comment,mock_submission, mock_reddit):
         controller_instance = controller(experiment_name, db_session, r, log)
 
         # reload mock_submission.comments 
-        mock_submission.comments = comments
-
-        if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
-            treatment_json_file = "submission_1_treatment"
-        else:                        
-            treatment_json_file = "submission_0_treatment"
-        with open("{script_dir}/fixture_data/{treatment_json_file}.json".format(script_dir=TEST_DIR, treatment_json_file=treatment_json_file)) as f:
-            treatment_json = f.read()
-            treatment = json2obj(treatment_json)
-            treatment_dict = json.loads(treatment_json)
-            treatment_dict['stickied']=True
-            stickied_treatment = json2obj(json.dumps(treatment_dict))
-            mock_comment.id = treatment.id
-            mock_comment.created_utc = treatment.created_utc
-            mock_submission.add_comment.return_value = mock_comment
-
-        # same for all experiment controllers?
-        with open("{script_dir}/fixture_data/submission_0_treatment_distinguish.json".format(script_dir=TEST_DIR)) as f:
-            distinguish = json.loads(f.read())
-            mock_comment.distinguish.return_value = distinguish
-
+        mock_submission.comments = list(comments)
 
         ## First check acceptability on a submission with an old timestamp
         ## which should return None and take no action
@@ -455,13 +451,11 @@ def test_submission_acceptable(mock_comment,mock_submission, mock_reddit):
 
         ## Now check acceptability in a case where the identical comment exists
         ## First in the case where the comment is not stickied
-        comments.append(treatment)
-        mock_submission.comments = comments
+        mock_submission.comments.append(treatment)
         assert controller_instance.submission_acceptable(mock_submission) == True
 
         ## And then in the case where the comment *is* stickied
-        comments.append(stickied_treatment)
-        mock_submission.comments = comments
+        mock_submission.comments.append(stickied_treatment)
         assert controller_instance.submission_acceptable(mock_submission) == False
 
         mock_submission.comments = comments[0:-2]
@@ -481,6 +475,7 @@ def test_submission_acceptable(mock_comment,mock_submission, mock_reddit):
         db_session.add(experiment_action)
         db_session.commit()
         assert controller_instance.submission_acceptable(mock_submission) == False
+        
         clear_all_tables()
 
 
@@ -523,18 +518,17 @@ def test_make_sticky_post(mock_comment, mock_submission, mock_reddit):
         # reload
         mock_submission.comments.return_value = comments
 
-        if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
-            treatment_json_file = "submission_1_treatment"
-            block_name = "frontpage_post"
-        else:                        
-            treatment_json_file = "submission_0_treatment"
-            block_name = "nonama"
-        with open("{script_dir}/fixture_data/{treatment_json_file}.json".format(script_dir=TEST_DIR, treatment_json_file=treatment_json_file)) as f:
+
+        with open("{script_dir}/fixture_data/submission_0_treatment.json".format(script_dir=TEST_DIR)) as f:
             treatment = json2obj(f.read())
             mock_comment.id = treatment.id
             mock_comment.created_utc = treatment.created_utc
             mock_submission.add_comment.return_value = mock_comment
 
+        if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
+            block_name = "frontpage_post"
+        elif controller_instance.__class__ is AMAStickyCommentExperimentController:                
+            block_name = "nonama"
 
         experiment_submission = ExperimentThing(
             id = submission.id,
@@ -587,7 +581,7 @@ def test_make_control_nonaction(mock_comment, mock_submission, mock_reddit):
 
         if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
             block_name = "frontpage_post"
-        else:
+        elif controller_instance.__class__ is AMAStickyCommentExperimentController:
             block_name = "nonama"
         experiment_submission = ExperimentThing(
             id = submission.id,
@@ -663,7 +657,7 @@ def test_find_treatment_replies(mock_reddit):
         ## TO CORRESPOND TO THE FIXTURE DATA
         if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
             block_name = "frontpage_post"
-        else:
+        elif controller_instance.__class__ is AMAStickyCommentExperimentController:
             block_name = "nonama"
 
         for treatment_comment in treatment_comments:
@@ -789,7 +783,7 @@ def test_identify_condition(mock_subreddit, mock_reddit):
 
         if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
             objs = controller_instance.set_eligible_objects(instance)
-        else:
+        elif controller_instance.__class__ is AMAStickyCommentExperimentController:
             objs = controller_instance.set_eligible_objects()
 
         eligible_objects = controller_instance.get_eligible_objects(objs)
@@ -800,7 +794,7 @@ def test_identify_condition(mock_subreddit, mock_reddit):
 
         if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
             assert Counter(condition_list)['frontpage_post'] == 100
-        else:
+        elif controller_instance.__class__ is AMAStickyCommentExperimentController:
             assert Counter(condition_list)['nonama'] == 98
             assert Counter(condition_list)['ama'] == 2
             
@@ -839,11 +833,8 @@ def test_archive_experiment_submission_metadata(mock_comment, mock_submission, m
         controller = experiment_name_to_controller[experiment_name]
         controller_instance = controller(experiment_name, db_session, r, log)
 
-        if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
-            treatment_json_file = "submission_1_treatment"
-        else:                        
-            treatment_json_file = "submission_0_treatment"
-        with open("{script_dir}/fixture_data/{treatment_json_file}.json".format(script_dir=TEST_DIR, treatment_json_file=treatment_json_file)) as f:
+
+        with open("{script_dir}/fixture_data/submission_0_treatment.json".format(script_dir=TEST_DIR)) as f:
             treatment = json2obj(f.read())
             mock_comment.id = treatment.id
             mock_comment.created_utc = treatment.created_utc
@@ -859,7 +850,7 @@ def test_archive_experiment_submission_metadata(mock_comment, mock_submission, m
 
         if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
             block_name = "frontpage_post"
-        else:
+        elif controller_instance.__class__ is AMAStickyCommentExperimentController:
             block_name = "nonama"
 
 

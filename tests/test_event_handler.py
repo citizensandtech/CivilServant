@@ -172,4 +172,4 @@ def test_event_handler(mock_reddit):
 
     data = caller_controller.test_set_data()
     assert(data == DATA_TEXT)
-    assert(caller_controller.num_callbacks_run == 2)
+    assert(caller_controller.num_callbacks_run == 3)

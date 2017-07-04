@@ -127,3 +127,7 @@ def archive_experiment_submission_metadata(experiment_name):
     )
     sce.archive_experiment_submission_metadata()
   
+if __name__ == "__main__":
+    fnc = sys.argv[1]
+    args =  sys.argv[2:]
+    locals()[fnc](*args)
