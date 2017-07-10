@@ -137,7 +137,6 @@ class TwitterObservationalAnalysisController:
         self.log.info("Out of {0} found ids, {1} also have corresponding not_found_ids: {2}".format(len(uids), len(partially_unavailable_ids), partially_unavailable_ids))
 
 
-
         # query batch_size at a time in order to update job states more often
         batch_size = 20
         prev_limit = 0
@@ -175,9 +174,6 @@ class TwitterObservationalAnalysisController:
                 prev_limit = limit
 
             self.log.info("Processed {0} out of {1} users".format(prev_limit, len(uids)))
-
-
-
 
 
     def get_users_to_notice_dates(self):
@@ -333,13 +329,8 @@ class TwitterObservationalAnalysisController:
                 else:
                     this_day_num_dicts = self.twitter_users_day_nums[uid]
 
-                #if uid in ['851658170455994368', '788958311714398208', '846706659732865025', '784022010456182785', '772763098239283201', '859037528858304513', '847768318232494080']:
-                #    self.log.info(uid)
-                #    self.log.info(this_day_num_dicts)
-
                 aggregates["num_days_before_day_0"] = max(0, 0 - min(this_day_num_dicts)) if len(this_day_num_dicts) > 0 else 0
                 aggregates["num_days_after_day_0"] = max(0, max(this_day_num_dicts)) if len(this_day_num_dicts) > 0 else 0
-
 
                 aggregates["total_unavailable_hours"] = 24*sum([1 for dn in this_day_num_dicts if (this_day_num_dicts[dn]["suspended"] or this_day_num_dicts[dn]["deleted"] or this_day_num_dicts[dn]["protected"])])
 
