@@ -1,0 +1,1 @@
+python app/controller.py create_csvs_sticky_comment_power_analysis SUBREDDIT_ID YYYY-MM-DD YYYY-MM-DD REDDIT_ARCHIVE OUTPUT_FOLDER

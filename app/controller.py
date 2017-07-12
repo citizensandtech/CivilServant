@@ -17,6 +17,7 @@ import app.controllers.sticky_comment_power_analysis_controller
 from utils.common import PageType, DbEngine
 import app.cs_logger
 import datetime
+from dateutil import parser
 from app.models import Base, SubredditPage, Subreddit, Post, ModAction, Experiment
 
 
@@ -128,11 +129,11 @@ def archive_experiment_submission_metadata(experiment_name):
     sce.archive_experiment_submission_metadata()
   
 
-# python app/controller.py create_csvs_sticky_comment_power_analysis mouw 12.2016 12.2016 
+# python app/controller.py create_csvs_sticky_comment_power_analysis mouw 12/01/2016 12/31/2016 
 # /mnt/samba/reddit-archive/03.2017 /home/mmou/CivilServant/output
 def create_csvs_sticky_comment_power_analysis(subreddit_id, start_date, end_date, data_dir, output_dir, frontpage_limit=10):
-    start_date = datetime.datetime.strptime(start_date, "%m.%Y")
-    end_date = datetime.datetime.strptime(end_date, "%m.%Y")    
+    start_date = parser.parse(start_date)
+    end_date = parser.parse(end_date)
 
     scpac = app.controllers.sticky_comment_power_analysis_controller.StickyCommentPowerAnalysisController( 
         subreddit_id = subreddit_id, 
