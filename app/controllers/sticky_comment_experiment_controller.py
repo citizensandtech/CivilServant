@@ -181,7 +181,7 @@ class StickyCommentExperimentController:
 
         ## Avoid Acting if an identical sticky comment already exists
         for comment in submission.comments:
-            if(comment.stickied and (comment.body in all_experiment_messages)):
+            if(hasattr(comment, "stickied") and comment.stickied and (comment.body in all_experiment_messages)):
                 self.log.info("{0}: Experiment {1} post {2} already has a sticky comment {2}".format(
                     self.__class__.__name__,
                     self.experiment_name, 
@@ -209,7 +209,7 @@ class StickyCommentExperimentController:
             return False
         return True
 
-    def make_control_nonaction(self, experiment_thing, submission):
+    def make_control_nonaction(self, experiment_thing, submission, group="control"):
         if(self.submission_acceptable(submission) == False):
             return None
 
@@ -223,7 +223,7 @@ class StickyCommentExperimentController:
             action = "Intervention",
             action_object_type = ThingType.SUBMISSION.value,
             action_object_id = submission.id,
-            metadata_json = json.dumps({"group":"control", "condition":condition, "arm": "arm_"+str(treatment_arm)})
+            metadata_json = json.dumps({"group":group, "condition":condition, "arm": "arm_"+str(treatment_arm)})
         )
         self.db_session.add(experiment_action)
         self.db_session.commit()
@@ -618,6 +618,7 @@ class FrontPageStickyCommentExperimentController(StickyCommentExperimentControll
     # differs from parent class's update_experiment with:
     #   - different method signature. "instance" variable used 
     #       because update_experiment is a callback
+    #       (instance is an instance of the caller object)
     #   - calls different set_eligible_objects, which takes in "instance" variable
     def update_experiment(self, instance):  ####
         eligible_submissions = {}
@@ -635,8 +636,9 @@ class FrontPageStickyCommentExperimentController(StickyCommentExperimentControll
 
     ## CONTROL GROUP
     def intervene_frontpage_post_arm_0(self, experiment_thing, submission):
-        return self.make_control_nonaction(experiment_thing, submission)
+        return self.make_control_nonaction(experiment_thing, submission, group="control")
         
     ## TREATMENT GROUP
     def intervene_frontpage_post_arm_1(self, experiment_thing, submission):
+        #return self.make_control_nonaction(experiment_thing, submission, group="stub-treat")
         return self.make_sticky_post(experiment_thing, submission)

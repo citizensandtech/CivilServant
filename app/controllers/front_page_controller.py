@@ -48,6 +48,7 @@ class FrontPageController:
 
       for post in fetched:
           new_post = post.json_dict if("json_dict" in dir(post)) else post['data'] ### TO HANDLE TEST FIXTURES
+          self.posts.append(post)
           pruned_post = {
             'id': new_post['id'],
             'author': new_post['author'],
@@ -60,8 +61,6 @@ class FrontPageController:
             }
           posts.append(pruned_post)
       self.log.info("Queried reddit {0} page".format(pg_type.name))
-
-      self.posts = fetched # praw submission objects
       return posts
 
   @app.event_handler.event_handler

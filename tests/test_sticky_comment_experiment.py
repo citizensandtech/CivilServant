@@ -595,14 +595,14 @@ def test_make_control_nonaction(mock_comment, mock_submission, mock_reddit):
             )
 
         mock_submission.created_utc = int(time.time())
-        sticky_result = controller_instance.make_control_nonaction(experiment_submission, mock_submission)
+        sticky_result = controller_instance.make_control_nonaction(experiment_submission, mock_submission, group="test")
 
         assert db_session.query(ExperimentAction).count() == 1
         assert sticky_result is not None
         action = db_session.query(ExperimentAction).first()
         action_metadata = json.loads(action.metadata_json)
         experiment_submission_metadata = json.loads(experiment_submission.metadata_json)
-        assert action_metadata['group'] == "control"
+        assert action_metadata['group'] == "test"
         assert action_metadata['condition'] == experiment_submission_metadata['condition']
         assert action_metadata['arm'] == "arm_" + str(experiment_submission_metadata['randomization']['treatment'])
 

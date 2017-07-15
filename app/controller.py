@@ -78,11 +78,11 @@ def get_experiment_class(experiment_name):
         try:
             experiment_config_all = yaml.load(f)
         except yaml.YAMLError as exc:
-            self.log.error("Failure loading experiment yaml {0}".format(experiment_file_path), str(exc))
+            log.error("Failure loading experiment yaml {0}".format(experiment_file_path), str(exc))
             sys.exit(1)
 
     if(ENV not in experiment_config_all.keys()):
-        self.log.error("Cannot find experiment settings for {0} in {1}".format(ENV, experiment_file_path))
+        log.error("Cannot find experiment settings for {0} in {1}".format(ENV, experiment_file_path))
         sys.exit(1)
     experiment_config = experiment_config_all[ENV]
     c = getattr(app.controllers.sticky_comment_experiment_controller, experiment_config['controller'])
