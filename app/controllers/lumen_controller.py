@@ -9,7 +9,7 @@ import app.controllers.twitter_controller
 import sqlalchemy
 from sqlalchemy import or_
 import sys
-
+import time
 
 class LumenController():
     def __init__(self, db_session, l, log):
@@ -23,7 +23,8 @@ class LumenController():
 
         # notices already stored in db
         added_notices = self.db_session.query(LumenNotice).filter(LumenNotice.date_received >= date).all()
-        added_notices_ids = set([notice.id for notice in recent_notices])
+        added_notices_ids = set([notice.id for notice in added_notices])
+        newly_added_notices_ids = set([])
 
         for topic in topics:
             next_page = 1
@@ -34,10 +35,6 @@ class LumenController():
                   time.sleep(2)
 
                 data = self.l.get_notices_to_twitter([topic], 50, next_page, date, nowish)
-                
-                #with open("tests/fixture_data/lumen_notices_0.json") as f:
-                #    data = json.loads(f.read())
-                
                 if not data:
                     # error is already logged by get_notices_to_twitter
                     return 
@@ -45,12 +42,13 @@ class LumenController():
                 notices_json = data["notices"]
                 next_page = data["meta"]["next_page"]
                 max_date_received = None
-                prev_add_notices_size = len(added_notices_ids)
+
+                prev_add_notices_size = len(newly_added_notices_ids)
                 for notice in notices_json:
                     nid = notice["id"]
                     date_received = datetime.datetime.strptime(notice["date_received"], '%Y-%m-%dT%H:%M:%S.000Z') # expect string like "2017-04-15T22:28:26.000Z"
                     max_date_received = max(date_received, max_date_received) if max_date_received else date_received
-                    if nid not in added_notices_ids and date_received >= date and date_received <= nowish:
+                    if nid not in added_notices_ids and nid not in newly_added_notices_ids and date_received >= date and date_received <= nowish:
                         try:
                             sender = (notice["sender_name"].encode("utf-8", "replace") if notice["sender_name"] else "")
                             principal = (notice["principal_name"].encode("utf-8", "replace") if notice["principal_name"] else "")
@@ -65,20 +63,23 @@ class LumenController():
                                 notice_data = json.dumps(notice).encode("utf-8", "replace"),
                                 CS_parsed_usernames = CS_JobState.NOT_PROCESSED.value)
                             self.db_session.add(notice_record)
-                            added_notices_ids.add(nid)
+                            newly_added_notices_ids.add(nid)
                         except:
                             self.log.error("Error while creating LumenNotice object for notice {0}".format(notice["id"]), extra=sys.exc_info()[0])
-                if max_date_received <= nowish and len(added_notices_ids) == prev_add_notices_size:
-                    # if we got lumen notices that are from at most nowish and we have seen them all before,
-                    break
 
-                prev_add_notices_size = len(added_notices_ids)
                 try:
                     self.db_session.commit()
                 except:         
                     self.log.error("Error while saving {0} lumen notices in DB Session".format(len(added_notices_ids)), extra=sys.exc_info()[0])
                 else:
-                    self.log.info("Saved {0} lumen notices.".format(len(added_notices_ids)))
+                    self.log.info("Saved {0} lumen notices.".format(len(newly_added_notices_ids) - prev_add_notices_size))
+
+                if next_page and next_page > 4 and len(newly_added_notices_ids) == prev_add_notices_size and max_date_received <= nowish:
+                    # if we got lumen notices that are from at most nowish and we have seen them all before,
+                    # hacky: always look at at least 3 pages
+                    break
+
+        self.log.info("fetch_lumen_notices saved {0} total new lumen notices.".format(len(newly_added_notices_ids)))
 
 
     """
@@ -217,6 +218,7 @@ def helper_parse_url_for_username(url, log):
         raise utils.common.ParseUsernameSuspendedUserFound
 
     if len(url_split) >= 3 and url_split[2] == twitter_domain:
-        username = url_split[3]
+        username = url_split[3].lower()
         
+
     return username
