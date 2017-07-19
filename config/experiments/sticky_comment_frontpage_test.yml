@@ -24,3 +24,29 @@ test:
       callee_module: app.controllers.sticky_comment_experiment_controller
       callee_controller: FrontPageStickyCommentExperimentController
       callee_method: update_experiment
+development:
+  subreddit: science
+  subreddit_id: mouw
+  username: CivilServantBot
+  conditions: 
+    frontpage_post:
+        randomizations: sticky_comment_frontpage.conditions.csv
+        next_randomization: 0 
+        arms:
+            arm_0: null
+            arm_1: |
+                This is arm 1 of the 1st condition.
+  controller: FrontPageStickyCommentExperimentController
+  start_time: 06/25/2016 00:00:00 UTC
+  end_time: 12/30/2020 23:59:59 UTC
+  max_eligibility_age: 86400
+  min_eligibility_age: 0
+  event_hooks:
+    change_sticky_comment_text: 
+      is_active: True
+      call_when: EventWhen.AFTER
+      caller_controller: FrontPageController
+      caller_method: archive_reddit_front_page
+      callee_module: app.controllers.sticky_comment_experiment_controller
+      callee_controller: FrontPageStickyCommentExperimentController
+      callee_method: update_experiment

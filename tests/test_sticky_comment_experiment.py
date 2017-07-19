@@ -750,7 +750,7 @@ def test_identify_condition(mock_subreddit, mock_reddit):
     experiment_name_to_controller = {
         "sticky_comment_0": AMAStickyCommentExperimentController,
         "sticky_comment_frontpage_test": FrontPageStickyCommentExperimentController
-        }
+    }
 
     for experiment_name in experiment_name_to_controller:
 
@@ -801,6 +801,22 @@ def test_identify_condition(mock_subreddit, mock_reddit):
 
         clear_all_tables()
 
+@patch('praw.Reddit', autospec=True)
+def test_frontpage_get_eligible_objects(mock_reddit):
+    r = mock_reddit.return_value
+    with open("{script_dir}/fixture_data/front_page_0.json".format(script_dir=TEST_DIR)) as f:
+        fp_json = json.loads(f.read())['data']['children']
+        ## setting the submission time to be recent enough
+        mock_fp_posts = []
+        for post in fp_json:
+            mock_fp_posts.append(json2obj(json.dumps(post['data'])))
+
+    controller = FrontPageStickyCommentExperimentController
+    controller_instance = controller("sticky_comment_frontpage_test", db_session, r, log)
+    eligible_objects = controller_instance.get_eligible_objects(mock_fp_posts)
+    assert len(eligible_objects) == 6
+    for obj in eligible_objects:
+        assert "t5_" + controller_instance.subreddit_id == obj.subreddit_id
 
 @patch('praw.Reddit', autospec=True)
 @patch('praw.objects.Submission', autospec=True)
@@ -811,7 +827,7 @@ def test_archive_experiment_submission_metadata(mock_comment, mock_submission, m
     experiment_name_to_controller = {
         "sticky_comment_0": AMAStickyCommentExperimentController,
         "sticky_comment_frontpage_test": FrontPageStickyCommentExperimentController
-        }
+    }
 
     for experiment_name in experiment_name_to_controller:
 

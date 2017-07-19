@@ -614,6 +614,10 @@ class FrontPageStickyCommentExperimentController(StickyCommentExperimentControll
             self.db_session.add(new_post)
         self.db_session.commit()
 
+    def get_eligible_objects(self, object_list):
+      subreddit_id_fullname = "t5_"+ self.subreddit_id
+      objects_in_subreddit = [obj for obj in object_list if obj.subreddit_id==subreddit_id_fullname]
+      return super(FrontPageStickyCommentExperimentController, self).get_eligible_objects(objects_in_subreddit)
     ## main scheduled job
     # differs from parent class's update_experiment with:
     #   - different method signature. "instance" variable used 
