@@ -178,8 +178,8 @@ class TwitterController():
                     failed_users.update(this_users)
                     self.log.error("Failed to query for {0} Twitter users using api.UsersLookup: {1}".format(limit-prev_limit, str(e)))
                 else:
-                    self.log.info("Queried for {0} Twitter users out of a total of {1} users, got {2} users".format(
-                        limit-prev_limit, len(user_names), len(users_info)))
+                    self.log.info("Queried for {0} Twitter users out of a total of {1} users, got {2} out of {3} users".format(
+                        limit, len(user_names), len(users_info), limit-prev_limit))
                 prev_limit = limit
 
                 # for found users, commit to db
@@ -329,20 +329,20 @@ class TwitterController():
         doesn't need to update any CS_JobState fields.   
     """
     def query_and_archive_user_snapshots_and_tweets(self, min_time, is_test=False):
-        need_snapshot_user_snapshots = self.db_session.query(
-            TwitterUserSnapshot.twitter_user_id).group_by(
-            TwitterUserSnapshot.twitter_user_id).having(
-            func.max(TwitterUserSnapshot.record_created_at) < min_time).all()
+        need_snapshot_users = self.db_session.query(TwitterUser).all()
+
+        # querying TwitterUserSnapshot is very expensive
+        #need_snapshot_user_snapshots = self.db_session.query(
+        #    TwitterUserSnapshot.twitter_user_id).group_by(
+        #    TwitterUserSnapshot.twitter_user_id).having(
+        #    func.max(TwitterUserSnapshot.record_created_at) < min_time).all()
 
         # make sure to get unique ids
-        need_snapshot_user_ids = list(set([us.twitter_user_id for us in need_snapshot_user_snapshots])) 
+        need_snapshot_user_ids = [u.id for u in need_snapshot_users] 
         self.log.info("Need to update snapshots for {0} users".format(len(need_snapshot_user_ids)))
         if len(need_snapshot_user_ids) <= 0:
             return
 
-        need_snapshot_users = self.db_session.query(TwitterUser).filter(
-            TwitterUser.id.in_(need_snapshot_user_ids)).all()
-        
         # store TwitterUserSnapshot, update TwitterUser for all queried users
         need_snapshot_id_to_all_user = {u.id: u for u in need_snapshot_users}
         need_snapshot_id_to_found_user = {uid: need_snapshot_id_to_all_user[uid] for uid in need_snapshot_id_to_all_user if utils.common.NOT_FOUND_TWITTER_USER_STR not in uid}
@@ -393,8 +393,8 @@ class TwitterController():
                     if e.message[0]['code'] != 17:
                         self.log.error("Unexpected error while querying for {0} Twitter users using api.UsersLookup: {1}; users: {2}".format(limit-prev_limit, str(e), this_users))
                 else:
-                    self.log.info("Queried for {0} Twitter users out of a total of {1} users, got {2} users".format(
-                        limit-prev_limit, len(user_keys), len(users_info)))
+                    self.log.info("Queried for {0} Twitter users out of a total of {1} users, got {2} out of {3} users".format(
+                        limit, len(user_keys), len(users_info), limit-prev_limit))
                 prev_limit = limit
                 
 
@@ -507,11 +507,12 @@ class TwitterController():
 
     def query_and_archive_tweets(self, backfill=False, is_test=False):
         if backfill:
+            # archive tweets for all users who haven't had oldest tweets PROCESSED
             unarchived_users = self.db_session.query(TwitterUser).filter(
                     TwitterUser.CS_oldest_tweets_archived != CS_JobState.PROCESSED.value).all()
         else:
             unarchived_users = self.db_session.query(TwitterUser).filter(
-                    TwitterUser.CS_oldest_tweets_archived == CS_JobState.NOT_PROCESSED.value).all()
+                    TwitterUser.CS_oldest_tweets_archived == CS_JobState.PROCESSED.value).all()
 
         self.log.info("About to query and archive tweets {0} users; backfill={1}".format(len(unarchived_users), backfill))
 
