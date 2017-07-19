@@ -78,18 +78,24 @@ def get_experiment_class(experiment_name):
         try:
             experiment_config_all = yaml.load(f)
         except yaml.YAMLError as exc:
-            self.log.error("Failure loading experiment yaml {0}".format(experiment_file_path), str(exc))
+            log.error("Failure loading experiment yaml {0}".format(experiment_file_path), str(exc))
             sys.exit(1)
 
     if(ENV not in experiment_config_all.keys()):
-        self.log.error("Cannot find experiment settings for {0} in {1}".format(ENV, experiment_file_path))
+        log.error("Cannot find experiment settings for {0} in {1}".format(ENV, experiment_file_path))
         sys.exit(1)
     experiment_config = experiment_config_all[ENV]
     c = getattr(app.controllers.sticky_comment_experiment_controller, experiment_config['controller'])
     return c
 
 
+# for sticky comment experiments that are NOT using event_handler+callbacks
 def conduct_sticky_comment_experiment(experiment_name):
+    sce = initialize_sticky_comment_experiment(experiment_name)
+    sce.update_experiment()
+
+# not to be run as a job, just to store and get a sce object
+def initialize_sticky_comment_experiment(experiment_name):
     c = get_experiment_class(experiment_name) 
     r = conn.connect(controller=experiment_name)    
     sce = c(        
@@ -98,7 +104,7 @@ def conduct_sticky_comment_experiment(experiment_name):
         r = r,
         log = log
     )
-    sce.update_experiment()
+    return sce    
 
 def remove_experiment_replies(experiment_name):
     r = conn.connect(controller=experiment_name)    
@@ -121,3 +127,7 @@ def archive_experiment_submission_metadata(experiment_name):
     )
     sce.archive_experiment_submission_metadata()
   
+if __name__ == "__main__":
+    fnc = sys.argv[1]
+    args =  sys.argv[2:]
+    locals()[fnc](*args)

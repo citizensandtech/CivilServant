@@ -16,6 +16,7 @@ export CS_ENV=development
 ## Reddit API queries:
 ## CivilServant requires praw-multiprocess
 ## which is kept up via supervise
+## make sure you have a praw.ini
 supervise prawserver
 ## or alternatively
 praw-multiprocess
@@ -51,8 +52,6 @@ alembic downgrade -1
 # export CS_ENV=all
 alembic revision --autogenerate -m "MESSAGE"
 
-
-
 ##### MONITORING STATUS #####
 
 ## Monitoring the redis-queue
@@ -63,3 +62,7 @@ civilservant-error-handler.herokuapp.com
 
 ## Monitoring errors and info, locally
 ./logs
+
+## INITIATE A STICKY COMMENT EXPERIMENT
+import app.controller
+app.controller.initialize_sticky_comment_experiment("experiment_file_name") #omit yml

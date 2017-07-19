@@ -13,7 +13,8 @@ import app.controllers.moderator_controller
 from utils.common import PageType, DbEngine, json2obj
 
 ### LOAD THE CLASSES TO TEST
-from app.models import Base, FrontPage, SubredditPage, Subreddit, Post, ModAction, Comment, User
+from app.models import Base, FrontPage, SubredditPage, Subreddit, Post 
+from app.models import ModAction, Comment, User, EventHook
 import app.cs_logger
 
 ## SET UP THE DATABASE ENGINE
@@ -25,6 +26,7 @@ ENV = os.environ['CS_ENV'] ="test"
 db_session = DbEngine(os.path.join(TEST_DIR, "../", "config") + "/{env}.json".format(env=ENV)).new_session()
 
 def clear_all_tables():
+    db_session.query(EventHook).delete()
     db_session.query(FrontPage).delete()
     db_session.query(SubredditPage).delete()
     db_session.query(Subreddit).delete()

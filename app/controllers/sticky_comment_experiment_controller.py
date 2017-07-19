@@ -10,6 +10,7 @@ from dateutil import parser
 from utils.common import *
 from app.models import Base, SubredditPage, Subreddit, Post, ModAction, PrawKey, Comment
 from app.models import Experiment, ExperimentThing, ExperimentAction, ExperimentThingSnapshot
+from app.models import EventHook
 from sqlalchemy import and_, or_
 from app.controllers.subreddit_controller import SubredditPageController
 import numpy as np
@@ -26,25 +27,30 @@ class StickyCommentExperimentController:
         self.r = r
         self.load_experiment_config(required_keys, experiment_name)
         
-        
-    def load_experiment_config(self, required_keys, experiment_name):
+    def get_experiment_config(self, required_keys, experiment_name):        
         experiment_file_path = os.path.join(BASE_DIR, "config", "experiments", experiment_name) + ".yml"
         with open(experiment_file_path, 'r') as f:
             try:
                 experiment_config_all = yaml.load(f)
             except yaml.YAMLError as exc:
-                self.log.error("Failure loading experiment yaml {0}".format(experiment_file_path), str(exc))
+                self.log.error("{0}: Failure loading experiment yaml {1}".format(
+                    self.__class__.__name__, experiment_file_path), str(exc))
                 sys.exit(1)
         if(ENV not in experiment_config_all.keys()):
-            self.log.error("Cannot find experiment settings for {0} in {1}".format(ENV, experiment_file_path))
+            self.log.error("{0}: Cannot find experiment settings for {1} in {2}".format(
+                self.__class__.__name__, ENV, experiment_file_path))
             sys.exit(1)
 
         experiment_config = experiment_config_all[ENV]
         for key in required_keys:
             if key not in experiment_config.keys():
-                self.log.error("Value missing from {0}: {1}".format(experiment_file_path, key))
+                self.log.error("{0}: Value missing from {1}: {2}".format(
+                    self.__class__.__name__, experiment_file_path, key))
                 sys.exit(1)
-        
+        return experiment_config
+
+    def load_experiment_config(self, required_keys, experiment_name):
+        experiment_config = self.get_experiment_config(required_keys, experiment_name)
         experiment = self.db_session.query(Experiment).filter(Experiment.name == experiment_name).first()
         if(experiment is None):
 
@@ -85,12 +91,56 @@ class StickyCommentExperimentController:
         ## LOAD SUBREDDIT PAGE CONTROLLER
         self.subreddit_page_controller = SubredditPageController(self.subreddit,self.db_session, self.r, self.log)
 
+        # LOAD EVENT HOOKS
+        self.load_event_hooks(experiment_config)
+
+    def load_event_hooks(self, experiment_config):
+        if 'event_hooks' not in experiment_config:
+            return
+
+        hooks = experiment_config['event_hooks']
+
+        now = datetime.datetime.utcnow()
+        for hook_name in hooks:
+            hook = self.db_session.query(EventHook).filter(
+                EventHook.name == hook_name).first()
+            if not hook:
+                call_when_str = hooks[hook_name]['call_when']
+                if call_when_str == "EventWhen.BEFORE":
+                    call_when = EventWhen.BEFORE.value
+                elif call_when_str == "EventWhen.AFTER":
+                    call_when = EventWhen.AFTER.value
+                else:
+                    self.log.error("{0}: While loading event hooks, call_when string incorrectly formatted: {1}".format(
+                        self.__class__.__name__, call_when_str))
+                    sys.exit(1)
+
+                hook_record = EventHook(
+                    name = hook_name,
+                    created_at = now,
+                    experiment_id = self.experiment.id,
+                    is_active = hooks[hook_name]['is_active'],
+                    call_when = call_when,
+                    caller_controller = hooks[hook_name]['caller_controller'],
+                    caller_method = hooks[hook_name]['caller_method'],
+                    callee_module = hooks[hook_name]['callee_module'],
+                    callee_controller = hooks[hook_name]['callee_controller'],
+                    callee_method = hooks[hook_name]['callee_method'])
+                self.db_session.add(hook_record)
+                self.db_session.commit()
+
     ## main scheduled job
     def update_experiment(self):
         eligible_submissions = {}
-        for submission in self.get_eligible_objects():
+        objs = self.set_eligible_objects() 
+                       
+        for submission in self.get_eligible_objects(objs):
             eligible_submissions[submission.id] = submission
-        
+
+        return self.run_interventions(eligible_submissions)
+    
+    # takes in eligible_submissions = { submission id: submission obj }
+    def run_interventions(self, eligible_submissions):
         rvals = []
         for experiment_thing in self.assign_randomized_conditions(eligible_submissions.values()):
             condition = json.loads(experiment_thing.metadata_json)['condition']
@@ -103,11 +153,13 @@ class StickyCommentExperimentController:
                 rvals.append(rval)
         return rvals
 
+
     ## Check the acceptability of a submission before acting
     def submission_acceptable(self, submission):
         if(submission is None):
             ## TODO: Determine what to do if you can't find the post
-            self.log.error("Can't find experiment {0} post {1}".format(self.subreddit, submission.id))
+            self.log.error("{0}: Can't find experiment {1} post {2}".format(
+                self.__class__.__name__, self.subreddit, submission.id))
             return False            
 
         ## Avoid Acting if the Intervention has already been recorded
@@ -116,7 +168,8 @@ class StickyCommentExperimentController:
             ExperimentAction.action_object_type == ThingType.SUBMISSION.value,
             ExperimentAction.action_object_id   == submission.id,
             ExperimentAction.action             == "Intervention")).count() > 0):
-                self.log.info("Experiment {0} post {1} already has an Intervention recorded".format(
+                self.log.info("{0}: Experiment {1} post {2} already has an Intervention recorded".format(
+                    self.__class__.__name__,
                     self.experiment_name, 
                     submission.id))            
                 return False
@@ -128,8 +181,9 @@ class StickyCommentExperimentController:
 
         ## Avoid Acting if an identical sticky comment already exists
         for comment in submission.comments:
-            if(comment.stickied and (comment.body in all_experiment_messages)):
-                self.log.info("Experiment {0} post {1} already has a sticky comment {2}".format(
+            if(hasattr(comment, "stickied") and comment.stickied and (comment.body in all_experiment_messages)):
+                self.log.info("{0}: Experiment {1} post {2} already has a sticky comment {2}".format(
+                    self.__class__.__name__,
                     self.experiment_name, 
                     submission.id,
                     comment.id))
@@ -139,7 +193,8 @@ class StickyCommentExperimentController:
         curtime = time.time()
 #        if((curtime - submission.created_utc) > 10800):
         if((curtime - submission.created_utc) > self.max_eligibility_age):
-            self.log.info("Submission created_utc {0} is {1} seconds greater than current time {2}, exceeding the max eligibility age of {3}. Declining to Add to the Experiment".format(
+            self.log.info("{0}: Submission created_utc {1} is {2} seconds greater than current time {3}, exceeding the max eligibility age of {4}. Declining to Add to the Experiment".format(
+                self.__class__.__name__,
                 submission.created_utc,
                 curtime - submission.created_utc,
                 curtime,
@@ -154,7 +209,7 @@ class StickyCommentExperimentController:
             return False
         return True
 
-    def make_control_nonaction(self, experiment_thing, submission):
+    def make_control_nonaction(self, experiment_thing, submission, group="control"):
         if(self.submission_acceptable(submission) == False):
             return None
 
@@ -168,11 +223,12 @@ class StickyCommentExperimentController:
             action = "Intervention",
             action_object_type = ThingType.SUBMISSION.value,
             action_object_id = submission.id,
-            metadata_json = json.dumps({"group":"control", "condition":condition, "arm": "arm_"+str(treatment_arm)})
+            metadata_json = json.dumps({"group":group, "condition":condition, "arm": "arm_"+str(treatment_arm)})
         )
         self.db_session.add(experiment_action)
         self.db_session.commit()
-        self.log.info("Experiment {0} applied arm {1} to post {2} (condition = {3})".format(
+        self.log.info("{0}: Experiment {1} applied arm {2} to post {3} (condition = {4})".format(
+            self.__class__.__name__,
             self.experiment_name, 
             treatment_arm,
             submission.id,
@@ -192,7 +248,8 @@ class StickyCommentExperimentController:
 
         comment = submission.add_comment(comment_text)
         distinguish_results = comment.distinguish(sticky=True)
-        self.log.info("Experiment {0} applied arm {1} to post {2} (condition = {3}). Result: {4}".format(
+        self.log.info("{0}: Experiment {1} applied arm {2} to post {3} (condition = {4}). Result: {5}".format(
+            self.__class__.__name__,            
             self.experiment_name,
             treatment_arm, 
             submission.id,
@@ -230,18 +287,25 @@ class StickyCommentExperimentController:
         self.db_session.commit()
         return distinguish_results
 
+
+    def set_eligible_objects(self):
+        objs = self.subreddit_page_controller.fetch_subreddit_page(PageType.NEW, return_praw_object=True)
+        return objs
+        
+
     ## TODO: REDUCE THE NUMBER OF API CALLS INVOLVED
     ## in the future possibly merge with submission_acceptable
-    def get_eligible_objects(self):
-        submissions = {}
-        for submission in self.subreddit_page_controller.fetch_subreddit_page(PageType.NEW, return_praw_object=True):
-            submissions[submission.id] = submission
+    def get_eligible_objects(self, objs):
         
-        already_processed_ids = [thing.id for thing in 
-            self.db_session.query(ExperimentThing).filter(and_(
-                ExperimentThing.object_type==ThingType.SUBMISSION.value, 
-                ExperimentThing.experiment_id == self.experiment.id,
-                ExperimentThing.id.in_(submissions.keys()))).all()]
+        submissions = {o.id:o for o in objs}
+
+        already_processed_ids = []
+        if len(submissions) > 0:
+            already_processed_ids = [thing.id for thing in 
+                self.db_session.query(ExperimentThing).filter(and_(
+                    ExperimentThing.object_type==ThingType.SUBMISSION.value, 
+                    ExperimentThing.experiment_id == self.experiment.id,
+                    ExperimentThing.id.in_(list(submissions.keys())))).all()]
 
         eligible_submissions = []
         eligible_submission_ids = []
@@ -252,12 +316,13 @@ class StickyCommentExperimentController:
                 continue
 
             if((curtime - submission.created_utc) < self.min_eligibility_age):
-                self.log.info("Submission {4} created_utc {0} is {1} seconds less than current time {2}, below the minimum eligibility age of {3}. Waiting to Add to the Experiment".format(
+                self.log.info("{0}: Submission {1} created_utc {2} is {3} seconds less than current time {4}, below the minimum eligibility age of {5}. Waiting to Add to the Experiment".format(
+                    self.__class__.__name__,
+                    submission.id,
                     submission.created_utc,
                     curtime - submission.created_utc,
                     curtime,
-                    self.min_eligibility_age,
-                    submission.id))
+                    self.min_eligibility_age))
                 continue
 
             ### TODO: rule out eligibility based on age at this stage
@@ -269,7 +334,8 @@ class StickyCommentExperimentController:
             eligible_submissions.append(submission)
             eligible_submission_ids.append(id)
 
-        self.log.info("Experiment {0} Discovered {1}eligible submissions: {2}".format(
+        self.log.info("{0}: Experiment {1} Discovered {2} eligible submissions: {3}".format(
+            self.__class__.__name__,
             self.experiment_name,
             len(eligible_submission_ids),
             json.dumps(eligible_submission_ids)))
@@ -293,7 +359,8 @@ class StickyCommentExperimentController:
                 randomization = condition['randomizations'][condition['next_randomization']]
                 self.experiment_settings['conditions'][label]['next_randomization'] += 1
             except:
-                self.log.error("Experiment {0} has used its full stock of {1} {2} conditions. Cannot assign any further.".format(
+                self.log.error("{0}: Experiment {1} has used its full stock of {2} {3} conditions. Cannot assign any further.".format(
+                    self.__class__.__name__,
                     self.experiment.name,
                     len(condition['randomizations']),
                     label
@@ -314,7 +381,8 @@ class StickyCommentExperimentController:
             
         self.experiment.settings_json = json.dumps(self.experiment_settings)
         self.db_session.commit()
-        self.log.info("Experiment {0}: assigned conditions to {1} submissions".format(self.experiment.name,len(experiment_things)))
+        self.log.info("{0}: Experiment {1}: assigned conditions to {2} submissions".format(
+            self.__class__.__name__, self.experiment.name,len(experiment_things)))
         return experiment_things
 
         
@@ -382,7 +450,8 @@ class StickyCommentExperimentController:
         self.db_session.add(experiment_action)
         self.db_session.commit()
 
-        self.log.info("Experiment {experiment}: found {replies} replies to {treatments} treatment comments. Removed {removed} comments.".format(
+        self.log.info("{controller}: Experiment {experiment}: found {replies} replies to {treatments} treatment comments. Removed {removed} comments.".format(
+            controller = self.__class__.__name__,
             experiment = self.experiment.id,
             replies = len(comments),
             treatments = len(parent_submission_ids),
@@ -411,7 +480,8 @@ class StickyCommentExperimentController:
                 ExperimentThing.object_type==ThingType.SUBMISSION.value, 
                 ExperimentThing.experiment_id == self.experiment.id))]
         if(len(submission_ids)==0):
-            self.log.info("Experiment {experiment}: Logged metadata for 0 submissions.".format(
+            self.log.info("{controller}: Experiment {experiment}: Logged metadata for 0 submissions.".format(
+                controller = self.__class__.__name__,
                 experiment = self.experiment.id
             ))       
             return []
@@ -435,7 +505,8 @@ class StickyCommentExperimentController:
             snapshots.append(experiment_thing_snapshot)
         self.db_session.commit()
 
-        self.log.info("Experiment {experiment}: Logged metadata for {submissions} submissions.".format(
+        self.log.info("{controller}: Experiment {experiment}: Logged metadata for {submissions} submissions.".format(
+            controller = self.__class__.__name__,
             experiment = self.experiment.id,
             submissions = len(snapshots)
         ))       
@@ -457,6 +528,7 @@ class AMAStickyCommentExperimentController(StickyCommentExperimentController):
 
     ###############################
     ### EXPERIMENT-SPECIFIC METHODS
+    ###############################
 
     def is_ama(self, submission):
         flair = []
@@ -511,3 +583,66 @@ class SubsetStickyCommentExperimentController(StickyCommentExperimentController)
     def intervene_considered_domain_arm_2(self, experiment_thing, submission):
         return self.make_sticky_post(experiment_thing, submission)
     
+
+class FrontPageStickyCommentExperimentController(StickyCommentExperimentController):
+    def __init__(self, experiment_name, db_session, r, log):
+        required_keys = ['subreddit', 'subreddit_id', 'username', 
+                         'start_time', 'end_time',
+                         'max_eligibility_age', 'min_eligibility_age',
+                         'conditions', 'event_hooks']
+
+        super().__init__(experiment_name, db_session, r, log, required_keys)
+
+    def set_eligible_objects(self, instance):
+        return instance.posts
+
+    # takes in dictionary {id: praw objects}
+    def archive_eligible_submissions(self, eligible_submissions):
+        existing_post_ids = set([sub.id for sub in self.db_session.query(Post).filter(
+            Post.id.in_(list(eligible_submissions.keys())))])
+
+        # list of praw objects
+        to_archive_posts = [eligible_submissions[sid] for sid in eligible_submissions if sid not in existing_post_ids]
+
+        for post in to_archive_posts:
+            post_info = post.json_dict if("json_dict" in dir(post)) else post['data'] ### TO HANDLE TEST FIXTURES
+            new_post = Post(
+                    id = post_info['id'],
+                    subreddit_id = post_info['subreddit_id'].strip("t5_"), # janky
+                    created = datetime.datetime.fromtimestamp(post_info['created_utc']),        
+                    post_data = json.dumps(post_info))
+            self.db_session.add(new_post)
+        self.db_session.commit()
+
+    def get_eligible_objects(self, object_list):
+      subreddit_id_fullname = "t5_"+ self.subreddit_id
+      objects_in_subreddit = [obj for obj in object_list if obj.subreddit_id==subreddit_id_fullname]
+      return super(FrontPageStickyCommentExperimentController, self).get_eligible_objects(objects_in_subreddit)
+    ## main scheduled job
+    # differs from parent class's update_experiment with:
+    #   - different method signature. "instance" variable used 
+    #       because update_experiment is a callback
+    #       (instance is an instance of the caller object)
+    #   - calls different set_eligible_objects, which takes in "instance" variable
+    def update_experiment(self, instance):  ####
+        eligible_submissions = {}
+        objs = self.set_eligible_objects(instance)  ####
+        
+        eligible_objects = self.get_eligible_objects(objs)
+        eligible_submissions = {sub.id: sub for sub in eligible_objects}
+
+        self.archive_eligible_submissions(eligible_submissions) ####
+        return self.run_interventions(eligible_submissions)
+
+    def identify_frontpage_post(self, submission):
+        # they are all frontpage posts  ???
+        return True
+
+    ## CONTROL GROUP
+    def intervene_frontpage_post_arm_0(self, experiment_thing, submission):
+        return self.make_control_nonaction(experiment_thing, submission, group="control")
+        
+    ## TREATMENT GROUP
+    def intervene_frontpage_post_arm_1(self, experiment_thing, submission):
+        #return self.make_control_nonaction(experiment_thing, submission, group="stub-treat")
+        return self.make_sticky_post(experiment_thing, submission)

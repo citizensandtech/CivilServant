@@ -15,6 +15,10 @@ class ThingType(Enum):
 	SUBREDDIT = 3
 	USER = 4
 
+class EventWhen(Enum):
+    BEFORE = 1
+    AFTER = 2
+
 class DbEngine:
 	def __init__(self, config_path):
 		self.config_path = config_path
