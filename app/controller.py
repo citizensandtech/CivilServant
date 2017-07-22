@@ -5,6 +5,7 @@ import app.controllers.front_page_controller
 import app.controllers.subreddit_controller
 import app.controllers.comment_controller
 import app.controllers.moderator_controller
+import app.controllers.stylesheet_experiment_controller
 import app.controllers.sticky_comment_experiment_controller
 from utils.common import PageType, DbEngine
 import app.cs_logger
@@ -126,6 +127,17 @@ def archive_experiment_submission_metadata(experiment_name):
         log = log
     )
     sce.archive_experiment_submission_metadata()
+
+def update_stylesheet_experiment(experiment_name):
+    r = conn.connect(controller=app.controllers.stylesheet_experiment_controller.StylesheetExperimentController)
+    sce = app.controllers.stylesheet_experiment_controller.StylesheetExperimentController(
+        experiment_name = experiment_name,
+        db_session = db_session,
+        r = r,
+        log = log
+    )
+    sce.update_experiment()
+
   
 if __name__ == "__main__":
     fnc = sys.argv[1]

@@ -51,6 +51,7 @@ def teardown_function(function):
     clear_all_tables()
 
 
+### TODO: REFACTOR THIS INTO A SUPERCLASS FOR EXPERIMENTS
 @patch('praw.Reddit', autospec=True)
 def test_initialize_experiment(mock_reddit):
     r = mock_reddit.return_value
