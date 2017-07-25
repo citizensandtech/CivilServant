@@ -5,6 +5,7 @@ import datetime
 import reddit.connection
 import reddit.praw_utils as praw_utils
 import reddit.queries
+import sqlalchemy
 from utils.common import PageType
 from app.models import Base, SubredditPage, Subreddit, Post, User
 
@@ -64,6 +65,8 @@ class SubredditPageController:
                 is_new_post = self.archive_post(post.json_dict)
                 is_new_user = self.archive_user(pruned_post['author'], datetime.datetime.fromtimestamp(post.created))
             self.log.info("Saved posts from /r/{0} {1} page.".format(self.subname, pg_type.name))
+        except sqlalchemy.exc.IntegrityError as e:
+            self.log.info("Error Saving posts from /r/{0} {1} page: {2}".format(self.subname, pg_type.name, str(e)))
         except Exception as e:
             self.log.error("Error Saving posts from /r/{0} {1} page: {2}".format(self.subname, pg_type.name, str(e)))
         
