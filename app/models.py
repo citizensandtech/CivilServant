@@ -17,7 +17,7 @@ Base = declarative_base()
 class FrontPage(Base):
     __tablename__ = 'front_pages'
     id                  = Column(Integer, primary_key = True)
-    created_at          = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     page_type           = Column(Integer) # see utils/common.py
     page_data           = Column(MEDIUMTEXT)
     is_utc              = Column(Boolean, default=False)
@@ -25,13 +25,13 @@ class FrontPage(Base):
 class Subreddit(Base):
     __tablename__ = 'subreddits'
     id                  = Column(String(32), primary_key = True, unique=True, autoincrement=False) # subreddit id
-    created_at          = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     name                = Column(String(32)) # display_name
 
 class SubredditPage(Base):
     __tablename__ = 'subreddit_pages'
     id                  = Column(Integer, primary_key = True)
-    created_at          = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     subreddit_id        = Column(String(32))
     page_type           = Column(Integer) # see utils/common.py
     page_data           = Column(MEDIUMTEXT)
@@ -40,11 +40,11 @@ class SubredditPage(Base):
 class Post(Base):
     __tablename__ = 'posts'
     id                  = Column(String(32), primary_key = True, unique=True, autoincrement=False)	# post id
-    created_at          = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     subreddit_id        = Column(String(32))	# "subreddit_id"
     created             = Column(DateTime) # "created"
     #when this record was created:
-    created_at          = Column(DateTime, default=datetime.datetime.utcnow) 
+    created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True) 
     post_data           = Column(MEDIUMTEXT)	# "json_dict"
     comment_data        = Column(LONGTEXT)
     comments_queried_at = Column(DateTime, default=None)  
@@ -52,7 +52,7 @@ class Post(Base):
 class ModAction(Base):
     __tablename__ = "mod_actions"
     id                  = Column(String(256), primary_key = True, unique=True, autoincrement=False)
-    created_at          = Column(DateTime, default=datetime.datetime.utcnow)  
+    created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)  
     created_utc         = Column(DateTime)
     subreddit_id        = Column(String(32), index=True)
     mod                 = Column(String(64))
@@ -64,7 +64,7 @@ class ModAction(Base):
 class Comment(Base):
     __tablename__ = "comments"
     id                  = Column(String(256), primary_key = True, unique=True, autoincrement=False)
-    created_at          = Column(DateTime, default=datetime.datetime.utcnow)  
+    created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     created_utc         = Column(DateTime)
     subreddit_id        = Column(String(32), index=True)
     post_id             = Column(String(32), index=True)
@@ -119,7 +119,7 @@ class PrawKey(Base):
     # For example:
     #   hannahmore:development:FrontPageController
     id                  = Column(String(256), primary_key = True)
-    created_at          = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     access_token        = Column(String(256))
     scope               = Column(String(256)) #json
     refresh_token       = Column(String(256))
@@ -134,7 +134,7 @@ class PrawKey(Base):
 class Experiment(Base):
     __tablename__ = 'experiments'
     id                  = Column(Integer, primary_key = True)
-    created_at          = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     name                = Column(String(256), nullable=False, index=True)
     controller          = Column(String(256), nullable=False)
     start_time          = Column(DateTime)
@@ -144,7 +144,7 @@ class Experiment(Base):
 class ExperimentThing(Base):
     __tablename__ = 'experiment_things'
     id                  = Column(String(256), primary_key = True)
-    created_at          = Column(DateTime, default = datetime.datetime.utcnow)
+    created_at          = Column(DateTime, default = datetime.datetime.utcnow, index=True)
     object_type         = Column(Integer)
     experiment_id       = Column(Integer, index = True)
     object_created      = Column(DateTime)
@@ -154,7 +154,7 @@ class ExperimentThingSnapshot(Base):
     __tablename__ = 'experiment_thing_snapshots'
     id                  = Column(Integer, primary_key = True)
     experiment_thing_id = Column(String(256), index = True)
-    created_at          = Column(DateTime, default = datetime.datetime.utcnow)
+    created_at          = Column(DateTime, default = datetime.datetime.utcnow, index=True)
     object_type         = Column(Integer)
     experiment_id       = Column(Integer, index = True)
     metadata_json       = Column(MEDIUMTEXT)
@@ -162,7 +162,7 @@ class ExperimentThingSnapshot(Base):
 class ExperimentAction(Base):
     __tablename__ = 'experiment_actions'
     id                  = Column(Integer, primary_key = True)
-    created_at          = Column(DateTime, default = datetime.datetime.utcnow)
+    created_at          = Column(DateTime, default = datetime.datetime.utcnow, index=True)
     experiment_id       = Column(Integer, index = True)
     praw_key_id         = Column(String(256), index = True)
     action              = Column(String(64), index = True)
@@ -177,7 +177,7 @@ class EventHook(Base):
     __tablename__ = "event_hooks"
     id                  = Column(Integer, primary_key=True)
     name                = Column(String(256), index=True) 
-    created_at          = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     experiment_id       = Column(Integer, index=True)
     is_active           = Column(Boolean, default=False)
     call_when           = Column(Integer) # see utils/common.py EventWhen Enum 
