@@ -1,0 +1,48 @@
+test:
+  subreddit: civilservantbot
+  subreddit_id: 3gbuk
+  username: CivilServantBot
+  conditions: 
+    normal:
+        days: Sunday,Tuesday,Wednesday,Thursday
+        randomizations: stylesheet_test_conditions.csv
+        next_randomization: 0 
+        arms:
+            arm_0: /* .commentarea .down {visibility:hidden !important;} */
+            arm_1: .commentarea .down {visibility:hidden !important;}
+    special:
+        days: Monday,Friday,Saturday
+        randomizations: stylesheet_test_conditions.csv
+        next_randomization: 0 
+        arms:
+            arm_0: /* .commentarea .down {visibility:hidden !important;} */
+            arm_1: .commentarea .down {visibility:hidden !important;}
+  controller: StylesheetExperimentController
+  start_time: 06/25/2016 00:00:00 UTC
+  end_time: 12/30/2020 23:59:59 UTC
+  intervention_interval_seconds: 86400
+  intervention_window_seconds: 3600
+development:
+  subreddit: civilservantbot
+  subreddit_id: 3gbuk
+  username: CivilServantBot
+  conditions: 
+    normal:
+        days: Sunday,Tuesday,Wednesday,Thursday
+        randomizations: stylesheet_test_conditions.csv
+        next_randomization: 0 
+        arms:
+            arm_0: /* .commentarea .down {visibility:hidden !important;} */
+            arm_1: .commentarea .down {visibility:hidden !important;}
+    special:
+        days: Monday,Friday,Saturday
+        randomizations: stylesheet_test_conditions.csv
+        next_randomization: 0 
+        arms:
+            arm_0: /* .commentarea .down {visibility:hidden !important;} */
+            arm_1: .commentarea .down {visibility:hidden !important;}
+  controller: StylesheetExperimentController
+  start_time: 06/25/2016 00:00:00 UTC
+  end_time: 12/30/2020 23:59:59 UTC
+  intervention_interval_seconds: 86400
+  intervention_window_seconds: 3600

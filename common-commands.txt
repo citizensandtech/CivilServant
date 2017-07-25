@@ -32,6 +32,14 @@ rq worker <<development, production>>
 ## which needs to be kept running
 rqscheduler
 
+## TO RUN CivilServantBot2
+## export CS_ENV=CivilServantBot2
+## rq worker CivilServantBot2
+
+## TO CHANGE THE QUEUE TIMEOUT
+## 3venv/lib/python3.5/site-packages/rq/queue.py
+## DEFAULT_TIMEOUT = 600 (originally 180)
+
 ##### DEVELOPMENT PROCESS #####
 
 ## THE ALEMBIC MIGRATIONS ARE NOW KEYED

@@ -14,6 +14,7 @@ class ThingType(Enum):
 	COMMENT = 2
 	SUBREDDIT = 3
 	USER = 4
+	STYLESHEET = 5
 
 class EventWhen(Enum):
     BEFORE = 1

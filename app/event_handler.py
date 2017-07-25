@@ -95,6 +95,8 @@ def initialize_callee_controllers(instance):
     experiments = instance.db_session.query(Experiment).all()
     for experiment in experiments:
         settings = json.loads(experiment.settings_json)
+        if('event_hooks' not in settings.keys()):
+            continue
         for hook_name in settings["event_hooks"]:
             if settings["event_hooks"][hook_name]["caller_controller"] == caller_controller:
                 callee_module_name = settings["event_hooks"][hook_name]["callee_module"]

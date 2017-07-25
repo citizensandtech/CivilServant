@@ -32,8 +32,7 @@ class SubredditPageController:
             elif pg_type==PageType.HOT:
                 fetched = sub.get_hot(limit=limit)   
         except:
-            self.log.error("Error querying /r/{0} {1} page".format(self.subname, pg_type.name), extra=sys.exc_info()[0] )
-            print(sys.exc.info()[0])
+            self.log.error("Error querying /r/{0} {1} page: {2}".format(self.subname, pg_type.name, str(e)))
             return []         
         self.log.info("Queried /r/{0} {1} page".format(self.subname, pg_type.name))
         # add sub to subreddit table if not already there
@@ -65,8 +64,8 @@ class SubredditPageController:
                 is_new_post = self.archive_post(post.json_dict)
                 is_new_user = self.archive_user(pruned_post['author'], datetime.datetime.fromtimestamp(post.created))
             self.log.info("Saved posts from /r/{0} {1} page.".format(self.subname, pg_type.name))
-        except:
-            self.log.error("Error Saving posts from /r/{0} {1} page".format(self.subname, pg_type.name), extra=sys.exc_info()[0] )
+        except Exception as e:
+            self.log.error("Error Saving posts from /r/{0} {1} page: {2}".format(self.subname, pg_type.name, str(e)))
         
         if(return_praw_object):
             return posts

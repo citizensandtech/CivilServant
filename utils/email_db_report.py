@@ -12,7 +12,7 @@ from utils.common import PageType, ThingType
 with open(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV), "r") as config:
   DBCONFIG = json.loads(config.read())
 
-with open(os.path.join(BASE_DIR, "utils") + "/email_db_report.json".format(env=ENV), "r") as config:
+with open(os.path.join(BASE_DIR, "config") + "/email_db_report.json".format(env=ENV), "r") as config:
   EMAIL_CONFIG = json.loads(config.read())
 
 ### LOAD SQLALCHEMY
