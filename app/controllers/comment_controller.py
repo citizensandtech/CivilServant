@@ -79,7 +79,7 @@ class CommentController:
             limit_found = False
             after_id = None
             try:
-              comment_ids = [x['id'] for x in self.db_session.execute(text("select id from comments WHERE subreddit_id='{0}' ORDER BY created_utc DESC LIMIT 1000;".format(subreddit.id)))]
+              comment_ids = [x['id'] for x in self.db_session.execute(text("SELECT id FROM comments FORCE INDEX(ix_comments_subreddit_id_created_at) WHERE subreddit_id='{0}' ORDER BY created_utc DESC LIMIT 1000;".format(subreddit.id)))]
             except:
               comment_ids = []
 
