@@ -41,7 +41,7 @@ class Post(Base):
     __tablename__ = 'posts'
     id                  = Column(String(32), primary_key = True, unique=True, autoincrement=False)	# post id
     created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)
-    subreddit_id        = Column(String(32))	# "subreddit_id"
+    subreddit_id        = Column(String(32), index=True)	# "subreddit_id"
     created             = Column(DateTime) # "created"
     #when this record was created:
     created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True) 

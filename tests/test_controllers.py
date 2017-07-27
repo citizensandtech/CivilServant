@@ -1,7 +1,8 @@
 import pytest
 import os
 from mock import Mock, patch
-import simplejson as json
+#import simplejson as json
+import json
 import sqlalchemy
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -514,7 +515,7 @@ def test_archive_last_thousand_comments(mock_reddit):
     subreddit_id = "mouw"
 
     comment_fixtures = []
-    for filename in glob.glob("{script_dir}/fixture_data/comments*".format(script_dir=TEST_DIR)):
+    for filename in sorted(glob.glob("{script_dir}/fixture_data/comments*".format(script_dir=TEST_DIR))):
         f = open(filename, "r")
         comment_fixtures.append(json.loads(f.read()))
         f.close()
@@ -531,7 +532,7 @@ def test_archive_last_thousand_comments(mock_reddit):
                      comment_fixtures[0][600:700],
                      comment_fixtures[0][700:800],
                      comment_fixtures[0][800:900],
-                     comment_fixtures[0][900:],
+                     comment_fixtures[0][900:], 
                      []]
 
     r.get_comments = m
@@ -567,7 +568,7 @@ def test_archive_last_thousand_comments(mock_reddit):
                      comment_fixtures[1][400:500],
                      comment_fixtures[1][500:600],
                      comment_fixtures[1][600:700],
-                     comment_fixtures[1][700:800],
+                    comment_fixtures[1][700:800],
                      comment_fixtures[1][800:900],
                      comment_fixtures[1][900:],
                      []]

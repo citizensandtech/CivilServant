@@ -150,7 +150,7 @@ class StylesheetExperimentController:
             arm = "arm_" + randomization['treatment']
             self.experiment_settings['conditions'][condname]['next_randomization'] += 1
         except:
-            import pdb;pdb.set_trace
+            #import pdb;pdb.set_trace
             self.log.error("{0}: Experiment {1} condition {2} has used its full stock of {3} {4} conditions. Cannot assign any further.".format(
                 self.__class__.__name__,
                 self.experiment.name,

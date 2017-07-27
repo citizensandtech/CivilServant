@@ -66,13 +66,10 @@ class CommentController:
     def archive_last_thousand_comments(self, subreddit_name):
         # fetch the subreddit ID
         subreddit = self.db_session.query(Subreddit).filter(Subreddit.name == subreddit_name).first()
+        subreddit_id = subreddit.id
         #subreddit_name = subreddit.name
 
         # fetch the last thousand comment IDs
-        try:
-          comment_ids = [x['id'] for x in self.db_session.execute(text("select id from comments WHERE subreddit_id='{0}' ORDER BY created_utc DESC LIMIT 1000;".format(subreddit.id)))]
-        except:
-          comment_ids = []
 
         # fetch comments from reddit
         comments = []
@@ -80,8 +77,19 @@ class CommentController:
         try:
             limit_found = False
             after_id = None
+            try:
+              comment_ids = [x['id'] for x in self.db_session.execute(text("select id from comments WHERE subreddit_id='{0}' ORDER BY created_utc DESC LIMIT 1000;".format(subreddit.id)))]
+            except:
+              comment_ids = []
+
             while(limit_found == False):
                 comment_result = self.r.get_comments(subreddit = subreddit_name, params={"after":after_id}, limit=100)
+
+                ## sometimes the above line takes a long time to run
+                ## so we expire the session before continuing
+                self.db_session.expire_all()
+
+
                 comments_returned = 0
                 for comment in comment_result:
                     comments_returned += 1
@@ -101,7 +109,7 @@ class CommentController:
                     if((comment['id'] in comment_ids) != True):
                         db_comment = Comment(
                             id = comment['id'],
-                            subreddit_id = subreddit.id,
+                            subreddit_id = subreddit_id,
                             created_utc = datetime.datetime.utcfromtimestamp(comment['created_utc']),
                             post_id = comment['link_id'].replace("t3_" ,""),
                             user_id = comment['author'],
@@ -109,15 +117,25 @@ class CommentController:
                         )
                         db_comments.append(db_comment)
                         db_comment_ids.append(comment['id'])
-                try:
-                    self.db_session.add_all(db_comments)
-                    self.db_session.commit()
-                    comment_ids = comment_ids + db_comment_ids
-                except sqlalchemy.exc.DBAPIError as e:
-                    self.log.error("Error saving {0} comments to database. Immediate attention needed. Error: {1}".format(len(db_comments),str(e)))
+
+                comments_added =0
+                for db_comment in db_comments:
+                    try:
+                        self.db_session.add(db_comment)
+                        self.db_session.commit()
+                        comment_ids.append(db_comment.id)
+                        comments_added += 1
+                    except (sqlalchemy.exc.DBAPIError, sqlalchemy.exc.InvalidRequestError) as e:
+                        self.db_session.rollback()
+                        self.db_session.add(db_comment)
+                        self.db_session.commit()
+                        comment_ids.append(db_comment.id)
+                        comments_added += 1
                 self.log.info("  New page fetched: total comments archived from {1}: {0}".format(
-                    len(db_comments),subreddit_name
+                    comments_added, subreddit_name
                 ))
+#                    self.log.info("Exception saving {0} comments to database. Successfully saved after rollback: {1}".format(len(db_comments),str(e)))
+                    
 
         except praw.errors.APIException:
             self.log.error("Error querying latest {subreddit_name} comments from reddit API. Immediate attention needed.".format(subreddit_name=subreddit_name))
