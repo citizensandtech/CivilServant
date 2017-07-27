@@ -73,6 +73,7 @@ class CommentController:
 
         # fetch comments from reddit
         comments = []
+        total_comments_added = 0
         self.log.info("Fetching up to the last thousand comments in {subreddit_name}.".format(subreddit_name=subreddit.name))
         try:
             limit_found = False
@@ -82,6 +83,7 @@ class CommentController:
             except:
               comment_ids = []
 
+            iterations = 0
             while(limit_found == False):
                 comment_result = self.r.get_comments(subreddit = subreddit_name, params={"after":after_id}, limit=100)
 
@@ -134,6 +136,15 @@ class CommentController:
                 self.log.info("  New page fetched: total comments archived from {1}: {0}".format(
                     comments_added, subreddit_name
                 ))
+                
+                total_comments_added += comments_added
+
+                ## BREAK THE LOOP AFTER 15 iterations
+                iterations += 1
+                if(iterations==15):
+                    log.info(" Reached 15 iterations while trying to fetch comments from {0}. Fetched {1}".format(subreddit_name, total_comments_added))
+                    limit_found = True
+
 #                    self.log.info("Exception saving {0} comments to database. Successfully saved after rollback: {1}".format(len(db_comments),str(e)))
                     
 
