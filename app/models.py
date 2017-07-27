@@ -61,6 +61,17 @@ class ModAction(Base):
     target_fullname     = Column(String(256))
     action_data         = Column(MEDIUMTEXT) # json_dict
 
+# class for comments that are not needed for operational purposes.
+class ArchivedComments(Base):
+    __tablename__ = "archived_comments"
+    id                  = Column(String(256), primary_key = True, unique=True, autoincrement=False)
+    created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    created_utc         = Column(DateTime)
+    subreddit_id        = Column(String(32), index=True)
+    post_id             = Column(String(32), index=True)
+    user_id             = Column(String(64), index=True)
+    comment_data        = Column(MEDIUMTEXT)
+
 class Comment(Base):
     __tablename__ = "comments"
     id                  = Column(String(256), primary_key = True, unique=True, autoincrement=False)
