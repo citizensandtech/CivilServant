@@ -3,7 +3,7 @@ import os
 import sys
 import simplejson as json
 from utils.common import *
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Index
 from sqlalchemy.dialects.mysql import MEDIUMTEXT, LONGTEXT
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -110,6 +110,8 @@ class Comment(Base):
             except:
                 continue
         return {"all_comments": all_comments, "all_toplevel":all_toplevel}    
+
+Index("ix_comments_subreddit_id_created_at", Comment.subreddit_id, Comment.created_at)
 
 class User(Base):
     __tablename__ = 'users'
