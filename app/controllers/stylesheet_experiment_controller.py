@@ -116,8 +116,6 @@ class StylesheetExperimentController:
                 last_experiment_created = last_experiment_action.created_at.replace(tzinfo=pytz.utc)
                 interval_since_last_action = (current_time - last_experiment_created).total_seconds()
                 eligible = ((interval_since_last_action < self.experiment_settings['intervention_interval_seconds'] + self.experiment_settings['intervention_window_seconds']) and (interval_since_last_action >= self.experiment_settings['intervention_interval_seconds'] - self.experiment_settings['intervention_window_seconds']))
-                # import pdb; pdb.set_trace()
-                # pass
         if(eligible==False):
             self.log.info("{0}: Experiment {1} code run. Ineligible to Continue. Begin Time: {2}. End Time: {3}. Last Intervention: {4} ".format(
                 self.__class__.__name__,
@@ -132,7 +130,7 @@ class StylesheetExperimentController:
     ### TWO CONDITIONS: NORMAL AND SPECIAL
     ### MONDAYS FRIDAYS SATURDAYS
     def select_condition(self, current_time=datetime.datetime.utcnow()):
-        isoweekdays = {0:"Sunday",1:"Monday", 2:"Tuesday", 
+        isoweekdays = {7:"Sunday",1:"Monday", 2:"Tuesday", 
             3:"Wednesday", 4:"Thursday", 5:"Friday", 6:"Saturday"}
 
         isoweekday = isoweekdays[current_time.date().isoweekday()]
@@ -203,7 +201,7 @@ class StylesheetExperimentController:
         result = self.r.set_stylesheet(self.subreddit, new_stylesheet)
         if('errors' in result.keys() and len(result['errors'])==0):
 
-            self.log.info("{0}: Experiment {1}: Applied Arm {2} of Condition {3}".format(
+            self.log.info("{0}: Experiment {1}: Applied Arm {3} of Condition {4} in {2}".format(
                     self.__class__.__name__,
                     self.experiment.id,
                     self.subreddit, 
@@ -212,12 +210,14 @@ class StylesheetExperimentController:
             experiment_action = ExperimentAction(
                 experiment_id = self.experiment.id,
                 praw_key_id = PrawKey.get_praw_id(ENV, self.experiment_name),
-                action = "Intervention".format(condition,arm),
+                action = "Intervention",
                 action_object_type = ThingType.STYLESHEET.value,
                 action_object_id = None,
                 metadata_json  = json.dumps({"arm":arm, "condition":condition})
 
             )
+            self.db_session.add(experiment_action)
+            self.db_session.commit()
         else:
             self.log.error("{0}: Experiment {1}: Failed to apply Arm {2} of Condition {3}. Reddit errors: {4}".format(
                     self.__class__.__name__,
@@ -259,8 +259,10 @@ class StylesheetExperimentController:
 
     ## THIS HIGH LEVEL METHOD TAKES A SNAPSHOT OF COMMENTS THAT NEED SAMPLING
     ## All 
-    def update_comment_snapshots(self):
-        pass
+    def archive_experiment_submission_metadata(self):
+        posts = self.identify_posts_that_need_snapshotting()
+        comments = self.sample_comments(posts)
+        self.observe_comment_snapshots(comments)
 
     ## IDENTIFY POSTS AND ALSO CREATE AN EXPERIMENT_THING 
     ## FOR POSTS THAT DON'T YET HAVE ONE
@@ -270,10 +272,12 @@ class StylesheetExperimentController:
             ExperimentAction.action=="Intervention").order_by(
             ExperimentAction.created_at
             ).first()
+        if(last_action is None):
+          return []
         eligible_posts = []
         for post in self.db_session.query(Post).filter(
             Post.created_at >= last_action.created_at,
-            Post.subreddit_id == self.experiment_settings['subreddit_id']):
+            Post.subreddit_id == self.experiment_settings['subreddit_id']).all():
             eligible_posts.append(post)
 
         # find posts that are unpaired
@@ -391,6 +395,13 @@ class StylesheetExperimentController:
                              if (current_time - x.created_utc).total_seconds() < intervention_window]
         #comment_things = self.db_session.query(ExperimentThing).filter(ExperimentThing.id.in_(eligible_comment_ids)).all()
         reddit_comment_ids = ["t1_" + x for x in eligible_comment_ids]
+        if(len(reddit_comment_ids) == 0):
+            self.log.info("{0}: Experiment {1}: Collected Snapshots from 0 comments in r/{3}.".format(
+                    self.__class__.__name__,
+                    self.experiment.id,
+                    len(reddit_comment_ids),
+                    self.subreddit))
+            return
         for comment in self.r.get_info(thing_id = reddit_comment_ids):
             snapshot = {"score":comment.score,
                         "num_reports":comment.num_reports,

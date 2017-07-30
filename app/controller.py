@@ -86,7 +86,12 @@ def get_experiment_class(experiment_name):
         log.error("Cannot find experiment settings for {0} in {1}".format(ENV, experiment_file_path))
         sys.exit(1)
     experiment_config = experiment_config_all[ENV]
-    c = getattr(app.controllers.sticky_comment_experiment_controller, experiment_config['controller'])
+    
+    ## this is a hack. needs to be improved
+    if(experiment_config['controller'] == "StylesheetExperimentController"):
+        c = getattr(app.controllers.stylesheet_experiment_controller, experiment_config['controller'])
+    else:
+        c = getattr(app.controllers.sticky_comment_experiment_controller, experiment_config['controller'])
     return c
 
 
