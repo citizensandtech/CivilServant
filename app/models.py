@@ -40,11 +40,10 @@ class SubredditPage(Base):
 class Post(Base):
     __tablename__ = 'posts'
     id                  = Column(String(32), primary_key = True, unique=True, autoincrement=False)	# post id
-    created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)
-    subreddit_id        = Column(String(32), index=True)	# "subreddit_id"
-    created             = Column(DateTime) # "created"
     #when this record was created:
     created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True) 
+    subreddit_id        = Column(String(32), index=True)	# "subreddit_id"
+    created             = Column(DateTime) # "created"
     post_data           = Column(MEDIUMTEXT)	# "json_dict"
     comment_data        = Column(LONGTEXT)
     comments_queried_at = Column(DateTime, default=None)  
@@ -160,7 +159,9 @@ class ExperimentThing(Base):
     created_at          = Column(DateTime, default = datetime.datetime.utcnow, index=True)
     object_type         = Column(Integer)
     experiment_id       = Column(Integer, index = True)
-    object_created      = Column(DateTime)
+    object_created      = Column(DateTime, index = True)
+    #column for experiment-specific custom query index
+    query_index         = Column(String(256), index = True) 
     metadata_json       = Column(MEDIUMTEXT)
 
 class ExperimentThingSnapshot(Base):

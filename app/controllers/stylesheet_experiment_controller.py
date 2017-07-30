@@ -6,12 +6,13 @@ import reddit.connection
 import reddit.praw_utils as praw_utils
 import reddit.queries
 import sqlalchemy
+from collections import defaultdict
 from dateutil import parser
 from utils.common import *
 from app.models import Base, SubredditPage, Subreddit, Post, ModAction, PrawKey, Comment
 from app.models import Experiment, ExperimentThing, ExperimentAction, ExperimentThingSnapshot
 from app.models import EventHook
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, desc, asc
 from app.controllers.subreddit_controller import SubredditPageController
 import numpy as np
 
@@ -24,7 +25,8 @@ class StylesheetExperimentController:
     def __init__(self, experiment_name, db_session, r, log, 
                        required_keys = ['subreddit', 'subreddit_id', 'username', 
                          'start_time', 'end_time', 'conditions', 
-                         'intervention_interval_seconds', 'intervention_window_seconds']):
+                         'intervention_interval_seconds', 'intervention_window_seconds',
+                         'first_n_comments','comment_snapshot_period_seconds']):
         self.db_session = db_session
         self.log = log
         self.r = r
@@ -105,7 +107,7 @@ class StylesheetExperimentController:
 
         if(eligible):
             last_experiment_action = self.db_session.query(ExperimentAction).filter(
-                ExperimentAction.experiment_id==self.experiment.id).order_by(ExperimentAction.created_at).first()
+                ExperimentAction.experiment_id==self.experiment.id).order_by(desc(ExperimentAction.created_at)).first()
 
             ## keep eligible True if there's no previous action
             ## if there is a previous action, check that it falls within
@@ -210,7 +212,7 @@ class StylesheetExperimentController:
             experiment_action = ExperimentAction(
                 experiment_id = self.experiment.id,
                 praw_key_id = PrawKey.get_praw_id(ENV, self.experiment_name),
-                action = "Intervention:{0}.{1}".format(condition,arm),
+                action = "Intervention".format(condition,arm),
                 action_object_type = ThingType.STYLESHEET.value,
                 action_object_id = None,
                 metadata_json  = json.dumps({"arm":arm, "condition":condition})
@@ -222,15 +224,19 @@ class StylesheetExperimentController:
                     self.experiment.id,
                     self.subreddit, 
                     arm,condition, ", ".join(result['errors'])))
-            experiment_action = ExperimentAction(
-                experiment_id = self.experiment.id,
-                praw_key_id = PrawKey.get_praw_id(ENV, self.experiment_name),
-                action = "NonIntervention:PrawError.{0}.{1}".format(condition,arm),
-                action_object_type = ThingType.STYLESHEET.value,
-                action_object_id = None
-            )
-        self.db_session.add(experiment_action)
-        self.db_session.commit()
+#            experiment_action = ExperimentAction(
+#                experiment_id = self.experiment.id,
+#                praw_key_id = PrawKey.get_praw_id(ENV, self.experiment_name),
+#                action = "NonIntervention:PrawError.{0}.{1}".format(condition,arm),
+#                action_object_type = ThingType.STYLESHEET.value,
+#                action_object_id = None
+#            )
+#            self.db_session.add(experiment_action)
+#            self.db_session.commit()
+            ## IF WE FAILED TO APPLY THE INTERVENTION, ROLL BACK THAT RANDOMIZATION
+            self.experiment_settings['conditions'][condname]['next_randomization'] -= 1
+            self.experiment.settings_json = json.dumps(self.experiment_settings)
+            self.db_session.commit()
 
         ## TO HELP WITH TESTING, RETURN THE FULL TEXT OF THE STYLESHEET
         return new_stylesheet
@@ -247,9 +253,163 @@ class StylesheetExperimentController:
     def intervene_special_arm_1(self, condname):
         return self.set_stylesheet(condname, "arm_1")
 
-    def sample_comments(self):
-        pass
-    
-    
+    ######################
+    ## COMMENT SNAPSHOTS
+    ######################
 
-        
+    ## THIS HIGH LEVEL METHOD TAKES A SNAPSHOT OF COMMENTS THAT NEED SAMPLING
+    ## All 
+    def update_comment_snapshots(self):
+        pass
+
+    ## IDENTIFY POSTS AND ALSO CREATE AN EXPERIMENT_THING 
+    ## FOR POSTS THAT DON'T YET HAVE ONE
+    def identify_posts_that_need_snapshotting(self):
+        last_action = self.db_session.query(ExperimentAction).filter(
+            ExperimentAction.experiment_id == self.experiment.id, 
+            ExperimentAction.action=="Intervention").order_by(
+            ExperimentAction.created_at
+            ).first()
+        eligible_posts = []
+        for post in self.db_session.query(Post).filter(
+            Post.created_at >= last_action.created_at,
+            Post.subreddit_id == self.experiment_settings['subreddit_id']):
+            eligible_posts.append(post)
+
+        # find posts that are unpaired
+        added_experiment_things = 0
+        ## in th future, 
+        # use the post prefix for ExperimentThing indices because
+        # the ExperimentThing table includes other object types
+        # and there might be collisions
+        #post_prefix = "t3_"
+        for post in self.db_session.query(Post).outerjoin(
+            ExperimentThing, Post.id == ExperimentThing.id).filter(
+            ExperimentThing.id==None,
+            Post.id.in_([x.id for x in eligible_posts])).all():
+
+            et = ExperimentThing(
+              id = post.id,
+              object_type = ThingType.SUBMISSION.value,
+              experiment_id = self.experiment.id,
+              object_created = post.created
+            )
+            self.db_session.add(et)
+            added_experiment_things += 1
+        self.db_session.commit()
+
+        self.log.info("{0}: Experiment {1}: Added {2} posts for comment monitoring in r/{3}.".format(
+                self.__class__.__name__,
+                self.experiment.id,
+                added_experiment_things,
+                self.subreddit))
+
+        return eligible_posts
+
+    ## THIS METHOD CHOOSES COMMENTS TO SAMPLE
+    ## COMMENTS ARE SELECTED IF THEY'RE TOPLEVEL COMMENTS
+    ## AND ADDS THEM AS EXPERIMENT_THINGS FOR LATER SNAPSHOTTING
+    def sample_comments(self, posts):
+        #posts = self.identify_posts_that_need_snapshotting()
+
+        comment_things_to_observe = []
+        comments_to_observe = []
+
+        # STEP ONE: FOR EACH POST, 
+        # FIND OUT HOW MANY EXPERIMENT_THINGS ARE ASSOCIATED WITH THAT POST
+        posts_needing_comments = defaultdict(list)
+        comment_thing_counts = []
+
+        for post in posts:
+            comment_things = list(self.db_session.query(ExperimentThing).filter(
+                           ExperimentThing.query_index == post.id,
+                           ExperimentThing.experiment_id == self.experiment.id).all())
+            comment_things_to_observe = comment_things_to_observe + comment_things
+            comment_thing_counts.append(len(comment_things))
+
+            if(len(comment_things) < self.experiment_settings['first_n_comments']):
+                posts_needing_comments[post.id] = comment_things
+
+        # this shouldn't be more than tens of thousands of comments
+        # for an experiment that randomizes on a day basis.
+        # In other experiments, it might be important to query on a per-post basis
+        post_comments = defaultdict(list)
+        added_n_comments_for_monitoring = 0 
+        for comment in self.db_session.query(Comment).filter(Comment.post_id.in_([x for x in posts_needing_comments.keys()])).order_by(asc(Comment.created_utc)):
+
+            post_comments[comment.post_id].append(comment)
+
+        for post_id, comments in post_comments.items():
+            already_observing = [x.id for x in posts_needing_comments[post_id]]
+            post_comment_count = len(already_observing)
+            for comment in comments:
+                # if the comment is toplevel and hasn't been seen before
+                # and we're under our quota, then add an experiment_thing.
+                # snapshots will be taken in a separate method
+                if(post_comment_count < self.experiment_settings['first_n_comments'] and 
+                   comment.post_id == comment.post_id and comment.id not in already_observing):
+
+                    comments_to_observe.append(comment)
+                    
+                    et = ExperimentThing(
+                      id = comment.id,
+                      object_type = ThingType.COMMENT.value,
+                      experiment_id = self.experiment.id,
+                      object_created = comment.created_utc,
+                      query_index = post_id
+                    )
+                    self.db_session.add(et)
+                    post_comment_count += 1
+                    added_n_comments_for_monitoring += 1
+
+        self.log.info("{0}: Experiment {1}: Added {2} comments for monitoring in r/{3}".format(
+                self.__class__.__name__,
+                self.experiment.id,
+                added_n_comments_for_monitoring,
+                self.subreddit))
+
+        self.db_session.commit()
+
+        ## now fetch the remaining comments
+        if(len(comment_things_to_observe)>0):
+            comments_to_observe = comments_to_observe + list(self.db_session.query(Comment).filter(Comment.id.in_([x.id for x in comment_things_to_observe])).all())
+
+        return comments_to_observe
+
+    ## THIS METHOD OBSERVES POSTS IN THE EXPERIMENT PERIOD THAT DON'T HAVE
+    ## AN EXPERIMENT THING RECORD OR HAVE ONE BUT NOT AN EXPERIMENT ACTION. IT THEN:
+    ## - ASSIGNS THEM AN EXPERIMENT THNG
+    ## - FOR POSTS WITH EXPERIMENT THINGS, WHICH HAVEN'T HAD 
+    ##   A CommentSampleComplete EXPERIMENT_ACTION
+    ## - RUN THE observe_first_comments method
+    ## - IF THE FIRST N COMMENTS ARE FOUND, ADD A 
+    ##   CommentSampleComplete EXPERIMENT_ACTION
+    def observe_comment_snapshots(self, comments_to_observe):
+        current_time = datetime.datetime.utcnow() 
+        intervention_window = self.experiment_settings['intervention_window_seconds']
+        eligible_comment_ids = [x.id for x in comments_to_observe  
+                             if (current_time - x.created_utc).total_seconds() < intervention_window]
+        #comment_things = self.db_session.query(ExperimentThing).filter(ExperimentThing.id.in_(eligible_comment_ids)).all()
+        reddit_comment_ids = ["t1_" + x for x in eligible_comment_ids]
+        for comment in self.r.get_info(thing_id = reddit_comment_ids):
+            snapshot = {"score":comment.score,
+                        "num_reports":comment.num_reports,
+                        "user_reports":len(comment.user_reports),
+                        "ups":comment.ups,
+                        "downs":comment.downs,
+                        "mod_reports":len(comment.mod_reports)
+                        }
+            experiment_thing_snapshot = ExperimentThingSnapshot(
+                experiment_thing_id = comment.id,
+                object_type = ThingType.COMMENT.value,
+                experiment_id = self.experiment.id,
+                metadata_json = json.dumps(snapshot)
+            )
+            self.db_session.add(experiment_thing_snapshot)
+        self.db_session.commit()
+
+        self.log.info("{0}: Experiment {1}: Collected Snapshots from {2} comments in r/{3}.".format(
+                self.__class__.__name__,
+                self.experiment.id,
+                len(reddit_comment_ids),
+                self.subreddit))
