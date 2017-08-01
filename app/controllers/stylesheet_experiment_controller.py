@@ -390,7 +390,7 @@ class StylesheetExperimentController:
     ##   CommentSampleComplete EXPERIMENT_ACTION
     def observe_comment_snapshots(self, comments_to_observe):
         current_time = datetime.datetime.utcnow() 
-        intervention_window = self.experiment_settings['intervention_window_seconds']
+        intervention_window = self.experiment_settings['comment_snapshot_period_seconds']
         eligible_comment_ids = [x.id for x in comments_to_observe  
                              if (current_time - x.created_utc).total_seconds() < intervention_window]
         #comment_things = self.db_session.query(ExperimentThing).filter(ExperimentThing.id.in_(eligible_comment_ids)).all()
