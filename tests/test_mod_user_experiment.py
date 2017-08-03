@@ -14,7 +14,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import and_, or_
 import glob, datetime, time, pytz
-from app.controllers.sticky_comment_experiment_controller import *
+from app.controllers.mod_user_experiment_controller import *
 from app.controllers.front_page_controller import FrontPageController
 
 from utils.common import *
@@ -37,6 +37,7 @@ def clear_all_tables():
     db_session.query(Post).delete()
     db_session.query(User).delete()
     db_session.query(Comment).delete()
+    db_session.query(ModAction).delete()
     db_session.query(Experiment).delete()
     db_session.query(ExperimentThing).delete()
     db_session.query(ExperimentAction).delete()
@@ -49,3 +50,46 @@ def setup_function(function):
 
 def teardown_function(function):
     clear_all_tables()
+
+
+
+##TODO FOR TESTS
+
+## TEST THE pre function, which archives the main subreddit
+##      query_and_archive_banned_users_main
+##      Fixtures and mocks:
+#       - past mod log for main
+#         - test cases where the accounts are older than oldest_mod_action_created_utc
+#         - test creation of new user metadata records
+#         - cases where we can get info about the user
+#         - cases where the user is not queryable from the reddit api because it's been removed from the system
+#       - more recent updates to main mod log
+#       - mod actions in shadow subreddit
+@patch('praw.Reddit', autospec=True)
+def test_query_and_archive_banned_users_main(mock_reddit):
+    r = mock_reddit.return_value
+    patch('praw.')
+
+    experiment_name = "mod_user_test"
+    with open(os.path.join(BASE_DIR,"config", "experiments", experiment_name + ".yml"), "r") as f:
+            experiment_config = yaml.load(f)['test']
+
+
+    controller = ModeratorExperimentController(experiment_name, db_session, r, log)
+
+    mod_action_fixtures = []
+    for filename in sorted(glob.glob("{script_dir}/fixture_data/mod_action*".format(script_dir=TEST_DIR))):
+        f = open(filename, "r")
+        mod_action_list = []
+        for mod_action in json.loads(f.read()):
+            mod_action['sr_id36'] = controller.subreddit_id
+            mod_action_list.append(json2obj(json.dumps(mod_action)))
+        mod_action_fixtures.append(mod_action_list)
+        f.close()
+
+    r.get_subreddit.return_value = json2obj('{{"name":"{0}", "id":"{1}", "display_name":"{2}"}}'.format(experiment_config['subreddit'], experiment_config['subreddit_id'], experiment_config['subreddit']))
+    r.get_mod_log.return_value = mod_action_fixtures[0] #contains one banuser record
+    
+    controller.query_and_archive_banned_users_main()
+    ## TEST THAT THE PROPER NUMBER OF ACTIONS ARE ADDED TO THE DATABASE
+    assert db_session.query(ModAction).count() == len(mod_action_fixtures[0])
