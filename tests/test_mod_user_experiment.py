@@ -52,6 +52,33 @@ def teardown_function(function):
     clear_all_tables()
 
 
+def setup_banned_user_fixtures(r):
+    experiment_name = "mod_user_test"
+    with open(os.path.join(BASE_DIR,"config", "experiments", experiment_name + ".yml"), "r") as f:
+            experiment_config = yaml.load(f)['test']
+
+    controller = ModeratorExperimentController(experiment_name, db_session, r, log)
+
+    mod_action_fixtures = []
+    for filename in sorted(glob.glob("{script_dir}/fixture_data/mod_action*".format(script_dir=TEST_DIR))):
+        f = open(filename, "r")
+        mod_action_list = []
+        for mod_action in json.loads(f.read()):
+            mod_action['sr_id36'] = experiment_config['subreddit_id']
+            mod_action_list.append(json2obj(json.dumps(mod_action)))
+        mod_action_fixtures.append(mod_action_list)
+        f.close()
+
+    r.get_subreddit.return_value = json2obj('{{"name":"{0}", "id":"{1}", "display_name":"{2}"}}'.format(experiment_config['subreddit'], experiment_config['subreddit_id'], experiment_config['subreddit']))
+    r.get_mod_log.return_value = mod_action_fixtures[0] #contains two banuser records
+
+    return controller, mod_action_fixtures
+    
+    #controller.query_and_archive_banned_users_main()
+    ## TEST THAT THE PROPER NUMBER OF ACTIONS ARE ADDED TO THE DATABASE
+    #assert db_session.query(ModAction).count() == len(mod_action_fixtures[0])
+
+    #assert len(controller.get_banned_users(controller.subreddit_id, None)) == 2
 
 ##TODO FOR TESTS
 
@@ -69,27 +96,7 @@ def teardown_function(function):
 def test_query_and_archive_banned_users_main(mock_reddit):
     r = mock_reddit.return_value
     patch('praw.')
-
-    experiment_name = "mod_user_test"
-    with open(os.path.join(BASE_DIR,"config", "experiments", experiment_name + ".yml"), "r") as f:
-            experiment_config = yaml.load(f)['test']
-
-
-    controller = ModeratorExperimentController(experiment_name, db_session, r, log)
-
-    mod_action_fixtures = []
-    for filename in sorted(glob.glob("{script_dir}/fixture_data/mod_action*".format(script_dir=TEST_DIR))):
-        f = open(filename, "r")
-        mod_action_list = []
-        for mod_action in json.loads(f.read()):
-            mod_action['sr_id36'] = controller.subreddit_id
-            mod_action_list.append(json2obj(json.dumps(mod_action)))
-        mod_action_fixtures.append(mod_action_list)
-        f.close()
-
-    r.get_subreddit.return_value = json2obj('{{"name":"{0}", "id":"{1}", "display_name":"{2}"}}'.format(experiment_config['subreddit'], experiment_config['subreddit_id'], experiment_config['subreddit']))
-    r.get_mod_log.return_value = mod_action_fixtures[0] #contains one banuser record
-    
+    controller, mod_action_fixtures = setup_banned_user_fixtures(r)
     controller.query_and_archive_banned_users_main()
-    ## TEST THAT THE PROPER NUMBER OF ACTIONS ARE ADDED TO THE DATABASE
     assert db_session.query(ModAction).count() == len(mod_action_fixtures[0])
+    #assert len(controller.get_banned_users(controller.subreddit_id, None)) == 2
