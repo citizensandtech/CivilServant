@@ -1,7 +1,7 @@
 from enum import Enum
 import simplejson as json
 from collections import namedtuple
-
+from pydoc import locate
 
 class PageType(Enum):
     TOP = 1
@@ -19,6 +19,16 @@ class ThingType(Enum):
 class EventWhen(Enum):
     BEFORE = 1
     AFTER = 2
+
+class UserMetadataField(Enum):
+    NUM_PREVIOUS_BANS = 1
+    
+    @property
+    def typeof(self):
+        self.name_to_type = {
+            UserMetadataField.NUM_PREVIOUS_BANS: locate("int")
+        }
+        return self.name_to_type[self]
 
 class DbEngine:
 	def __init__(self, config_path):

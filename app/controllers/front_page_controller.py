@@ -7,7 +7,6 @@ import reddit.praw_utils as praw_utils
 import reddit.queries
 from utils.common import PageType
 from app.models import Base, FrontPage
-from app.event_handler import event_handler, initialize_callee_controllers
 import app.event_handler
 
 ALL_SUBREDDIT_NAME = "all"
@@ -24,7 +23,7 @@ class FrontPageController:
 
     # for event_handler, need a dictionary of {experiment id: experiment controller instance}.
     # if you forget this line, it's okay because when we run event_handler, it will look for this attr
-    self.experiment_to_controller = initialize_callee_controllers(self)
+    self.experiment_to_controller = app.event_handler.initialize_callee_controllers(self)
 
 
 
@@ -48,7 +47,6 @@ class FrontPageController:
 
       for post in fetched:
           new_post = post.json_dict if("json_dict" in dir(post)) else post['data'] ### TO HANDLE TEST FIXTURES
-          self.posts.append(post)
           pruned_post = {
             'id': new_post['id'],
             'author': new_post['author'],
@@ -59,6 +57,7 @@ class FrontPageController:
             'created_utc': new_post['created_utc'],
             'subreddit_id': new_post['subreddit_id']
             }
+          self.posts.append(post) # for event hook
           posts.append(pruned_post)
       self.log.info("Queried reddit {0} page".format(pg_type.name))
       return posts

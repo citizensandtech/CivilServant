@@ -1,0 +1,65 @@
+test:
+  subreddit: natematias
+  subreddit_id: 3940b
+  shadow_subreddit: CivilServantBot2
+  shadow_subreddit_id: 3n1tq
+  username: CivilServantBot
+  conditions: 
+    main:
+        randomizations: mod_user_main.conditions.csv
+        next_randomization: 0 
+        arms:
+            arm_0: null
+            arm_1: |
+                This is arm 1 of the 1st condition. perma ban
+                ... 
+                #######
+            arm_2: |
+                temp ban
+                ...
+                #######
+  controller: ModUserExperimentController
+  start_time: 06/25/2016 00:00:00 UTC
+  end_time: 12/30/2020 23:59:59 UTC
+  event_hooks:
+    treat_first_time_banned:
+      is_active: True
+      call_when: EventWhen.AFTER
+      caller_controller: ModeratorController
+      caller_method: archive_mod_action_history_with_event_hooks
+      callee_module: app.controllers.mod_user_experiment_controller
+      callee_controller: ModUserExperimentController
+      callee_method: update_experiment
+
+development:
+  subreddit: natematias
+  subreddit_id: 3940b
+  shadow_subreddit: CivilServantBot2
+  shadow_subreddit_id: 3n1tq
+  username: CivilServantBot
+  conditions: 
+    main:
+        randomizations: mod_user_main.conditions.csv
+        next_randomization: 0 
+        arms:
+            arm_0: null
+            arm_1: |
+                This is arm 1 of the 1st condition. perma ban
+                ... 
+                #######
+            arm_2: |
+                temp ban
+                ...
+                #######
+  controller: ModUserExperimentController
+  start_time: 06/25/2016 00:00:00 UTC
+  end_time: 12/30/2020 23:59:59 UTC
+  event_hooks:
+    treat_first_time_banned:
+      is_active: True
+      call_when: EventWhen.AFTER
+      caller_controller: ModeratorController
+      caller_method: archive_mod_action_history_with_event_hooks
+      callee_module: app.controllers.mod_user_experiment_controller
+      callee_controller: ModUserExperimentController
+      callee_method: update_experiment

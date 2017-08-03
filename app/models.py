@@ -200,3 +200,14 @@ class EventHook(Base):
     callee_module       = Column(String(256), nullable=False) # module, e.g. "app.controllers.sticky_comment_experiment_controller"    
     callee_controller   = Column(String(256), nullable=False) # class, e.g. "ChangingStickyCommentExperimentController"
     callee_method       = Column(String(256), nullable=False) # method, e.g. "change_sticky_comment_text"
+
+
+class UserMetadata(Base):
+    __tablename__ = 'user_metadata'
+    id                  = Column(Integer, primary_key=True)
+    user_id             = Column(String(32), index=True)
+    subreddit_id        = Column(String(32))
+    created_at          = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at          = Column(DateTime, default=datetime.datetime.utcnow)
+    field_name          = Column(String(256), nullable=False, index=True)
+    field_value         = Column(String(256), nullable=False)

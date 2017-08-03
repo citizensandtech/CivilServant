@@ -51,55 +51,6 @@ def teardown_function(function):
     clear_all_tables()
 
 
-### TODO: REFACTOR THIS INTO A SUPERCLASS FOR EXPERIMENTS
-@patch('praw.Reddit', autospec=True)
-def test_initialize_experiment(mock_reddit):
-    r = mock_reddit.return_value
-    patch('praw.')
-
-    experiment_name_to_controller = {
-        "sticky_comment_0": AMAStickyCommentExperimentController,
-        "sticky_comment_frontpage_test": FrontPageStickyCommentExperimentController
-        }
-
-    for experiment_name in experiment_name_to_controller:
-        with open(os.path.join(BASE_DIR,"config", "experiments", experiment_name + ".yml"), "r") as f:
-            experiment_config = yaml.load(f)['test']
-
-        assert(len(db_session.query(Experiment).all()) == 0)
-
-        controller = experiment_name_to_controller[experiment_name]
-        controller_instance = controller(experiment_name, db_session, r, log)
-
-        assert(len(db_session.query(Experiment).all()) == 1)
-        experiment = db_session.query(Experiment).first()
-        assert(experiment.name       == experiment_name)
-        assert(experiment.controller == experiment_config['controller'])
-        assert(pytz.timezone("UTC").localize(experiment.start_time) == parser.parse(experiment_config['start_time']))
-        assert(pytz.timezone("UTC").localize(experiment.end_time)   == parser.parse(experiment_config['end_time']))
-        
-        settings = json.loads(experiment.settings_json)
-        for k in ['username', 'subreddit', 'subreddit_id','max_eligibility_age', 
-                  'min_eligibility_age', 'start_time', 'end_time', 'controller']:
-            assert(settings[k] == experiment_config[k])
-
-        ### NOW TEST THAT AMA OBJECTS ARE ADDED
-        for condition_name in experiment_config['conditions']:
-            with open(os.path.join(BASE_DIR,"config", "experiments", experiment_config['conditions'][condition_name]['randomizations']), "r") as f:
-                conditions = []
-                for row in csv.DictReader(f):
-                    conditions.append(row)
-
-            with open(os.path.join(BASE_DIR,"config", "experiments", experiment_config['conditions'][condition_name]['randomizations']), "r") as f:
-                nonconditions = []
-                for row in csv.DictReader(f):
-                    nonconditions.append(row)
-
-            assert len(settings['conditions'][condition_name]['randomizations']) == len(conditions)
-            assert settings['conditions'][condition_name]['next_randomization']     == 0
-
-        clear_all_tables()
-
 # calls set_eligible_objects, which for FrontPageStickyCommentExperimentController has a different signature
 # (is a callback function), so we don't test FrontPageStickyCommentExperimentController here
 @patch('praw.Reddit', autospec=True)
@@ -150,6 +101,10 @@ def test_get_eligible_objects(mock_subreddit, mock_reddit):
             objs = controller_instance.set_eligible_objects(instance)
         elif controller_instance.__class__ is AMAStickyCommentExperimentController:
             objs = controller_instance.set_eligible_objects()            
+        for obj in objs:
+            assert "t5_mouw" == obj.subreddit_id            
+        assert len(objs) == 100
+
         eligible_objects = controller_instance.get_eligible_objects(objs)
         assert len(eligible_objects) == 100
 
@@ -179,7 +134,8 @@ def test_get_eligible_objects(mock_subreddit, mock_reddit):
             objs = controller_instance.set_eligible_objects()
         eligible_objects = controller_instance.get_eligible_objects(objs)
         assert len(eligible_objects) == 50
-        clear_all_tables()    
+        clear_all_tables()   
+
 
 @patch('praw.Reddit', autospec=True)
 @patch('praw.objects.Subreddit', autospec=True)
@@ -217,7 +173,6 @@ def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
             instance = FrontPageController(db_session, r, log)
             instance.posts = sub_data
 
-
         ## TEST THE BASE CASE OF RANDOMIZATION
         if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
             objs = controller_instance.set_eligible_objects(instance)
@@ -225,7 +180,7 @@ def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
             objs = controller_instance.set_eligible_objects()            
         eligible_objects = controller_instance.get_eligible_objects(objs)
         assert len(eligible_objects) == 100 ####
-
+        assert eligible_objects[0].__class__.__name__ == "X"
 
         experiment_action_count = db_session.query(ExperimentAction).count()
         experiment_settings = json.loads(controller_instance.experiment.settings_json)
@@ -294,6 +249,66 @@ def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
 
         clear_all_tables()
 
+
+
+
+@patch('praw.Reddit', autospec=True)
+@patch('praw.objects.Subreddit', autospec=True)
+def test_identify_condition(mock_subreddit, mock_reddit):
+    r = mock_reddit.return_value
+
+    experiment_name_to_controller = {
+        "sticky_comment_0": AMAStickyCommentExperimentController,
+        "sticky_comment_frontpage_test": FrontPageStickyCommentExperimentController
+    }
+
+    for experiment_name in experiment_name_to_controller:
+
+        with open(os.path.join(BASE_DIR, "config", "experiments") + "/"+ experiment_name + ".yml", "r") as f:
+            experiment_settings = yaml.load(f.read())['test']
+
+        sub_data = []
+        with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
+            fixture = [x['data'] for x in json.loads(f.read())['data']['children']]
+            for post in fixture:
+                json_dump = json.dumps(post)
+                postobj = json2obj(json_dump)
+                sub_data.append(postobj)
+        mock_subreddit.get_new.return_value = sub_data
+        mock_subreddit.display_name = experiment_settings['subreddit']
+        mock_subreddit.name = experiment_settings['subreddit']
+        mock_subreddit.id = experiment_settings['subreddit_id']
+        r.get_subreddit.return_value = mock_subreddit
+        patch('praw.')
+
+        ## TEST THE BASE CASE OF RANDOMIZATION
+        controller = experiment_name_to_controller[experiment_name]
+        controller_instance = controller(experiment_name, db_session, r, log)
+
+        # "mock" FrontPageController.posts
+        if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
+            instance = FrontPageController(db_session, r, log)
+            instance.posts = sub_data
+
+
+        if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
+            objs = controller_instance.set_eligible_objects(instance)
+        elif controller_instance.__class__ is AMAStickyCommentExperimentController:
+            objs = controller_instance.set_eligible_objects()
+
+        eligible_objects = controller_instance.get_eligible_objects(objs)
+
+        condition_list = []
+        for obj in eligible_objects:
+            condition_list.append(controller_instance.identify_condition(obj))
+
+        if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
+            assert Counter(condition_list)['frontpage_post'] == 100
+        elif controller_instance.__class__ is AMAStickyCommentExperimentController:
+            assert Counter(condition_list)['nonama'] == 98
+            assert Counter(condition_list)['ama'] == 2
+
+        clear_all_tables()
 
 @patch('praw.Reddit', autospec=True)
 @patch('praw.objects.Subreddit', autospec=True)
@@ -386,6 +401,7 @@ def test_update_experiment(intervene_ama_arm_1, intervene_ama_arm_0,
             assert intervene_ama_arm_1.called == True
         assert len(experiment_return) == 100
         clear_all_tables()
+
 
 
 @patch('praw.Reddit', autospec=True)
@@ -743,81 +759,41 @@ def test_find_treatment_replies(mock_reddit):
         clear_all_tables()        
 
 
+
+
 @patch('praw.Reddit', autospec=True)
 @patch('praw.objects.Subreddit', autospec=True)
-def test_identify_condition(mock_subreddit, mock_reddit):
+def test_frontpage_get_eligible_objects(mock_subreddit, mock_reddit):
     r = mock_reddit.return_value
-
-    experiment_name_to_controller = {
-        "sticky_comment_0": AMAStickyCommentExperimentController,
-        "sticky_comment_frontpage_test": FrontPageStickyCommentExperimentController
-    }
-
-    for experiment_name in experiment_name_to_controller:
-
-        with open(os.path.join(BASE_DIR, "config", "experiments") + "/"+ experiment_name + ".yml", "r") as f:
-            experiment_settings = yaml.load(f.read())['test']
-
-        sub_data = []
-        with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
-            fixture = [x['data'] for x in json.loads(f.read())['data']['children']]
-            for post in fixture:
-                json_dump = json.dumps(post)
-                postobj = json2obj(json_dump)
-                sub_data.append(postobj)
-        mock_subreddit.get_new.return_value = sub_data
-        mock_subreddit.display_name = experiment_settings['subreddit']
-        mock_subreddit.name = experiment_settings['subreddit']
-        mock_subreddit.id = experiment_settings['subreddit_id']
-        r.get_subreddit.return_value = mock_subreddit
-        patch('praw.')
-
-        ## TEST THE BASE CASE OF RANDOMIZATION
-        controller = experiment_name_to_controller[experiment_name]
-        controller_instance = controller(experiment_name, db_session, r, log)
-
-        # "mock" FrontPageController.posts
-        if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
-            instance = FrontPageController(db_session, r, log)
-            instance.posts = sub_data
-
-
-        if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
-            objs = controller_instance.set_eligible_objects(instance)
-        elif controller_instance.__class__ is AMAStickyCommentExperimentController:
-            objs = controller_instance.set_eligible_objects()
-
-        eligible_objects = controller_instance.get_eligible_objects(objs)
-
-        condition_list = []
-        for obj in eligible_objects:
-            condition_list.append(controller_instance.identify_condition(obj))
-
-        if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
-            assert Counter(condition_list)['frontpage_post'] == 100
-        elif controller_instance.__class__ is AMAStickyCommentExperimentController:
-            assert Counter(condition_list)['nonama'] == 98
-            assert Counter(condition_list)['ama'] == 2
-            
-
-        clear_all_tables()
-
-@patch('praw.Reddit', autospec=True)
-def test_frontpage_get_eligible_objects(mock_reddit):
-    r = mock_reddit.return_value
+    sub_data = []
     with open("{script_dir}/fixture_data/front_page_0.json".format(script_dir=TEST_DIR)) as f:
-        fp_json = json.loads(f.read())['data']['children']
-        ## setting the submission time to be recent enough
-        mock_fp_posts = []
-        for post in fp_json:
-            mock_fp_posts.append(json2obj(json.dumps(post['data'])))
+        fixture = [x['data'] for x in json.loads(f.read())['data']['children']]
+        for post in fixture:
+            json_dump = json.dumps(post)
+            postobj = json2obj(json_dump)
+            sub_data.append(postobj)
+
+    #mock_subreddit.get_new.return_value = sub_data
+    r.get_subreddit.return_value = mock_subreddit
+    patch('praw.')
 
     controller = FrontPageStickyCommentExperimentController
     controller_instance = controller("sticky_comment_frontpage_test", db_session, r, log)
-    eligible_objects = controller_instance.get_eligible_objects(mock_fp_posts)
-    assert len(eligible_objects) == 6
-    for obj in eligible_objects:
+
+
+    instance = FrontPageController(db_session, r, log)
+    instance.posts = sub_data
+
+        
+    objs = controller_instance.set_eligible_objects(instance)
+
+    for obj in objs:
         assert "t5_" + controller_instance.subreddit_id == obj.subreddit_id
+    assert len(objs) == 6
+
+    eligible_objects = controller_instance.get_eligible_objects(objs)
+    assert len(eligible_objects) == 6
+
 
 @patch('praw.Reddit', autospec=True)
 @patch('praw.objects.Submission', autospec=True)
@@ -831,7 +807,6 @@ def test_archive_experiment_submission_metadata(mock_comment, mock_submission, m
     }
 
     for experiment_name in experiment_name_to_controller:
-
     
         with open(os.path.join(BASE_DIR, "config", "experiments") + "/"+ experiment_name + ".yml", "r") as f:
             experiment_settings = yaml.load(f.read())['test']

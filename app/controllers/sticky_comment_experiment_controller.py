@@ -13,6 +13,7 @@ from app.models import Experiment, ExperimentThing, ExperimentAction, Experiment
 from app.models import EventHook
 from sqlalchemy import and_, or_
 from app.controllers.subreddit_controller import SubredditPageController
+from app.controllers.experiment_controller import ExperimentController
 import numpy as np
 
 ### LOAD ENVIRONMENT VARIABLES
@@ -20,114 +21,13 @@ BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.
 ENV = os.environ['CS_ENV']
 
 
-class StickyCommentExperimentController:
+class StickyCommentExperimentController(ExperimentController):
     def __init__(self, experiment_name, db_session, r, log, required_keys):
-        self.db_session = db_session
-        self.log = log
-        self.r = r
-        self.load_experiment_config(required_keys, experiment_name)
-        
-    def get_experiment_config(self, required_keys, experiment_name):        
-        experiment_file_path = os.path.join(BASE_DIR, "config", "experiments", experiment_name) + ".yml"
-        with open(experiment_file_path, 'r') as f:
-            try:
-                experiment_config_all = yaml.load(f)
-            except yaml.YAMLError as exc:
-                self.log.error("{0}: Failure loading experiment yaml {1}".format(
-                    self.__class__.__name__, experiment_file_path), str(exc))
-                sys.exit(1)
-        if(ENV not in experiment_config_all.keys()):
-            self.log.error("{0}: Cannot find experiment settings for {1} in {2}".format(
-                self.__class__.__name__, ENV, experiment_file_path))
-            sys.exit(1)
 
-        experiment_config = experiment_config_all[ENV]
-        for key in required_keys:
-            if key not in experiment_config.keys():
-                self.log.error("{0}: Value missing from {1}: {2}".format(
-                    self.__class__.__name__, experiment_file_path, key))
-                sys.exit(1)
-        return experiment_config
-
-    def load_experiment_config(self, required_keys, experiment_name):
-        experiment_config = self.get_experiment_config(required_keys, experiment_name)
-        experiment = self.db_session.query(Experiment).filter(Experiment.name == experiment_name).first()
-        if(experiment is None):
-
-            condition_keys = []
-
-            ## LOAD RANDOMIZED CONDITIONS (see CivilServant-Analysis)
-            for condition in experiment_config['conditions'].values():
-                with open(os.path.join(BASE_DIR, "config", "experiments", condition['randomizations']), "r") as f:
-                    reader = csv.DictReader(f)
-                    randomizations = []
-                    for row in reader:
-                        randomizations.append(row)
-                        condition['randomizations']  = randomizations
-
-            experiment = Experiment(
-                name = experiment_name,
-                controller = self.__class__.__name__,
-                start_time = parser.parse(experiment_config['start_time']),
-                end_time = parser.parse(experiment_config['end_time']),
-                settings_json = json.dumps(experiment_config)
-            )
-            self.db_session.add(experiment)
-            self.db_session.commit()
-        
-        ### SET UP INSTANCE PROPERTIES
-        self.experiment = experiment
-        self.experiment_settings = json.loads(self.experiment.settings_json)
-        
-
-        self.experiment_name = experiment_name
-
-        self.subreddit = experiment_config['subreddit']
-        self.subreddit_id = experiment_config['subreddit_id']
-        self.username = experiment_config['username']
-        self.max_eligibility_age = experiment_config['max_eligibility_age']
-        self.min_eligibility_age = experiment_config['min_eligibility_age']
+        super().__init__(experiment_name, db_session, r, log, required_keys)
 
         ## LOAD SUBREDDIT PAGE CONTROLLER
         self.subreddit_page_controller = SubredditPageController(self.subreddit,self.db_session, self.r, self.log)
-
-        # LOAD EVENT HOOKS
-        self.load_event_hooks(experiment_config)
-
-    def load_event_hooks(self, experiment_config):
-        if 'event_hooks' not in experiment_config:
-            return
-
-        hooks = experiment_config['event_hooks']
-
-        now = datetime.datetime.utcnow()
-        for hook_name in hooks:
-            hook = self.db_session.query(EventHook).filter(
-                EventHook.name == hook_name).first()
-            if not hook:
-                call_when_str = hooks[hook_name]['call_when']
-                if call_when_str == "EventWhen.BEFORE":
-                    call_when = EventWhen.BEFORE.value
-                elif call_when_str == "EventWhen.AFTER":
-                    call_when = EventWhen.AFTER.value
-                else:
-                    self.log.error("{0}: While loading event hooks, call_when string incorrectly formatted: {1}".format(
-                        self.__class__.__name__, call_when_str))
-                    sys.exit(1)
-
-                hook_record = EventHook(
-                    name = hook_name,
-                    created_at = now,
-                    experiment_id = self.experiment.id,
-                    is_active = hooks[hook_name]['is_active'],
-                    call_when = call_when,
-                    caller_controller = hooks[hook_name]['caller_controller'],
-                    caller_method = hooks[hook_name]['caller_method'],
-                    callee_module = hooks[hook_name]['callee_module'],
-                    callee_controller = hooks[hook_name]['callee_controller'],
-                    callee_method = hooks[hook_name]['callee_method'])
-                self.db_session.add(hook_record)
-                self.db_session.commit()
 
     ## main scheduled job
     def update_experiment(self):
@@ -152,6 +52,49 @@ class StickyCommentExperimentController:
             if(rval is not None):
                 rvals.append(rval)
         return rvals
+
+    def assign_randomized_conditions(self, submissions):
+        if(submissions is None or len(submissions)==0):
+            return []
+        ## Assign experiment condition to objects
+        experiment_things = []
+        for submission in submissions:
+            label = self.identify_condition(submission)
+            if(label is None):
+                continue
+
+            no_randomizations_remain = False
+
+            condition = self.experiment_settings['conditions'][label]
+            try:
+                randomization = condition['randomizations'][condition['next_randomization']]
+                self.experiment_settings['conditions'][label]['next_randomization'] += 1
+            except:
+                self.log.error("{0}: Experiment {1} has used its full stock of {2} {3} conditions. Cannot assign any further.".format(
+                    self.__class__.__name__,
+                    self.experiment.name,
+                    len(condition['randomizations']),
+                    label
+                ))
+                no_randomizations_remain = True
+
+            if(no_randomizations_remain):
+                continue
+            experiment_thing = ExperimentThing(
+                id             = submission.id,
+                object_type    = ThingType.SUBMISSION.value,
+                experiment_id  = self.experiment.id,
+                object_created = datetime.datetime.fromtimestamp(submission.created_utc),
+                metadata_json  = json.dumps({"randomization":randomization, "condition":label})
+            )
+            self.db_session.add(experiment_thing)
+            experiment_things.append(experiment_thing)
+            
+        self.experiment.settings_json = json.dumps(self.experiment_settings)
+        self.db_session.commit()
+        self.log.info("{0}: Experiment {1}: assigned conditions to {2} submissions".format(
+            self.__class__.__name__, self.experiment.name,len(experiment_things)))
+        return experiment_things
 
 
     ## Check the acceptability of a submission before acting
@@ -223,7 +166,10 @@ class StickyCommentExperimentController:
             action = "Intervention",
             action_object_type = ThingType.SUBMISSION.value,
             action_object_id = submission.id,
-            metadata_json = json.dumps({"group":group, "condition":condition, "arm": "arm_"+str(treatment_arm)})
+            metadata_json = json.dumps({
+                "group":group, 
+                "condition":condition, 
+                "arm": "arm_"+str(treatment_arm)})
         )
         self.db_session.add(experiment_action)
         self.db_session.commit()
@@ -312,9 +258,12 @@ class StickyCommentExperimentController:
         curtime = time.time()
 
         for id, submission in submissions.items():
+
+            # do not return objs that already have ExperimentThing records
             if id in already_processed_ids:
                 continue
 
+            # do not return objs that are too young 
             if((curtime - submission.created_utc) < self.min_eligibility_age):
                 self.log.info("{0}: Submission {1} created_utc {2} is {3} seconds less than current time {4}, below the minimum eligibility age of {5}. Waiting to Add to the Experiment".format(
                     self.__class__.__name__,
@@ -342,48 +291,6 @@ class StickyCommentExperimentController:
 
         return eligible_submissions
 
-    def assign_randomized_conditions(self, submissions):
-        if(submissions is None or len(submissions)==0):
-            return []
-        ## Assign experiment condition to objects
-        experiment_things = []
-        for submission in submissions:
-            label = self.identify_condition(submission)
-            if(label is None):
-                continue
-
-            no_randomizations_remain = False
-
-            condition = self.experiment_settings['conditions'][label]
-            try:
-                randomization = condition['randomizations'][condition['next_randomization']]
-                self.experiment_settings['conditions'][label]['next_randomization'] += 1
-            except:
-                self.log.error("{0}: Experiment {1} has used its full stock of {2} {3} conditions. Cannot assign any further.".format(
-                    self.__class__.__name__,
-                    self.experiment.name,
-                    len(condition['randomizations']),
-                    label
-                ))
-                no_randomizations_remain = True
-
-            if(no_randomizations_remain):
-                continue
-            experiment_thing = ExperimentThing(
-                id             = submission.id,
-                object_type    = ThingType.SUBMISSION.value,
-                experiment_id  = self.experiment.id,
-                object_created = datetime.datetime.fromtimestamp(submission.created_utc),
-                metadata_json  = json.dumps({"randomization":randomization, "condition":label})
-            )
-            self.db_session.add(experiment_thing)
-            experiment_things.append(experiment_thing)
-            
-        self.experiment.settings_json = json.dumps(self.experiment_settings)
-        self.db_session.commit()
-        self.log.info("{0}: Experiment {1}: assigned conditions to {2} submissions".format(
-            self.__class__.__name__, self.experiment.name,len(experiment_things)))
-        return experiment_things
 
         
     #######################################################
@@ -458,17 +365,6 @@ class StickyCommentExperimentController:
             removed = len(removed_comment_ids) 
         ))       
         return len(removed_comment_ids)
-
-    ## IDENTIFY THE CONDITION, IF ANY, THAT APPLIES TO THIS OBSERVATION
-    ## THIS METHOD SHOULD SUPPORT CASES WHERE THERE ARE MULTIPLE CONDITIONS, INCLUSIVE
-    ## OR WHERE ONLY SOME OBSERVATIONS SHOULD BE PART OF THE EXPERIMENT
-    ## RETURN: LABEL NAME FOR THE CONDITION IN QUESTION
-    def identify_condition(self, submission):
-        for label in self.experiment_settings['conditions'].keys():
-            detection_method = getattr(self, "identify_"+label)
-            if(detection_method(submission)):
-                return label
-        return None
 
     #######################################################
     ## CODE FOR QUERYING INFORMATION ABOUT EXPERIMENT OBJECTS
@@ -584,6 +480,26 @@ class SubsetStickyCommentExperimentController(StickyCommentExperimentController)
         return self.make_sticky_post(experiment_thing, submission)
     
 
+
+"""
+
+To run front page sticky comment experiment:
+
+0) Setup
+- have callback code in callee experiment controller (FrontPageStickyCommentExperimentController)
+- make modifications to caller controller (FrontPageController)
+- have yml file in config/experiments
+- have conditions file in config/experiments
+
+1) Store an Experiment record
+python app/controller.py initialize_sticky_comment_experiment [experiment_name]
+
+2) Experiment runs as often as the caller controller's job is called
+[assuming caller controller is already running, then the experiment will automatically begin]
+
+
+
+"""
 class FrontPageStickyCommentExperimentController(StickyCommentExperimentController):
     def __init__(self, experiment_name, db_session, r, log):
         required_keys = ['subreddit', 'subreddit_id', 'username', 
@@ -594,7 +510,9 @@ class FrontPageStickyCommentExperimentController(StickyCommentExperimentControll
         super().__init__(experiment_name, db_session, r, log, required_keys)
 
     def set_eligible_objects(self, instance):
-        return instance.posts
+        subreddit_id_fullname = "t5_"+ self.subreddit_id
+        objects_in_subreddit = [obj for obj in instance.posts if obj.subreddit_id==subreddit_id_fullname]
+        return objects_in_subreddit
 
     # takes in dictionary {id: praw objects}
     def archive_eligible_submissions(self, eligible_submissions):
@@ -614,10 +532,12 @@ class FrontPageStickyCommentExperimentController(StickyCommentExperimentControll
             self.db_session.add(new_post)
         self.db_session.commit()
 
-    def get_eligible_objects(self, object_list):
-      subreddit_id_fullname = "t5_"+ self.subreddit_id
-      objects_in_subreddit = [obj for obj in object_list if obj.subreddit_id==subreddit_id_fullname]
-      return super(FrontPageStickyCommentExperimentController, self).get_eligible_objects(objects_in_subreddit)
+    #def get_eligible_objects(self, object_list):
+    #  subreddit_id_fullname = "t5_"+ self.subreddit_id
+    #  objects_in_subreddit = [obj for obj in object_list if obj.subreddit_id==subreddit_id_fullname]
+    #  return super(FrontPageStickyCommentExperimentController, self).get_eligible_objects(objects_in_subreddit)
+
+
     ## main scheduled job
     # differs from parent class's update_experiment with:
     #   - different method signature. "instance" variable used 
