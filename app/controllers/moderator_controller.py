@@ -96,6 +96,8 @@ class ModeratorController:
             #### TO HANDLE TEST FIXTURES
             if("json_dict" in dir(action)):
                 action_dict = action.json_dict
+            else:
+                action_dict = action
             #### CREATE NEW OBJECT
             modaction = ModAction(
                 id = action_dict['id'],

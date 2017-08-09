@@ -23,6 +23,32 @@ ENV = os.environ['CS_ENV']
 
 BAN_USER_STR = "banuser"
 
+def parse_days_from_details(details_str):
+    duration = None # if None, then permanent
+    parse_error = False
+    if details_str == "permanent":
+        duration = None
+    else:
+        details_list = details_str.split(" ")
+        if details_list[1] != "days":
+            parse_error = True
+
+        try:
+            duration = int(details_list[0])
+        except:
+            parse_error = True
+
+    if not parse_error:
+        return duration
+    else:          
+        self.log.error("{0}: Experiment {1} error while parsing details to apply control nonaction to user {2}. details={3}. exception={4}".format(
+            self.__class__.__name__,
+            self.experiment_name,
+            username,
+            details_str,
+            sys.exc_info()[0]))
+        raise Exception ##########
+
 class ModeratorExperimentController(ExperimentController):
     
     def __init__(self, experiment_name, db_session, r, log):
@@ -48,8 +74,8 @@ class ModeratorExperimentController(ExperimentController):
         self.main_mod.archive_mod_action_history()
 
         banned_users = self.get_banned_users(self.subreddit_id, oldest_mod_action_created_utc)
-        existing_banned_user_id_to_usermetadata = self.get_existing_banned_user_id_to_usermetadata(self.subreddit_id, banned_users)
-        banned_user_id_to_usermetadata = self.update_and_archive_user_metadata(self.subreddit_id, banned_users, existing_banned_user_id_to_usermetadata)
+        existing_banned_user_name_to_usermetadata = self.get_existing_banned_user_name_to_usermetadata(self.subreddit_id, banned_users)
+        banned_user_id_to_usermetadata = self.update_and_archive_user_metadata(self.subreddit_id, banned_users, existing_banned_user_name_to_usermetadata)
 
     # from ModActions since oldest_mod_action_created_utc, find banned users 
     # returns list of usernames ["xxxx"]
@@ -63,21 +89,21 @@ class ModeratorExperimentController(ExperimentController):
                 ModAction.created_utc >= oldest_mod_action_created_utc).all()
         else:
             users = sub_query.all()
-        return [x[0] for x in users]
+        return [x[0] for x in users] #screennames
 
 
-    # returns dict existing_banned_user_id_to_usermetadata
-    def get_existing_banned_user_id_to_usermetadata(self, subreddit_id, banned_users):
-        existing_banned_user_id_to_usermetadata = {}
+    # returns dict existing_banned_user_name_to_usermetadata
+    def get_existing_banned_user_name_to_usermetadata(self, subreddit_id, banned_users):
+        existing_banned_user_name_to_usermetadata = {}
         if len(banned_users) > 0:
             existing_banned_usermetadata = self.db_session.query(UserMetadata).filter(
                 and_(
                     UserMetadata.field_name == UserMetadataField.NUM_PREVIOUS_BANS.name,
                     UserMetadata.subreddit_id == subreddit_id
                     )).filter(
-                UserMetadata.user_id.in_(banned_users)).all()
-            existing_banned_user_id_to_usermetadata = {umd.user_id: umd for umd in existing_banned_usermetadata}
-        return existing_banned_user_id_to_usermetadata
+                UserMetadata.user_id.in_(banned_users)).all() #user_id is actually username
+            existing_banned_user_name_to_usermetadata = {umd.user_id: umd for umd in existing_banned_usermetadata}
+        return existing_banned_user_name_to_usermetadata
 
     def update_and_archive_user_metadata(self, subreddit_id, banned_users, banned_user_id_to_usermetadata):
         self.log.info("banned_users: {0}".format(banned_users))
@@ -120,12 +146,14 @@ class ModeratorExperimentController(ExperimentController):
         # {username_str: praw.objects.ModAction}
         # need to preserve multiple mod actions on same user
         all_banned_users = [action.target_author for action in instance.mod_actions if action.action == BAN_USER_STR]
-        banned_user_id_to_usermetadata_main = self.get_existing_banned_user_id_to_usermetadata(self.shadow_subreddit_id, all_banned_users)
+        banned_user_id_to_usermetadata_main = self.get_existing_banned_user_name_to_usermetadata(self.subreddit_id, all_banned_users)
+
+        ######banned_user_id_to_usermetadata_main.pop("_rri") #####        
 
         # update user metadata records for shadow subreddit
         banned_user_id_to_usermetadata_shadow = self.update_and_archive_user_metadata(
             self.shadow_subreddit_id, all_banned_users, 
-            self.get_existing_banned_user_id_to_usermetadata(self.subreddit_id, all_banned_users)
+            self.get_existing_banned_user_name_to_usermetadata(self.shadow_subreddit_id, all_banned_users)
             ) # stores UserMetadata records
 
         # get {username: modaction} dict from this observation period's mod_actions instance.mod_actions
@@ -133,13 +161,18 @@ class ModeratorExperimentController(ExperimentController):
             action.action == BAN_USER_STR}
 
         self.log.info("all_banned_users: {0}".format(all_banned_users))        
-        self.log.info("banned_user_id_to_usermetadata_main: {0}".format(banned_user_id_to_usermetadata_main))        
         self.log.info("banned_users_shadow_dict: {0}".format(banned_users_shadow_dict))        
 
+        self.log.info("banned_user_id_to_usermetadata_main={0}".format(
+            {name: banned_user_id_to_usermetadata_main[name].field_value for name in banned_user_id_to_usermetadata_main}))
+        self.log.info("banned_user_id_to_usermetadata_shadow={0}".format(
+            {name: banned_user_id_to_usermetadata_shadow[name].field_value for name in banned_user_id_to_usermetadata_shadow}))
+
+
         # get users that already have ExperimentThing records
-        already_processed_ids = []
+        already_processed_usernames = []
         if len(all_banned_users) > 0:
-            already_processed_ids = [thing.id for thing in 
+            already_processed_usernames = [thing.id for thing in 
                 self.db_session.query(ExperimentThing).filter(and_(
                     ExperimentThing.object_type==ThingType.USER.value, 
                     ExperimentThing.experiment_id == self.experiment.id,
@@ -152,10 +185,10 @@ class ModeratorExperimentController(ExperimentController):
         newly_banned_users_dict = {u: banned_users_shadow_dict[u] for u in banned_users_shadow_dict if 
             u not in banned_user_id_to_usermetadata_main and 
             banned_user_id_to_usermetadata_shadow[u].field_value==str(1) and
-            u not in already_processed_ids}
+            u not in already_processed_usernames}
 
 
-        self.log.info("already_processed_ids: {0}".format(already_processed_ids))        
+        self.log.info("already_processed_usernames: {0}".format(already_processed_usernames))        
         self.log.info("newly_banned_users_dict: {0}".format(newly_banned_users_dict))                                
 
         self.log.info("{0}: Experiment {1} Discovered {2} eligible users: {3}".format(
@@ -163,7 +196,6 @@ class ModeratorExperimentController(ExperimentController):
             self.experiment_name,
             len(newly_banned_users_dict),
             newly_banned_users_dict))
-
 
 
         # {username: praw.objects.ModAction}
@@ -184,14 +216,27 @@ class ModeratorExperimentController(ExperimentController):
         banned_user_to_modaction = {}
         for user_name in to_archive_user_names:
             # query reddit
-            praw_user = self.r.get_redditor(user_name)
-            new_user = User(
-                    name = user_name,
-                    id = praw_user.id, # without "t2_"
-                    created = datetime.datetime.fromtimestamp(praw_user.created_utc),
-                    first_seen = seen_at,
-                    last_seen = seen_at, 
-                    user_data = json.dumps(praw_user.json_dict))
+            try:
+                praw_user = self.r.get_redditor(user_name) # this seems to always lazily evaluate?
+                uid = praw_user.id # if user doesn't except, this line (which sends a get request) will throw an exception
+            except:
+                # couldn't find user
+                new_user = User(
+                        name = user_name,
+                        id = None,
+                        created = None,
+                        first_seen = seen_at,
+                        last_seen = seen_at, 
+                        user_data = None)                
+            else:
+                # found the user
+                new_user = User(
+                        name = user_name,
+                        id = uid, # without "t2_"
+                        created = datetime.datetime.fromtimestamp(praw_user.created_utc),
+                        first_seen = seen_at,
+                        last_seen = seen_at, 
+                        user_data = json.dumps(praw_user.json_dict))
             self.db_session.add(new_user)
             banned_user_to_modaction[new_user] = banned_username_to_modaction[user_name]
         self.db_session.commit()
@@ -222,7 +267,7 @@ class ModeratorExperimentController(ExperimentController):
             return
 
         # get and store newest mod actions on main subreddit
-        #################self.query_and_archive_new_banned_users_main()
+        self.query_and_archive_new_banned_users_main()
 
         # get new mod actions from shadow subreddit
         banned_username_to_modaction = self.get_eligible_users_and_archive_mod_actions(instance)
@@ -328,7 +373,7 @@ class ModeratorExperimentController(ExperimentController):
 
     # get username from experiment_thing.id
     # only need modaction!=None if group="control"
-    def apply_ban(self, experiment_thing, group="control", duration=None):
+    def apply_ban(self, experiment_thing, group="control"):
         username = experiment_thing.id
         if(self.user_acceptable(username) == False):
             return None
@@ -346,38 +391,34 @@ class ModeratorExperimentController(ExperimentController):
             "arm":"arm_" + str(treatment_arm)
         }
 
-        self.log.info("modaction={0}".format(modaction))
+        # determine ban action parameters
+        ban_reason = None
+        duration = None
         if group == "treatment":
-            reason_text = "treatment reason text"
-            message_text  = "treatment message text" # self.experiment_settings['conditions'][condition]['arms']["arm_" + str(treatment_arm)]
+            ban_reason = self.experiment_settings['conditions'][condition]['arms']["arm_" + str(treatment_arm)]["reason_text"]
+            duration = self.experiment_settings['conditions'][condition]['arms']["arm_" + str(treatment_arm)]["duration"]
             exp_action_metadata["randomization"] = metadata['randomization']
-            duration = duration ########
-
         elif group == "control":
-            reason_text = "control reason text" # modaction["description"]    #############         
-            message_text  = "control message text"
+            ban_reason = modaction['description']
+            exp_action_metadata["modaction"] = modaction
             try:
-                duration = self.parse_days_from_details(modaction["details"])
+                duration = parse_days_from_details(modaction["details"])
             except:
                 self.log.error("{0}: Experiment {1} failed to make_control_nonaction on experiment_thing id {2}. error={3}".format(
-                    self.__class__.__name__,
+                    self.__class__.__naem__,
                     self.experiment_name,
                     experiment_thing.id,
                     sys.exc_info()[0]))
                 return
 
-        self.log.info("reason_text={0}".format(reason_text))
-        self.log.info("duration={0}".format(duration))        
-
         # add ban
         if not hasattr(self, "main_sub"):
-            self.main_sub = self.r.get_subreddit(self.subreddit)        
-
+            self.main_sub = self.r.get_subreddit(self.subreddit)
         try:
             if not duration: #perma ban
-                self.main_sub.add_ban(username, ban_reason=reason_text, ban_message=message_text)
+                self.main_sub.add_ban(username, ban_reason=ban_reason) # can't see??: ban_message=message_text)
             else: # temp ban
-                self.main_sub.add_ban(username, ban_reason=reason_text, ban_message=message_text, duration=duration)
+                self.main_sub.add_ban(username, ban_reason=ban_reason, duration=duration)  # can't see??: ban_message=message_text)
         except:
             self.log.error("{0}: Experiment {1} failed to add ban on experiment_thing id {2}, username={3}, description={4}, duration={5}, error={6}".format(
                 self.__class__.__name__,
@@ -388,7 +429,6 @@ class ModeratorExperimentController(ExperimentController):
                 duration,
                 sys.exc_info()[0]))
             return
-
 
         # add ExperimentAction
         experiment_action = ExperimentAction(
@@ -415,39 +455,13 @@ class ModeratorExperimentController(ExperimentController):
         return experiment_action.id
 
     def make_control_nonaction(self, experiment_thing, group="control"):
-        self.apply_ban(experiment_thing, group=group)
+        return self.apply_ban(experiment_thing, group=group)
 
-    def apply_temp_ban(self, experiment_thing, group="treatment", duration=7):
-        self.apply_ban(experiment_thing, group=group, duration=duration)
+    def apply_temp_ban(self, experiment_thing, group="treatment"):
+        return self.apply_ban(experiment_thing, group=group)
 
     def apply_perma_ban(self, experiment_thing, group="treatment"):
-        self.apply_ban(experiment_thing, group=group, duration=None)
-
-    def parse_days_from_details(self, details_str):
-        duration = None # if None, then permanent
-        parse_error = False
-        if details_str == "permanent":
-            duration = None
-        else:
-            details_list = details_str.split(" ")
-            if details_list[1] != "days":
-                parse_error = True
-
-            try:
-                duration = int(details_list[0])
-            except:
-                parse_error = True
-
-        if not parse_error:
-            return duration
-        else:          
-            self.log.error("{0}: Experiment {1} error while parsing details to apply control nonaction to user {2}. details={3}. exception={4}".format(
-                self.__class__.__name__,
-                self.experiment_name,
-                username,
-                details_str,
-                sys.exc_info()[0]))
-            raise Exception ##########
+        return self.apply_ban(experiment_thing, group=group)
 
 class ModUserExperimentController(ModeratorExperimentController):
     
@@ -468,7 +482,7 @@ class ModUserExperimentController(ModeratorExperimentController):
             ))
         return self.make_control_nonaction(experiment_thing, group="control")
         
-    ## TREATMENT GROUP 1
+    ## TREATMENT GROUP 1: perma ban
     def intervene_main_arm_1(self, experiment_thing):
         self.log.info(">>>Attempting intervene_main_arm_1 perma ban on user {0}, details={1}, description={2}".format(
             experiment_thing.id,
@@ -477,11 +491,11 @@ class ModUserExperimentController(ModeratorExperimentController):
             ))
         return self.apply_perma_ban(experiment_thing, group="treatment")
 
-    ## TREATMENT GROUP 2
+    ## TREATMENT GROUP 2: temp ban
     def intervene_main_arm_2(self, experiment_thing):
         self.log.info(">>>Attempting intervene_main_arm_2 temp ban on user {0}, details={1}, description={2}".format(
             experiment_thing.id,
             json.loads(experiment_thing.metadata_json)["modaction"]["details"],
             json.loads(experiment_thing.metadata_json)["modaction"]["description"]
             ))
-        return self.apply_temp_ban(experiment_thing, group="treatment", duration=7)
+        return self.apply_temp_ban(experiment_thing, group="treatment")

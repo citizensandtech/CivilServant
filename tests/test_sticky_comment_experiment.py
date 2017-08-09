@@ -183,6 +183,7 @@ def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
         assert eligible_objects[0].__class__.__name__ == "X"
 
         experiment_action_count = db_session.query(ExperimentAction).count()
+        assert experiment_action_count == 0
         experiment_settings = json.loads(controller_instance.experiment.settings_json)
         for condition_name in experiment_settings['conditions']:
             assert experiment_settings['conditions'][condition_name]['next_randomization']    == 0            
@@ -250,66 +251,6 @@ def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
         clear_all_tables()
 
 
-
-
-@patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Subreddit', autospec=True)
-def test_identify_condition(mock_subreddit, mock_reddit):
-    r = mock_reddit.return_value
-
-    experiment_name_to_controller = {
-        "sticky_comment_0": AMAStickyCommentExperimentController,
-        "sticky_comment_frontpage_test": FrontPageStickyCommentExperimentController
-    }
-
-    for experiment_name in experiment_name_to_controller:
-
-        with open(os.path.join(BASE_DIR, "config", "experiments") + "/"+ experiment_name + ".yml", "r") as f:
-            experiment_settings = yaml.load(f.read())['test']
-
-        sub_data = []
-        with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
-            fixture = [x['data'] for x in json.loads(f.read())['data']['children']]
-            for post in fixture:
-                json_dump = json.dumps(post)
-                postobj = json2obj(json_dump)
-                sub_data.append(postobj)
-        mock_subreddit.get_new.return_value = sub_data
-        mock_subreddit.display_name = experiment_settings['subreddit']
-        mock_subreddit.name = experiment_settings['subreddit']
-        mock_subreddit.id = experiment_settings['subreddit_id']
-        r.get_subreddit.return_value = mock_subreddit
-        patch('praw.')
-
-        ## TEST THE BASE CASE OF RANDOMIZATION
-        controller = experiment_name_to_controller[experiment_name]
-        controller_instance = controller(experiment_name, db_session, r, log)
-
-        # "mock" FrontPageController.posts
-        if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
-            instance = FrontPageController(db_session, r, log)
-            instance.posts = sub_data
-
-
-        if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
-            objs = controller_instance.set_eligible_objects(instance)
-        elif controller_instance.__class__ is AMAStickyCommentExperimentController:
-            objs = controller_instance.set_eligible_objects()
-
-        eligible_objects = controller_instance.get_eligible_objects(objs)
-
-        condition_list = []
-        for obj in eligible_objects:
-            condition_list.append(controller_instance.identify_condition(obj))
-
-        if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
-            assert Counter(condition_list)['frontpage_post'] == 100
-        elif controller_instance.__class__ is AMAStickyCommentExperimentController:
-            assert Counter(condition_list)['nonama'] == 98
-            assert Counter(condition_list)['ama'] == 2
-
-        clear_all_tables()
-
 @patch('praw.Reddit', autospec=True)
 @patch('praw.objects.Subreddit', autospec=True)
 @patch.object(FrontPageStickyCommentExperimentController, "intervene_frontpage_post_arm_0")
@@ -318,9 +259,9 @@ def test_identify_condition(mock_subreddit, mock_reddit):
 @patch.object(AMAStickyCommentExperimentController, "intervene_nonama_arm_1")
 @patch.object(AMAStickyCommentExperimentController, "intervene_ama_arm_0")
 @patch.object(AMAStickyCommentExperimentController, "intervene_ama_arm_1")
-def test_update_experiment(intervene_ama_arm_1, intervene_ama_arm_0, 
-                            intervene_nonama_arm_1, intervene_nonama_arm_0, 
-                            intervene_frontpage_post_arm_1, intervene_frontpage_post_arm_0,
+def test_update_experiment(mock_intervene_ama_arm_1, mock_intervene_ama_arm_0, 
+                            mock_intervene_nonama_arm_1, mock_intervene_nonama_arm_0, 
+                            mock_intervene_frontpage_post_arm_1, mock_intervene_frontpage_post_arm_0,
                             mock_subreddit, mock_reddit):
     r = mock_reddit.return_value
 
@@ -375,14 +316,14 @@ def test_update_experiment(intervene_ama_arm_1, intervene_ama_arm_0,
         )
 
         # for AMAStickyCommentExperimentController
-        intervene_nonama_arm_0.return_value = comment_thing
-        intervene_nonama_arm_1.return_value = comment_thing
-        intervene_ama_arm_0.return_value = comment_thing
-        intervene_ama_arm_1.return_value = comment_thing 
+        mock_intervene_nonama_arm_0.return_value = comment_thing
+        mock_intervene_nonama_arm_1.return_value = comment_thing
+        mock_intervene_ama_arm_0.return_value = comment_thing
+        mock_intervene_ama_arm_1.return_value = comment_thing 
         
         # for FrontPageStickyCommentExperimentController
-        intervene_frontpage_post_arm_0.return_value = comment_thing 
-        intervene_frontpage_post_arm_1.return_value = comment_thing
+        mock_intervene_frontpage_post_arm_0.return_value = comment_thing 
+        mock_intervene_frontpage_post_arm_1.return_value = comment_thing
 
         if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
             experiment_return = controller_instance.update_experiment(instance)
@@ -392,13 +333,13 @@ def test_update_experiment(intervene_ama_arm_1, intervene_ama_arm_0,
 
         ## ASSERT THAT THE METHODS FOR TAKING ACTIONS ARE CALLED
         if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
-            assert intervene_frontpage_post_arm_0.called == True
-            assert intervene_frontpage_post_arm_1.called == True
+            assert mock_intervene_frontpage_post_arm_0.called == True
+            assert mock_intervene_frontpage_post_arm_1.called == True
         elif controller_instance.__class__ is AMAStickyCommentExperimentController:
-            assert intervene_nonama_arm_0.called == True
-            assert intervene_nonama_arm_1.called == True
-            assert intervene_ama_arm_0.called == True
-            assert intervene_ama_arm_1.called == True
+            assert mock_intervene_nonama_arm_0.called == True
+            assert mock_intervene_nonama_arm_1.called == True
+            assert mock_intervene_ama_arm_0.called == True
+            assert mock_intervene_ama_arm_1.called == True
         assert len(experiment_return) == 100
         clear_all_tables()
 
@@ -551,7 +492,14 @@ def test_make_sticky_post(mock_comment, mock_submission, mock_reddit):
             id = submission.id,
             object_type = ThingType.SUBMISSION.value,
             experiment_id = controller_instance.experiment.id,
-            metadata_json = json.dumps({"randomization":{"treatment":1, "block.id":"{0}.block001".format(block_name), "block.size":10}, "condition":"{0}".format(block_name)})            
+            metadata_json = json.dumps({
+                "randomization": {
+                    "treatment":1, 
+                    "block.id":"{0}.block001".format(block_name), 
+                    "block.size":10
+                    }, 
+                "condition":"{0}".format(block_name)
+            })            
         )
 
 

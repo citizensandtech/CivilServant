@@ -10,14 +10,12 @@ test:
         next_randomization: 0 
         arms:
             arm_0: null
-            arm_1: |
-                This is arm 1 of the 1st condition. perma ban
-                ... 
-                #######
-            arm_2: |
-                temp ban
-                ...
-                #######
+            arm_1: 
+              reason_text: This is arm 1 of the 1st condition (perma ban)
+              duration: null
+            arm_2: 
+              reason_text: This is arm 2 of the 1st condition (temp ban)
+              duration: 7
   controller: ModUserExperimentController
   start_time: 06/25/2016 00:00:00 UTC
   end_time: 12/30/2020 23:59:59 UTC
