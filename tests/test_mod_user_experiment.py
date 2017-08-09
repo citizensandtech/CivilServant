@@ -475,7 +475,9 @@ def test_apply_ban(mock_subreddit, mock_reddit):
     metadata = json.loads(ea.metadata_json)
     log.info(metadata)
     assert metadata["arm"] == "arm_0"
-    assert "modaction" in metadata and metadata["modaction"] is not None
+    assert "shadow_modaction" in metadata and metadata["shadow_modaction"] is not None
+    assert "randomization" in metadata and metadata["randomization"] is not None
+    assert metadata["randomization"]["treatment"] == 0
 
 
     # 2) perma ban: test group="treatment", duration = None (test_apply_perma_ban)
@@ -505,6 +507,8 @@ def test_apply_ban(mock_subreddit, mock_reddit):
         assert len(ea) == 1
         ea = ea[0]
         metadata = json.loads(ea.metadata_json)
+        assert metadata["arm"] == "arm_" + str(treatment_arm)        
+        assert "shadow_modaction" in metadata and metadata["shadow_modaction"] is not None
         assert "randomization" in metadata and metadata["randomization"] is not None
         assert metadata["randomization"]["treatment"] == treatment_arm
 

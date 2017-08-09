@@ -385,22 +385,14 @@ class ModeratorExperimentController(ExperimentController):
 
         #####################
         message_text = ""
-        exp_action_metadata = {
-            "group":group, 
-            "condition":condition,
-            "arm":"arm_" + str(treatment_arm)
-        }
-
         # determine ban action parameters
         ban_reason = None
         duration = None
         if group == "treatment":
             ban_reason = self.experiment_settings['conditions'][condition]['arms']["arm_" + str(treatment_arm)]["reason_text"]
             duration = self.experiment_settings['conditions'][condition]['arms']["arm_" + str(treatment_arm)]["duration"]
-            exp_action_metadata["randomization"] = metadata['randomization']
         elif group == "control":
             ban_reason = modaction['description']
-            exp_action_metadata["modaction"] = modaction
             try:
                 duration = parse_days_from_details(modaction["details"])
             except:
@@ -439,7 +431,14 @@ class ModeratorExperimentController(ExperimentController):
             action = "Intervention",
             action_object_type = ThingType.USER.value,
             action_object_id = username,
-            metadata_json = json.dumps(exp_action_metadata))
+            metadata_json = json.dumps({
+                "group":group, 
+                "condition":condition,
+                "arm":"arm_" + str(treatment_arm),
+                "randomization": metadata['randomization'],
+                "shadow_modaction": modaction # original shadow mod action
+            }
+        ))
         self.db_session.add(experiment_action)
         self.db_session.commit()
 
