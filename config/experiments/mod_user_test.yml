@@ -19,6 +19,7 @@ test:
   controller: ModUserExperimentController
   start_time: 06/25/2016 00:00:00 UTC
   end_time: 12/30/2020 23:59:59 UTC
+  max_ban_duration: 7
   event_hooks:
     treat_first_time_banned:
       is_active: True

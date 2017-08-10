@@ -61,14 +61,16 @@ BANUSER_TEMPLATE_MOD_ACTION_JSON = None
 with open("{script_dir}/fixture_data/banuser_mod_action.json".format(script_dir=TEST_DIR), "r") as f:
     BANUSER_TEMPLATE_MOD_ACTION_JSON = json.loads(f.read())
 
-def create_banuser_mod_action(target_author, subreddit_name,  subreddit_id):
+def create_banuser_mod_action(target_fullname, target_author, subreddit_name,  subreddit_id, created_utc=1500000000.0):
     new_mod_action = copy.deepcopy(BANUSER_TEMPLATE_MOD_ACTION_JSON)
     # modify the fields we care about
     new_id = "ModAction_" + randstring(len(new_mod_action["id"]) - new_mod_action["id"].index("_"))  
     new_mod_action["id"] = new_id 
+    new_mod_action["target_fullname"] = "t2_{0}".format(target_fullname)
     new_mod_action["target_author"] = target_author
     new_mod_action["subreddit"] = subreddit_name
     new_mod_action["sr_id36"] = subreddit_id
+    new_mod_action["created_utc"] = created_utc
 
     return json2obj(json.dumps(new_mod_action))
 
@@ -88,7 +90,6 @@ def load_mod_actions(subreddit_name, subreddit_id):
 
 
 ##########################################################
-
 
 ##TODO FOR TESTS
 
@@ -126,9 +127,10 @@ def test_query_and_archive_banned_users_main(mock_reddit):
         banuser_count = {}
         for mod_action in mod_action_fixtures[0]:
             if (not d or (d and datetime.datetime.fromtimestamp(mod_action.created_utc) >= d)) and mod_action.action == "banuser":
-                if mod_action.target_author not in banuser_count:
-                     banuser_count[mod_action.target_author] = 0
-                banuser_count[mod_action.target_author] += 1     
+                uid = mod_action.target_fullname.strip("t2_")
+                if uid not in banuser_count:
+                     banuser_count[uid] = 0
+                banuser_count[uid] += 1     
                 
         assert db_session.query(ModAction).count() == 0
         controller.query_and_archive_banned_users_main(oldest_mod_action_created_utc=d)
@@ -144,8 +146,6 @@ def test_query_and_archive_banned_users_main(mock_reddit):
             assert int(user.field_value) == banuser_count[user.user_id]
 
         clear_all_tables()
-
-
 
 @patch('praw.Reddit', autospec=True)
 @patch('praw.objects.Subreddit', autospec=True)
@@ -189,28 +189,28 @@ def test_get_eligible_users_and_archive_mod_actions(mock_subreddit, mock_reddit)
 
         # not eligible: user main banned, shadow banned, this time shadow banned once
         user_a = "ymysb"
-        main_mod_actions.append(create_banuser_mod_action(user_a, controller_instance.subreddit, controller_instance.subreddit_id))
-        shadow_mod_actions.append(create_banuser_mod_action(user_a, controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id))
-        this_shadow_mod_actions.append(create_banuser_mod_action(user_a, controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id))
+        main_mod_actions.append(create_banuser_mod_action(user_a, user_a, controller_instance.subreddit, controller_instance.subreddit_id))
+        shadow_mod_actions.append(create_banuser_mod_action(user_a, user_a, controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id))
+        this_shadow_mod_actions.append(create_banuser_mod_action(user_a, user_a, controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id))
 
         #    not eligible: user main banned, not shadow banned, this time shadow banned once
         user_b = "ymnsb"
-        main_mod_actions.append(create_banuser_mod_action(user_b, controller_instance.subreddit, controller_instance.subreddit_id))
-        this_shadow_mod_actions.append(create_banuser_mod_action(user_b, controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id))
+        main_mod_actions.append(create_banuser_mod_action(user_b, user_b, controller_instance.subreddit, controller_instance.subreddit_id))
+        this_shadow_mod_actions.append(create_banuser_mod_action(user_b, user_b, controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id))
 
         # not eligible: not user main banned, shadow banned, this time shadow banned once           
         user_c = "nmysb"
-        shadow_mod_actions.append(create_banuser_mod_action(user_c, controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id))
-        this_shadow_mod_actions.append(create_banuser_mod_action(user_c, controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id))
+        shadow_mod_actions.append(create_banuser_mod_action(user_c, user_c, controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id))
+        this_shadow_mod_actions.append(create_banuser_mod_action(user_c, user_c, controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id))
 
         # not eligible: not user main banned, not shadow banned, this time shadow banned more than once                   
         user_d = "nmnsbb"
         for i in range(2):
-            this_shadow_mod_actions.append(create_banuser_mod_action(user_d, controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id))
+            this_shadow_mod_actions.append(create_banuser_mod_action(user_d, user_d, controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id))
 
         # not eligible: not user main banned, not shadow banned, this time shadow banned once, have ExperimentThing   
         user_e = "nmnsbe"
-        this_shadow_mod_actions.append(create_banuser_mod_action(user_e, controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id))
+        this_shadow_mod_actions.append(create_banuser_mod_action(user_e, user_e, controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id))
         experiment_thing = ExperimentThing(
                 id             = user_e,
                 object_type    = ThingType.USER.value,
@@ -223,7 +223,13 @@ def test_get_eligible_users_and_archive_mod_actions(mock_subreddit, mock_reddit)
 
         # eligible: not user main banned, not shadow banned, this time shadow banned once, no ExperimentThing   
         user_f = "nmnsb"
-        this_shadow_mod_actions.append(create_banuser_mod_action(user_f, controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id))
+        this_shadow_mod_actions.append(create_banuser_mod_action(user_f, user_f, controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id))
+
+        user_g = "too_old"
+        this_shadow_mod_actions.append(create_banuser_mod_action(user_g, user_g, controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id, created_utc=1400000000.0))
+
+        user_h = "too_new"        
+        this_shadow_mod_actions.append(create_banuser_mod_action(user_h, user_h, controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id, created_utc=1700000000.0))
 
         ############
 
@@ -260,9 +266,9 @@ def test_get_eligible_users_and_archive_mod_actions(mock_subreddit, mock_reddit)
         mod_instance.mod_actions = shadow_mod_actions
         assert len(mod_instance.mod_actions) == 502
         
-        banned_username_to_modaction = controller_instance.get_eligible_users_and_archive_mod_actions(mod_instance) ############ <<<<
-        assert(len(banned_username_to_modaction.keys())) == 1
-        assert user_c in banned_username_to_modaction
+        banned_user_id_to_modaction = controller_instance.get_eligible_users_and_archive_mod_actions(mod_instance) ############ <<<<
+        assert(len(banned_user_id_to_modaction.keys())) == 1
+        assert user_c in banned_user_id_to_modaction
 
         main_user_metadata = db_session.query(UserMetadata).filter(UserMetadata.subreddit_id==controller_instance.subreddit_id).all()
         assert len(main_user_metadata) == 2 #still 
@@ -281,11 +287,11 @@ def test_get_eligible_users_and_archive_mod_actions(mock_subreddit, mock_reddit)
 
         # 3) 2nd shadow load: instance.mod_actions should have new mod actions on shadow subreddit
         mod_instance.mod_actions = this_shadow_mod_actions
-        assert len(mod_instance.mod_actions) == 507 # 500 existing, and mod actions for user_a through user_f (2 for user_d)
+        assert len(mod_instance.mod_actions) == 509 # 500 existing, and mod actions for user_a through user_h (2 for user_d)
 
-        banned_username_to_modaction = controller_instance.get_eligible_users_and_archive_mod_actions(mod_instance) ############ <<<<
-        assert(len(banned_username_to_modaction.keys())) == 1 # user_f
-        assert user_f in banned_username_to_modaction
+        banned_user_id_to_modaction = controller_instance.get_eligible_users_and_archive_mod_actions(mod_instance) ############ <<<<
+        assert(len(banned_user_id_to_modaction.keys())) == 1 # user_f
+        assert user_f in banned_user_id_to_modaction
 
         main_user_metadata = db_session.query(UserMetadata).filter(UserMetadata.subreddit_id==controller_instance.subreddit_id).all()
         assert len(main_user_metadata) == 2 #still           
@@ -329,22 +335,21 @@ def test_user_acceptable(mock_reddit):
     experiment_name = "mod_user_test"
     controller_instance = ModUserExperimentController(experiment_name, db_session, r, log)
 
-    username = "foo"
+    user_id = "foo"
     # if no ExperimentAction, return True
-    assert controller_instance.user_acceptable(username) == True
+    assert controller_instance.user_acceptable(user_id) == True
 
     ea = ExperimentAction(
         experiment_id=controller_instance.experiment.id,
         action_object_type=ThingType.USER.value,
-        action_object_id=username,
+        action_object_id=user_id,
         action="Intervention"
         )
     db_session.add(ea)
     db_session.commit()
 
     # if ExperimentAction, return False
-    assert controller_instance.user_acceptable(username) == False
-
+    assert controller_instance.user_acceptable(user_id) == False
 
 # this test is very similar to test_sticky_comment_experiment_controller.test_assign_randomized_conditions
 @patch('praw.Reddit', autospec=True)
@@ -363,13 +368,14 @@ def test_assign_randomized_conditions(mock_reddit):
     ## TEST THE BASE CASE OF RANDOMIZATION
     banned_user_to_modaction = {} ################### ????
     for i in range(100):
-        username = randstring(10)
-        mod_action = create_banuser_mod_action(username, controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id)
+        mod_action = create_banuser_mod_action(randstring(10), randstring(10), controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id)
         assert mod_action.__class__.__name__ == "X"
-        user = User(name=username)
-        db_session.add(user)
+        user_record = User(
+            id=mod_action.target_fullname.strip("t2_"), 
+            name=mod_action.target_author)
+        db_session.add(user_record)
         db_session.commit()
-        banned_user_to_modaction[user] = mod_action
+        banned_user_to_modaction[user_record] = mod_action
     assert len(banned_user_to_modaction) == 100 ####
 
 
@@ -395,7 +401,7 @@ def test_assign_randomized_conditions(mock_reddit):
         assert experiment_thing.experiment_id == controller_instance.experiment.id
         assert "randomization" in json.loads(experiment_thing.metadata_json).keys()
         assert "condition" in json.loads(experiment_thing.metadata_json).keys()
-        assert "modaction" in json.loads(experiment_thing.metadata_json).keys() #####
+        assert "shadow_modaction" in json.loads(experiment_thing.metadata_json).keys() #####
 
         
     ## TEST THE CASE WHERE THE EXPERIMENT HAS CONCLUDED
@@ -409,12 +415,13 @@ def test_assign_randomized_conditions(mock_reddit):
 
     new_banned_user_to_modaction = {} ################### ????
     for i in range(4):
-        username = randstring(10)
-        mod_action = create_banuser_mod_action(username, controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id)
-        user = User(name=username)
-        db_session.add(user)
+        mod_action = create_banuser_mod_action(randstring(10), randstring(10), controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id)
+        user_record = User(
+            id=mod_action.target_fullname.strip("t2_"), 
+            name=mod_action.target_author)
+        db_session.add(user_record)
         db_session.commit()
-        new_banned_user_to_modaction[user] = mod_action
+        new_banned_user_to_modaction[user_record] = mod_action
     assert len(new_banned_user_to_modaction) == 4 ####
 
     # Only 1 randomization left for each condition, while there are >1 new_posts
@@ -422,7 +429,7 @@ def test_assign_randomized_conditions(mock_reddit):
     ## assert that only 1 item from each condition went through
     assert len(experiment_things) == len(experiment_settings['conditions'])
     for thing in experiment_things:
-        assert thing.id in [x.name for x in new_banned_user_to_modaction]
+        assert thing.id in [x.id for x in new_banned_user_to_modaction]
     
     ## CHECK THE EMPTY CASE
     ## make sure that no actions are taken if the list is empty
@@ -433,12 +440,14 @@ def test_assign_randomized_conditions(mock_reddit):
 
 @patch('praw.Reddit', autospec=True)
 @patch('praw.objects.Subreddit', autospec=True)
-def test_apply_ban(mock_subreddit, mock_reddit):
+@patch.object(ModUserExperimentController, "find_latest_mod_action_id_with")
+def test_apply_ban(mock_find_latest_mod_action_id_with, mock_subreddit, mock_reddit):
     r = mock_reddit.return_value
     patch('praw.')
 
     experiment_name = "mod_user_test"
     controller_instance = ModUserExperimentController(experiment_name, db_session, r, log)
+    controller_instance.find_latest_mod_action_id_with.return_value = "ModAction_123456"
 
     mock_subreddit.add_ban.return_value = {'errors': []}
     mock_subreddit.display_name = controller_instance.subreddit
@@ -450,9 +459,9 @@ def test_apply_ban(mock_subreddit, mock_reddit):
 
     # 1) control: test group="control", duration = None (always). should parse details correctly (make_control_nonaction)
 
-    mod_action = create_banuser_mod_action(randstring(10), controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id)
+    mod_action = create_banuser_mod_action(randstring(10), randstring(10), controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id)
     experiment_thing = ExperimentThing(
-        id             = mod_action.target_author,
+        id             = mod_action.target_fullname,
         object_type    = ThingType.USER.value,
         experiment_id  = controller_instance.experiment.id,
         object_created = None, # don't need to mock this for tests
@@ -463,7 +472,7 @@ def test_apply_ban(mock_subreddit, mock_reddit):
                 "block.size":10
                 }, 
             "condition":"main",
-            "modaction": mod_action
+            "shadow_modaction": mod_action
             })
     )
 
@@ -473,7 +482,6 @@ def test_apply_ban(mock_subreddit, mock_reddit):
     assert len(ea) == 1
     ea = ea[0]
     metadata = json.loads(ea.metadata_json)
-    log.info(metadata)
     assert metadata["arm"] == "arm_0"
     assert "shadow_modaction" in metadata and metadata["shadow_modaction"] is not None
     assert "randomization" in metadata and metadata["randomization"] is not None
@@ -484,9 +492,9 @@ def test_apply_ban(mock_subreddit, mock_reddit):
     # 3) treatment ban: test group="treatment", duration = 7 (test_apply_temp_ban)
     # duration, reason_text specified in experiment yml
     for treatment_arm in [1, 2]:
-        mod_action = create_banuser_mod_action(randstring(10), controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id)
+        mod_action = create_banuser_mod_action(randstring(10), randstring(10), controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id)
         experiment_thing = ExperimentThing(
-            id             = mod_action.target_author,
+            id             = mod_action.target_fullname.strip("t2_"),
             object_type    = ThingType.USER.value,
             experiment_id  = controller_instance.experiment.id,
             object_created = None, # don't need to mock this for tests
@@ -497,7 +505,7 @@ def test_apply_ban(mock_subreddit, mock_reddit):
                     "block.size":10
                     }, 
                 "condition":"main",
-                "modaction": mod_action
+                "shadow_modaction": mod_action
                 })
         )
 
@@ -517,9 +525,10 @@ def test_apply_ban(mock_subreddit, mock_reddit):
 
 @patch('praw.Reddit', autospec=True)
 @patch('praw.objects.Subreddit', autospec=True)
-@patch.object(ModUserExperimentController, "query_and_archive_new_banned_users_main", )
+@patch.object(ModUserExperimentController, "query_and_archive_new_banned_users_main")
 @patch.object(ModUserExperimentController, "apply_ban")
-def test_update_experiment(mock_query_and_archive_new_banned_users_main, mock_apply_ban,
+@patch.object(ModUserExperimentController, "conclude_intervention")
+def test_update_experiment(mock_conclude_intervention, mock_apply_ban, mock_query_and_archive_new_banned_users_main, 
                             mock_subreddit, mock_reddit):
     r = mock_reddit.return_value    
 
@@ -540,18 +549,23 @@ def test_update_experiment(mock_query_and_archive_new_banned_users_main, mock_ap
     mod_instance.mod_actions = shadow_mod_action_fixtures[0]
     for i in range(10):
         # add 10 more banactions
-        mod_instance.mod_actions.append(create_banuser_mod_action(randstring(10), controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id))
+        mod_instance.mod_actions.append(create_banuser_mod_action(
+            randstring(10), randstring(10), 
+            controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id))
 
     assert mock_query_and_archive_new_banned_users_main.called == False
     assert mock_apply_ban.called == False
+    assert mock_conclude_intervention.called == False
     controller_instance.query_and_archive_new_banned_users_main.return_value = None # don't do anything
     controller_instance.apply_ban.return_value = 129874 # "mocked" experiment_action.id
+    controller_instance.conclude_intervention.return_value = None
 
     experiment_return = controller_instance.update_experiment(mod_instance)
 
     ## ASSERT THAT THE METHODS FOR TAKING ACTIONS ARE CALLED
     assert mock_query_and_archive_new_banned_users_main.called == True
     assert mock_apply_ban.called == True
+    assert mock_conclude_intervention.called == True
 
     assert db_session.query(Experiment).count() == 1
     assert db_session.query(ModAction).count() == 0 # update experiment doesn't store any shadow mod actions. it will store main mod actions, but we didn't load any
@@ -564,7 +578,7 @@ def test_update_experiment(mock_query_and_archive_new_banned_users_main, mock_ap
 
 @patch('praw.Reddit', autospec=True)
 def test_archive_user_records(mock_reddit):
-    # for each username in banned_username_to_modaction, store User record
+    # for each username in banned_user_id_to_modaction, store User record
     # returns dictionary of {User record: praw.objects.ModAction}
     r = mock_reddit.return_value
 
@@ -573,53 +587,165 @@ def test_archive_user_records(mock_reddit):
 
 
 
-    username_a = "username_a"   # already existed
-    username_b = "username_b"   # could not find when queried
-    username_c = "username_c"   # found when queried
-    test_users = [username_a, username_b, username_c]
+    user_a = "user_a"   # already existed
+    user_b = "user_b"   # could not find when queried
+    user_c = "user_c"   # found when queried
 
     # db commit
-    user_a = User(name=username_a, last_seen=datetime.datetime.utcnow())
-    user_a_last_seen = user_a.last_seen
-    db_session.add(user_a)
+    user_a_record = User(id=user_a, name=user_a, last_seen=datetime.datetime.utcnow())
+    user_a_last_seen = user_a_record.last_seen
+    db_session.add(user_a_record)
     db_session.commit()
 
     count = 1
     assert db_session.query(User).count() == count
 
-    for username in test_users: # test one at a time to make mocking get_redditor easier
-        if username == username_a:
+    test_users = [user_a, user_b, user_c]
+    for user_str in test_users: # test one at a time to make mocking get_redditor easier
+        if user_str == user_a:
             # don't need to mock get_redditor
             time.sleep(1) # just so user_a_last_seen can get old enough
-        elif username == username_b:
+        elif user_str == user_b:
             count += 1    
             r.get_redditor.side_effect = Mock(side_effect=praw.errors.NotFound) 
-        elif username ==username_c:
+        elif user_str == user_c:
             count += 1    
             r.get_redditor.side_effect = None
             with open("{script_dir}/fixture_data/user.json".format(script_dir=TEST_DIR)) as f:
-                data = f.read()
-                r.get_redditor.return_value = json2obj(data)
+                data = json.loads(f.read())
+                data["id"] = user_str
+                data["name"] = user_str
+                r.get_redditor.return_value = json2obj(json.dumps(data))
         patch('praw.')
 
-
-        banned_username_to_modaction = {username: None}
-        banned_user_to_modaction = controller_instance.archive_user_records(banned_username_to_modaction)
+        banned_user_id_to_modaction = {
+            user_str: create_banuser_mod_action(user_str, user_str, controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id)}
+        banned_user_to_modaction = controller_instance.archive_user_records(banned_user_id_to_modaction)
 
         assert db_session.query(User).count() == count # testing one at a time
 
-        user = list(banned_user_to_modaction.keys())[0]
-        assert type(user) == User # models.User
+        user_record = list(banned_user_to_modaction.keys())[0]
+        assert type(user_record) == User # models.User
         
-        if username == username_a:
-            assert user.name == username
-            assert user.last_seen > user_a_last_seen
-            assert user.id is None
-            assert user.user_data is None
-        elif username == username_b:
-            assert user.name == username
-            assert user.user_data is None
-        elif username == username_c:
-            assert user.name == username
-            assert user.id is not None
-            assert user.user_data is not None
+        if user_str == user_a:
+            assert user_record.name == banned_user_id_to_modaction[user_str].target_author
+            assert user_record.id == banned_user_id_to_modaction[user_str].target_fullname.strip("t2_")
+            assert user_record.last_seen > user_a_last_seen
+            assert user_record.user_data is None
+        elif user_str == user_b:
+            assert user_record.name == banned_user_id_to_modaction[user_str].target_author
+            assert user_record.id == banned_user_id_to_modaction[user_str].target_fullname.strip("t2_")
+            assert user_record.user_data is None
+        elif user_str == user_c:
+            assert user_record.name == banned_user_id_to_modaction[user_str].target_author            
+            assert user_record.id == banned_user_id_to_modaction[user_str].target_fullname.strip("t2_")
+            assert user_record.created is not None
+            assert user_record.user_data is not None
+
+
+
+@patch('praw.Reddit', autospec=True)
+@patch('praw.objects.Subreddit', autospec=True)
+def test_conclude_intervention(mock_subreddit, mock_reddit):
+    r = mock_reddit.return_value
+    mock_subreddit.remove_ban.return_value = {'errors': []}
+
+    patch('praw.')
+
+    experiment_name = "mod_user_test"
+    controller_instance = ModUserExperimentController(experiment_name, db_session, r, log)
+
+    mock_subreddit.add_ban.return_value = {'errors': []}
+    mock_subreddit.display_name = controller_instance.subreddit
+    mock_subreddit.name = controller_instance.subreddit
+    mock_subreddit.id = controller_instance.subreddit_id    
+    r.get_subreddit.return_value = mock_subreddit
+
+    patch('praw.')
+
+    # user_a has ExperimentThing, not old "Intervention" ExperimentAction > do nothing
+    user_a = "user_a"
+
+    # user_b has ExperimentThing, old "Intervention" ExperimentAction, "ConcludeIntervention" ExperimentAction : do nothing
+    user_b = "user_b"
+
+    # user_c has ExperimentThing, old "Intervention" ExperimentAction > unban
+    user_c = "user_c"
+
+    too_old_time = datetime.datetime.utcnow() - datetime.timedelta(days=controller_instance.experiment_settings['max_ban_duration']+2)
+    not_old_time = datetime.datetime.utcnow() - datetime.timedelta(days=controller_instance.experiment_settings['max_ban_duration']-2)    
+    
+    randomization = {
+            "treatment":"control",
+            "block.id":"main.block001", 
+            "block.size":10
+        }
+    for user in [user_a, user_b, user_c]:
+        shadow_mod_action = create_banuser_mod_action(user, user, controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id)
+        main_mod_action = create_banuser_mod_action(user, user, controller_instance.subreddit, controller_instance.subreddit_id)        
+        experiment_thing = ExperimentThing(
+            id             = shadow_mod_action.target_fullname.strip("t2_"),
+            object_type    = ThingType.USER.value,
+            experiment_id  = controller_instance.experiment.id,
+            object_created = None, # don't need to mock this for tests
+            metadata_json = json.dumps({
+                "randomization":randomization, 
+                "condition":"main",
+                "shadow_modaction": shadow_mod_action
+                })
+        )
+        db_session.add(experiment_thing)
+
+        if user is user_a:
+            created_at = not_old_time
+        elif user is user_b or user is user_c:
+            created_at = too_old_time
+
+        intervene_experiment_action = ExperimentAction(
+            created_at = created_at,
+            experiment_id = controller_instance.experiment.id,
+            praw_key_id = PrawKey.get_praw_id(ENV, controller_instance.experiment_name),
+            action_subject_type = ThingType.USER.value,
+            action_subject_id = shadow_mod_action.mod, ########
+            action = "Intervention",
+            action_object_type = ThingType.USER.value,
+            action_object_id = user,
+            metadata_json = json.dumps({
+                "group":"control", 
+                "condition":"main",
+                "arm":"arm_0",
+                "randomization": randomization,
+                "shadow_modaction": shadow_mod_action, # original shadow mod action
+                "main_modaction_id": main_mod_action.id
+            }
+        ))
+        db_session.add(intervene_experiment_action)        
+
+        if user is user_b:
+            conclude_experiment_action = ExperimentAction(
+                experiment_id = controller_instance.experiment.id,
+                praw_key_id = PrawKey.get_praw_id(ENV, controller_instance.experiment_name),
+                action_subject_type = ThingType.USER.value,
+                action_subject_id = shadow_mod_action.mod, ########
+                action = "ConcludeIntervention",
+                action_object_type = ThingType.USER.value,
+                action_object_id = user,
+                metadata_json = json.dumps({
+                    "intervention_id": intervene_experiment_action.id,
+                    "shadow_modaction_id": shadow_mod_action.id, # original shadow mod action
+                    "main_modaction_id": main_mod_action.id
+                }
+            ))
+            db_session.add(conclude_experiment_action)        
+
+    db_session.commit()
+
+    ###########
+    assert db_session.query(ExperimentAction).filter(ExperimentAction.action == "ConcludeIntervention").count() == 1    
+    new_ea_ids = controller_instance.conclude_intervention()
+    assert len(new_ea_ids) == 1
+    assert db_session.query(ExperimentAction).filter(ExperimentAction.action == "ConcludeIntervention").count() == 2
+
+
+"""
+"""

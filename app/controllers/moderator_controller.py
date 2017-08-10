@@ -10,6 +10,7 @@ from utils.common import PageType
 from app.models import Base, SubredditPage, Subreddit, Post, ModAction
 from sqlalchemy import and_
 import app.event_handler
+import time
 
 class ModeratorController:
     def __init__(self, subreddit_name, db_session, r, log):
@@ -48,16 +49,18 @@ class ModeratorController:
             ModAction.created_at.desc()).first() # latest action
         last_action_id = last_action.id if last_action else None
         self.log.info("in archive_new_mod_actions for subreddit {0}, last_action_id={1}".format(self.subreddit_name, last_action_id))
-        self.archive_mod_action_history_with_event_hooks(last_action_id)
+        self.archive_mod_action_history_with_event_hooks(before_id=last_action_id, after_id=None)
 
     # uses self.mod_actions
     @app.event_handler.event_handler
-    def archive_mod_action_history_with_event_hooks(self, after_id=None):
-        self.archive_mod_action_history(after_id=after_id)
+    def archive_mod_action_history_with_event_hooks(self, before_id=None, after_id=None):
+        self.archive_mod_action_history(before_id=before_id, after_id=None)
 
     # without event hooks
     # populates self.mod_actions. 
-    def archive_mod_action_history(self, after_id=None):
+    #before = mod actions newer than id
+    #after = mod actions older than id
+    def archive_mod_action_history(self, before_id=None, after_id=None, limit=500):
         self.mod_actions = [] # empty this data structure that is used by event hooks
 
         total_actions = self.db_session.query(ModAction).filter(ModAction.subreddit_id == self.subreddit_id).count()
@@ -70,7 +73,7 @@ class ModeratorController:
 
         num_actions_stored = None
         while num_actions_stored is None or num_actions_stored > 0 :
-            after_id = self.archive_mod_action_page(after_id)
+            after_id = self.archive_mod_action_page(before_id=before_id, after_id=after_id, limit=limit)
             self.db_session.commit()
             total_actions = self.db_session.query(ModAction).filter(ModAction.subreddit_id == self.subreddit_id).count()
             num_actions_stored = total_actions - pre_action_count
@@ -81,15 +84,16 @@ class ModeratorController:
             stored = total_actions - first_action_count,
             total = total_actions))
 
-    # returns the last action id, for paging purposes
-    def archive_mod_action_page(self, after_id=None):
-        if(after_id):
-            self.log.info("Querying moderation log for {subreddit}, after_id = {after_id}".format(
-                subreddit=self.subreddit_name, after_id = after_id))
-        else:
-            self.log.info("Querying moderation log for {subreddit}".format(subreddit=self.subreddit_name)) 
+    # returns the last action id, for paging purposes (should be passed in as "after" param)
+    def archive_mod_action_page(self, before_id=None, after_id=None, limit=500):
+        self.log.info("Querying moderation log for {subreddit}, before_id = {before_id}, after_id = {after_id}".format(
+            subreddit=self.subreddit_name, before_id = before_id, after_id = after_id))
 
-        actions = self.r.get_mod_log(self.subreddit_name, limit = 500, params={"after": after_id})
+        #before = mod actions newer than id (for getting new mod actions)
+        #after = mod actions older than id (for paging purposes)
+        actions = self.r.get_mod_log(self.subreddit_name, limit = limit, params={
+            "before": before_id, "after": after_id})
+
         action_count = 0
         last_action = None
         for action in actions:
@@ -137,3 +141,34 @@ class ModeratorController:
             return last_action['id']
         else:
             return last_action
+
+
+    # mod_action_query: a dictionary with any subset of mod action fields
+    # this method is expected to be called soon after the sought after mod action is created
+    # returns None if can't find within first max_mod_actions
+    def find_latest_mod_action_id_with(self, mod_action_query, max_mod_actions=1000):
+        ###time.sleep(1)
+        mod_actions_count = 0
+        after_id = None
+        while mod_actions_count <= max_mod_actions:
+            actions = self.r.get_mod_log(self.subreddit_name, limit = min(500, max_mod_actions), params={"after": after_id})
+
+            for action in actions:
+
+                #### TO HANDLE TEST FIXTURES
+                if("json_dict" in dir(action)):
+                    action_dict = action.json_dict
+                else:
+                    action_dict = action
+        
+                is_match = True
+                for field in mod_action_query:
+                    if field in action_dict and action_dict[field] != mod_action_query[field]:
+                        is_match = False
+                        break
+                if is_match:
+                    return action_dict["id"]
+
+                mod_actions_count += 1
+                after_id = action_dict['id']
+        return None

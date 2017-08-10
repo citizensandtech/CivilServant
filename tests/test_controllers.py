@@ -528,8 +528,6 @@ def test_archive_last_thousand_comments(mock_reddit):
 def test_archive_mod_action_page(mock_subreddit, mock_reddit):
     r = mock_reddit.return_value
 
-
-
     ## TO START, LOAD MOD ACTION FIXTURES
     mod_action_fixtures = []
     for filename in glob.glob("{script_dir}/fixture_data/mod_action*".format(script_dir=TEST_DIR)):
@@ -583,6 +581,41 @@ def test_archive_mod_action_page(mock_subreddit, mock_reddit):
     # NOW ADD A NEW PAGE
     r.get_mod_log.return_value = mod_action_fixtures[1]
     patch('praw.')
-    last_action_id = mac.archive_mod_action_page(after_id = mod_action_fixtures[0][-1]['id'])
+    last_action_id = mac.archive_mod_action_page(before_id = mod_action_fixtures[0][-1]['id'])
     assert db_session.query(ModAction).count() == len(mod_action_fixtures[0]) + len(mod_action_fixtures[1])
     assert last_action_id == mod_action_fixtures[1][-1]['id']
+
+
+@patch('praw.Reddit', autospec=True)
+@patch('praw.objects.Subreddit', autospec=True)
+def test_find_latest_mod_action_id_with(mock_subreddit, mock_reddit):
+    r = mock_reddit.return_value
+
+    ## TO START, LOAD MOD ACTION FIXTURES
+    mod_action_fixtures = []
+    for filename in glob.glob("{script_dir}/fixture_data/mod_action*".format(script_dir=TEST_DIR)):
+        f = open(filename, "r")
+        mod_action_fixtures.append(json.loads(f.read()))
+        f.close()
+
+    subreddit_name = mod_action_fixtures[0][0]['subreddit']
+    subreddit_id = mod_action_fixtures[0][0]['sr_id36']
+
+    mock_subreddit.display_name = subreddit_name
+    mock_subreddit.name = subreddit_name
+    mock_subreddit.id = subreddit_id     
+    r.get_subreddit.return_value = mock_subreddit
+
+    r.get_mod_log.return_value = mod_action_fixtures[0]
+    patch('praw.')
+
+    log = app.cs_logger.get_logger(ENV, BASE_DIR)
+    mac = app.controllers.moderator_controller.ModeratorController(
+        subreddit_name=subreddit_name, db_session=db_session, r=r, log=log
+    )
+
+    username = mod_action_fixtures[0][200]["target_author"]
+    ma_id = mod_action_fixtures[0][200]["id"]
+    mod_action_query = {"target_author": username}
+    last_action_id = mac.find_latest_mod_action_id_with(mod_action_query)
+    assert last_action_id == ma_id
