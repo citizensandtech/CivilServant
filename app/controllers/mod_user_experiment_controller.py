@@ -345,8 +345,6 @@ class ModeratorExperimentController(ExperimentController):
             self.__class__.__name__, self.experiment.name, len(new_ea_ids)))
         return new_ea_ids
 
-
-
     # takes in {username: mod action detail}
     # otherwise same as sticky_comment_experiment_controller
     def run_interventions(self, banned_user_to_modaction):
@@ -441,6 +439,83 @@ class ModeratorExperimentController(ExperimentController):
             self.main_mod = ModeratorController(self.subreddit, self.db_session, self.r, self.log)
         main_mod_action_id = self.main_mod.find_latest_mod_action_id_with(mod_action_query)
         return main_mod_action_id
+
+    # this method is not done / tested
+    def auto_reply(self):
+        ban_messages = []
+        ban_subjects = []
+        for arm in self.experiment_settings['conditions'][condition]['arms']:
+            ban_messages.append(self.experiment_settings['conditions'][condition]['arms'][arm]["pm_text"])
+            ban_subjects.append(self.experiment_settings['conditions'][condition]['arms'][arm]["pm_subject"])            
+
+        # does this require paging??
+        messages = self.r.get_mod_mail(self.subreddit)
+
+        for message in messages:
+            # if message is one of our ban messages 
+                if len(message.replies) > 0:
+                    for reply in message.replies:
+                        # if reply id is not in  
+                        if reply.body:
+                               pass   
+
+
+    # this method is not done / tested
+    def send_ban_message(self, experiment_thing, group="control"):
+        if group == "control":
+            # currently, don't plan on sending messages to "control" users
+            return
+
+        metadata = json.loads(experiment_thing.metadata_json)
+        treatment_arm = int(metadata['randomization']['treatment'])
+        condition     = metadata['condition']
+        modaction = metadata["shadow_modaction"]
+        username = modaction["target_author"]
+
+        if group == "treatment":
+            pm_subject = self.experiment_settings['conditions'][condition]['arms']["arm_" + str(treatment_arm)]["pm_subject"]
+            pm_text = self.experiment_settings['conditions'][condition]['arms']["arm_" + str(treatment_arm)]["pm_text"]
+
+
+        if not hasattr(self, "main_sub"):
+            self.main_sub = self.r.get_subreddit(self.subreddit)
+        self.r.send_message(username, pm_subject, pm_text, self.main_sub)
+
+        # add ExperimentAction
+        experiment_action = ExperimentAction(
+            experiment_id = self.experiment.id,
+            praw_key_id = PrawKey.get_praw_id(ENV, self.experiment_name),
+            action_subject_type = ThingType.USER.value,
+            action_subject_id = self.subreddit, ########
+            action = "InterventionMessage",
+            action_object_type = ThingType.USER.value,
+            action_object_id = experiment_thing.id,
+            metadata_json = json.dumps({
+                "group": group, 
+                "condition": condition,
+                "arm":"arm_" + str(treatment_arm),
+                "randomization": metadata['randomization'],
+                "shadow_modaction": modaction, # original shadow mod action
+                "main_modaction_id": main_mod_action_id,
+                "message_id": None ###### TODO ?????
+            }
+        ))
+        self.db_session.add(experiment_action)
+        self.db_session.commit()
+
+        self.log.info("{0}: Experiment {1} sent PM to username {5}, user id {6}; group {2}, condition {3}, treatment_arm {4}".format(
+            self.__class__.__name__,
+            self.experiment_name, 
+            group,
+            condition,
+            treatment_arm,
+            username,
+            experiment_thing.id
+        ))
+
+        return experiment_action.id
+
+
 
     # get username from experiment_thing.id
     # only need modaction!=None if group="control"

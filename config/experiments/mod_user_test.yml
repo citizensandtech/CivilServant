@@ -12,9 +12,13 @@ test:
             arm_0: null
             arm_1: 
               reason_text: This is arm 1 of the 1st condition (perma ban)
+              pm_subject: PM Subject Line (perma ban) 
+              pm_text: Hello, this is the message for arm 1 of the 1st condition (perma ban).
               duration: null
             arm_2: 
               reason_text: This is arm 2 of the 1st condition (temp ban)
+              pm_subject: PM Subject Line (temp ban)
+              pm_text: Hello, this is the message for arm 2 of the 1st condition (temp ban).
               duration: 7
   controller: ModUserExperimentController
   start_time: 06/25/2016 00:00:00 UTC

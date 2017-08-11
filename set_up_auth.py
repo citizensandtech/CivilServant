@@ -13,7 +13,7 @@ import os
 
 env =  os.environ['CS_ENV']
 
-scope = ['identity','read','modlog','modposts','submit','modconfig','flair','modcontributors']
+scope = ['identity','read','modlog','modposts','submit','modconfig','flair','modcontributors', 'privatemessages']
 
 r = praw.Reddit(user_agent="Test version of CivilServant by u/natematias")
 
