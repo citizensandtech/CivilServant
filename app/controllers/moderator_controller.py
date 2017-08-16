@@ -146,7 +146,7 @@ class ModeratorController:
     # mod_action_query: a dictionary with any subset of mod action fields
     # this method is expected to be called soon after the sought after mod action is created
     # returns None if can't find within first max_mod_actions
-    def find_latest_mod_action_id_with(self, mod_action_query, max_mod_actions=1000):
+    def find_latest_mod_action_id_with(self, mod_action_query, max_mod_actions=500):
         ###time.sleep(1)
         mod_actions_count = 0
         after_id = None

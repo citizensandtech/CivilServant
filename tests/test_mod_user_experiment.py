@@ -127,7 +127,7 @@ def test_query_and_archive_banned_users_main(mock_reddit):
         banuser_count = {}
         for mod_action in mod_action_fixtures[0]:
             if (not d or (d and datetime.datetime.fromtimestamp(mod_action.created_utc) >= d)) and mod_action.action == "banuser":
-                uid = mod_action.target_fullname.strip("t2_")
+                uid = mod_action.target_fullname.replace("t2_", "")
                 if uid not in banuser_count:
                      banuser_count[uid] = 0
                 banuser_count[uid] += 1     
@@ -142,6 +142,7 @@ def test_query_and_archive_banned_users_main(mock_reddit):
         # which UserMetadata records are stored depends on oldest_mod_action_created_utc
         usermetadata = db_session.query(UserMetadata).all()
         assert len(usermetadata) == len(banuser_count)
+        
         for user in usermetadata:
             assert int(user.field_value) == banuser_count[user.user_id]
 
@@ -371,7 +372,7 @@ def test_assign_randomized_conditions(mock_reddit):
         mod_action = create_banuser_mod_action(randstring(10), randstring(10), controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id)
         assert mod_action.__class__.__name__ == "X"
         user_record = User(
-            id=mod_action.target_fullname.strip("t2_"), 
+            id=mod_action.target_fullname.replace("t2_", ""), 
             name=mod_action.target_author)
         db_session.add(user_record)
         db_session.commit()
@@ -417,7 +418,7 @@ def test_assign_randomized_conditions(mock_reddit):
     for i in range(4):
         mod_action = create_banuser_mod_action(randstring(10), randstring(10), controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id)
         user_record = User(
-            id=mod_action.target_fullname.strip("t2_"), 
+            id=mod_action.target_fullname.replace("t2_", ""), 
             name=mod_action.target_author)
         db_session.add(user_record)
         db_session.commit()
@@ -494,7 +495,7 @@ def test_apply_ban(mock_find_latest_mod_action_id_with, mock_subreddit, mock_red
     for treatment_arm in [1, 2]:
         mod_action = create_banuser_mod_action(randstring(10), randstring(10), controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id)
         experiment_thing = ExperimentThing(
-            id             = mod_action.target_fullname.strip("t2_"),
+            id             = mod_action.target_fullname.replace("t2_", ""),
             object_type    = ThingType.USER.value,
             experiment_id  = controller_instance.experiment.id,
             object_created = None, # don't need to mock this for tests
@@ -629,16 +630,16 @@ def test_archive_user_records(mock_reddit):
         
         if user_str == user_a:
             assert user_record.name == banned_user_id_to_modaction[user_str].target_author
-            assert user_record.id == banned_user_id_to_modaction[user_str].target_fullname.strip("t2_")
+            assert user_record.id == banned_user_id_to_modaction[user_str].target_fullname.replace("t2_", "")
             assert user_record.last_seen > user_a_last_seen
             assert user_record.user_data is None
         elif user_str == user_b:
             assert user_record.name == banned_user_id_to_modaction[user_str].target_author
-            assert user_record.id == banned_user_id_to_modaction[user_str].target_fullname.strip("t2_")
+            assert user_record.id == banned_user_id_to_modaction[user_str].target_fullname.replace("t2_", "")
             assert user_record.user_data is None
         elif user_str == user_c:
             assert user_record.name == banned_user_id_to_modaction[user_str].target_author            
-            assert user_record.id == banned_user_id_to_modaction[user_str].target_fullname.strip("t2_")
+            assert user_record.id == banned_user_id_to_modaction[user_str].target_fullname.replace("t2_", "")
             assert user_record.created is not None
             assert user_record.user_data is not None
 
@@ -684,7 +685,7 @@ def test_conclude_intervention(mock_subreddit, mock_reddit):
         shadow_mod_action = create_banuser_mod_action(user, user, controller_instance.shadow_subreddit, controller_instance.shadow_subreddit_id)
         main_mod_action = create_banuser_mod_action(user, user, controller_instance.subreddit, controller_instance.subreddit_id)        
         experiment_thing = ExperimentThing(
-            id             = shadow_mod_action.target_fullname.strip("t2_"),
+            id             = shadow_mod_action.target_fullname.replace("t2_", ""),
             object_type    = ThingType.USER.value,
             experiment_id  = controller_instance.experiment.id,
             object_created = None, # don't need to mock this for tests

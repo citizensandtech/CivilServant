@@ -90,7 +90,7 @@ class ModeratorExperimentController(ExperimentController):
                 ModAction.created_utc >= oldest_mod_action_created_utc).all()
         else:
             users = sub_query.all()
-        return [x[0].strip("t2_") for x in users] #ids
+        return [x[0].replace("t2_", "") for x in users] #ids
 
 
     # returns dict existing_banned_user_id_to_usermetadata
@@ -105,7 +105,7 @@ class ModeratorExperimentController(ExperimentController):
         return existing_banned_user_id_to_usermetadata
 
     def update_and_archive_user_metadata(self, subreddit_id, banned_users, banned_user_id_to_usermetadata):
-        ##self.log.info("banned_users: {0}".format(banned_users))
+        self.log.info("banned_users: {0}".format(banned_users))
         for uid in banned_users:
             if uid in banned_user_id_to_usermetadata:
                 user_ban_metadata = banned_user_id_to_usermetadata[uid]
@@ -123,8 +123,6 @@ class ModeratorExperimentController(ExperimentController):
                 banned_user_id_to_usermetadata[uid] = user_ban_metadata
                 self.db_session.add(user_ban_metadata)
 
-            ##self.log.info("update_and_archive_user_metadata: name={0}, banned_user_id_to_usermetadata={1}".format(
-            ##    name, {name: banned_user_id_to_usermetadata[name].field_value for name in banned_user_id_to_usermetadata}))
         self.db_session.commit()
         return banned_user_id_to_usermetadata
 
@@ -144,10 +142,11 @@ class ModeratorExperimentController(ExperimentController):
         # get banned users from mod actions on shadow subreddit, if mod actions within experiment time
         # {user id: praw.objects.ModAction}
         # need to preserve multiple mod actions on same user
-        banactions = [action for action in instance.mod_actions if action.action == BAN_USER_STR]
-        all_banned_users = [action.target_fullname.strip("t2_") for action in banactions if
+        banactions = [action for action in instance.mod_actions if action.action == BAN_USER_STR and 
             datetime.datetime.fromtimestamp(action.created_utc) >= self.experiment.start_time and 
             datetime.datetime.fromtimestamp(action.created_utc) <= self.experiment.end_time]
+        all_banned_users = [action.target_fullname.replace("t2_", "") for action in banactions]
+
         banned_users_set = set(all_banned_users)
         banned_user_id_to_usermetadata_main = self.get_existing_banned_user_id_to_usermetadata(self.subreddit_id, all_banned_users)
 
@@ -158,8 +157,8 @@ class ModeratorExperimentController(ExperimentController):
             ) # stores UserMetadata records
 
         # get {user id: modaction} dict from this observation period's mod_actions instance.mod_actions
-        banned_users_shadow_dict = {action.target_fullname.strip("t2_"): action for action in banactions if 
-            action.target_fullname.strip("t2_") in banned_users_set}
+        banned_users_shadow_dict = {action.target_fullname.replace("t2_", ""): action for action in banactions if 
+            action.target_fullname.replace("t2_", "") in banned_users_set}
 
         self.log.info("all_banned_users: {0}".format(all_banned_users))        
         self.log.info("banned_users_shadow_dict: {0}".format(banned_users_shadow_dict))        
@@ -204,10 +203,12 @@ class ModeratorExperimentController(ExperimentController):
 
     # archives user objects 
     def archive_user_records(self, banned_user_id_to_modaction):
-        existing_user_ids = set([])
+        self.log.info("archive_user_records banned_user_id_to_modaction keys: {0}".format(list(banned_user_id_to_modaction.keys())))
+        existing_user_ids = {}
         if len(banned_user_id_to_modaction) > 0:
             existing_user_ids = {user.id: user for user in self.db_session.query(User).filter(
-                User.id.in_(banned_user_id_to_modaction))}
+                User.id.in_(banned_user_id_to_modaction)).all()}
+        self.log.info("existing_user_ids keys: {0}".format(list(existing_user_ids.keys())))
 
         # list of userids
         to_archive_user_ids = [uid for uid in banned_user_id_to_modaction if uid not in existing_user_ids]
@@ -262,15 +263,15 @@ class ModeratorExperimentController(ExperimentController):
     ###      event hook on shadow subreddit look ing for mod actions
     ###      upon finding a banned user on shadow subreddit, look for all mod actions on main subreddit
     def update_experiment(self, instance):
-        ##self.log.info("IN UPDATE_EXPERIMENT; instance.subreddit_name={0}, self.shadow_subreddit={1}, instance.mod_actions={2}".format(
-        ##    instance.subreddit_name,
-        ##    self.shadow_subreddit,
-        ##    instance.mod_actions
-        ##    ))
+        self.log.info("IN UPDATE_EXPERIMENT; instance.subreddit_name={0}, self.shadow_subreddit={1}, instance.mod_actions={2}".format(
+            instance.subreddit_name,
+            self.shadow_subreddit,
+            instance.mod_actions
+            ))
         
         # make sure to only run this callback only if the ModeratorController instance 
         # is fetching mod actions for this experiment's shadow subreddit 
-        if instance.subreddit_name != self.shadow_subreddit or len(instance.mod_actions) == 0:    
+        if instance.subreddit_name != self.shadow_subreddit:
             return
 
         # OTHER TASKS TO TRIGGER
@@ -281,7 +282,7 @@ class ModeratorExperimentController(ExperimentController):
         banned_user_id_to_modaction = self.get_eligible_users_and_archive_mod_actions(instance)
 
 
-        ##self.log.info("IN UPDATE_EXPERIMENT; banned_user_id_to_modaction={0}".format(banned_user_id_to_modaction))
+        self.log.info("IN UPDATE_EXPERIMENT; banned_user_id_to_modaction={0}".format(banned_user_id_to_modaction))
 
         # store User records
         banned_user_to_modaction = self.archive_user_records(banned_user_id_to_modaction)

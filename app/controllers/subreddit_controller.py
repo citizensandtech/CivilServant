@@ -119,7 +119,7 @@ class SubredditPageController:
         if not queried_post:
             new_post = Post(
                     id = post_info['id'],
-                    subreddit_id = post_info['subreddit_id'].strip("t5_"), # janky
+                    subreddit_id = post_info['subreddit_id'].replace("t5_", ""), # janky
                     created = datetime.datetime.fromtimestamp(post_info['created_utc']),        
                     post_data = json.dumps(post_info))
             self.db_session.add(new_post)

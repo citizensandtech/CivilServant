@@ -1,8 +1,8 @@
 test:
-  subreddit: natematias
-  subreddit_id: 3940b
-  shadow_subreddit: CivilServantBot2
-  shadow_subreddit_id: 3n1tq
+  subreddit: CivilServantBot2
+  subreddit_id: 3n1tq
+  shadow_subreddit: natematias
+  shadow_subreddit_id: 3940b
   username: CivilServantBot
   conditions: 
     main:
@@ -21,9 +21,9 @@ test:
               pm_text: Hello, this is the message for arm 2 of the 1st condition (temp ban).
               duration: 7
   controller: ModUserExperimentController
-  start_time: 06/25/2016 00:00:00 UTC
+  start_time: 08/16/2015 00:00:00 UTC
   end_time: 12/30/2020 23:59:59 UTC
-  max_ban_duration: 7
+  max_ban_duration: 1
   event_hooks:
     treat_first_time_banned:
       is_active: True
@@ -35,10 +35,10 @@ test:
       callee_method: update_experiment
 
 development:
-  subreddit: natematias
-  subreddit_id: 3940b
-  shadow_subreddit: CivilServantBot2
-  shadow_subreddit_id: 3n1tq
+  subreddit: CivilServantBot2
+  subreddit_id: 3n1tq
+  shadow_subreddit: natematias
+  shadow_subreddit_id: 3940b
   username: CivilServantBot
   conditions: 
     main:
@@ -46,17 +46,20 @@ development:
         next_randomization: 0 
         arms:
             arm_0: null
-            arm_1: |
-                This is arm 1 of the 1st condition. perma ban
-                ... 
-                #######
-            arm_2: |
-                temp ban
-                ...
-                #######
+            arm_1: 
+              reason_text: This is arm 1 of the 1st condition (perma ban)
+              pm_subject: PM Subject Line (perma ban) 
+              pm_text: Hello, this is the message for arm 1 of the 1st condition (perma ban).
+              duration: null
+            arm_2: 
+              reason_text: This is arm 2 of the 1st condition (temp ban)
+              pm_subject: PM Subject Line (temp ban)
+              pm_text: Hello, this is the message for arm 2 of the 1st condition (temp ban).
+              duration: 7
   controller: ModUserExperimentController
-  start_time: 06/25/2016 00:00:00 UTC
+  start_time: 08/16/2015 00:00:00 UTC
   end_time: 12/30/2020 23:59:59 UTC
+  max_ban_duration: 1
   event_hooks:
     treat_first_time_banned:
       is_active: True
