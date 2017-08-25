@@ -1,7 +1,8 @@
 import pytest
 import os
 from mock import Mock, patch
-import simplejson as json
+#import simplejson as json
+import json
 import sqlalchemy
 from sqlalchemy import create_engine, func, or_
 from sqlalchemy.orm import sessionmaker
@@ -33,7 +34,7 @@ db_session = DbEngine(os.path.join(TEST_DIR, "../", "config") + "/{env}.json".fo
 log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
 def clear_all_tables():
-    db_session.rollback()
+    db_session.query(EventHook).delete()
     db_session.query(FrontPage).delete()
     db_session.query(SubredditPage).delete()
     db_session.query(Subreddit).delete()
@@ -321,6 +322,7 @@ def test_archive_all_missing_subreddit_post_comments(mock_submission, mock_reddi
     assert dbpost.comments_queried_at == None
 
 ### this test doesn't pass right now. not related to twitter/lumen code
+### this test may have been deleted at some point? 
 @patch('praw.Reddit', autospec=True)
 def test_archive_last_thousand_comments(mock_reddit):
     r = mock_reddit.return_value
@@ -599,6 +601,7 @@ def test_archive_lumen_notices(mock_LumenConnect):
 
     topics = ["Copyright"]
 
+
     date = datetime.datetime(2017, 6, 1, 0, 0) # 0 notices
     lumen.archive_lumen_notices(topics, date)
     assert len(db_session.query(LumenNotice).all()) == 0
@@ -785,7 +788,6 @@ def test_archive_old_users(mock_TwitterConnect, mock_twitter_api, mock_twitter_e
     key_to_user_A = {u.id: u for u in users if u.id == user_A_id}
     key_to_user_B =  {u.screen_name: u for u in users if u.id == user_B_not_found_id} 
 
-
     ####################################################################
 
     # user A.1: has id before, find id again
@@ -933,7 +935,6 @@ def test_archive_user_tweets(mock_TwitterConnect, mock_twitter_api):
     tc.api = api
     patch('twitter.')
     patch('app.connections.twitter_connect.')
-
     
     assert len(db_session.query(TwitterStatus).all()) == 0
 

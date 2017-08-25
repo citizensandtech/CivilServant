@@ -7,7 +7,11 @@ os.environ['CS_ENV'] = ENV
 BASE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..")
 sys.path.append(BASE_DIR)
 
+<<<<<<< HEAD
 from utils.common import PageType, ThingType, TwitterUserState
+=======
+from utils.common import PageType, ThingType
+>>>>>>> 7ac23d957d071e0160eb3f53fdfe101338ac0914
 
 with open(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV), "r") as config:
   DBCONFIG = json.loads(config.read())
@@ -196,8 +200,8 @@ def generate_reddit_front_page(today=datetime.datetime.utcnow(), days=7):
     result = run_query_for_days(query_str, today, days=days)
     result = [(PageType(a).name, b, c, d, e) for (a,b,c,d,e) in result]
     return generate_days_html_table(result, 
-                               str_to_date(date_to_str(today)), 
-                               "New FrontPage count, by pagetype")  # to make everything 00:00:00 
+        str_to_date(date_to_str(today)), 
+        "New FrontPage count, by pagetype")  # to make everything 00:00:00 
 
 
 def generate_reddit_subreddit_page(today=datetime.datetime.utcnow(), days=7):
@@ -437,10 +441,10 @@ def generate_twitter_statuses_simple_counts():
         "TwitterStatuses counts")
 
 
-##### TOO EXPENSIVE.... probably not worth doing.
-query_str = """SELECT YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
-FROM twitter_statuses WHERE record_created_at <= "2017-07-19" and record_created_at >= "2017-07-05" 
-GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);"""
+# ##### TOO EXPENSIVE.... probably not worth doing.
+# query_str = """SELECT YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
+# FROM twitter_statuses WHERE record_created_at <= "2017-07-19" and record_created_at >= "2017-07-05" 
+# GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);"""
 
 
 
@@ -633,10 +637,8 @@ def generate_twitter_report(today=datetime.datetime.utcnow(), days=7):
 
 if __name__ == "__main__":
     today = datetime.datetime.utcnow() # str_to_date("2016-08-26 23:59:59", by_day=False)
-    
     html = generate_report(today, days=7)
     toaddrs = EMAIL_CONFIG["toaddrs"]    
     send_db_report(toaddrs, today, html)
 
-    print(html)
-
+    #print(html)

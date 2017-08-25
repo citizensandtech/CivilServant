@@ -1,0 +1,4 @@
+{
+  "fromaddr": "from_address@example.com",
+  "toaddrs": ["to_address@example.com"]
+}

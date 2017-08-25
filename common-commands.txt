@@ -16,6 +16,7 @@ export CS_ENV=development
 ## Reddit API queries:
 ## CivilServant requires praw-multiprocess
 ## which is kept up via supervise
+## make sure you have a praw.ini
 supervise prawserver
 ## or alternatively
 praw-multiprocess
@@ -30,6 +31,14 @@ rq worker <<development, production>>
 ## Scheduling is handled with rqscheduler
 ## which needs to be kept running
 rqscheduler
+
+## TO RUN CivilServantBot2
+## export CS_ENV=CivilServantBot2
+## rq worker CivilServantBot2
+
+## TO CHANGE THE QUEUE TIMEOUT
+## 3venv/lib/python3.5/site-packages/rq/queue.py
+## DEFAULT_TIMEOUT = 600 (originally 180)
 
 ##### DEVELOPMENT PROCESS #####
 
@@ -51,8 +60,6 @@ alembic downgrade -1
 # export CS_ENV=all
 alembic revision --autogenerate -m "MESSAGE"
 
-
-
 ##### MONITORING STATUS #####
 
 ## Monitoring the redis-queue
@@ -65,7 +72,6 @@ civilservant-error-handler.herokuapp.com
 ./logs
 
 
-
 #### SUMMARY: COMMANDS TO RUN WHEN STARTING UP #####
 
 redis-server &
@@ -74,3 +80,8 @@ praw-multiprocess &
 rqscheduler &
 
 (rq-dashboard &)
+
+
+## INITIATE A STICKY COMMENT EXPERIMENT
+import app.controller
+app.controller.initialize_sticky_comment_experiment("experiment_file_name") #omit yml
