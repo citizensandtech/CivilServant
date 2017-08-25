@@ -20,7 +20,7 @@ import utils
 from utils.common import CS_JobState
 
 ### LOAD THE CLASSES TO TEST
-from app.models import Base, FrontPage, SubredditPage, Subreddit, Post, ModAction, Comment, User, LumenNotice, LumenNoticeToTwitterUser, TwitterUser, TwitterStatus, TwitterUserSnapshot
+from app.models import *
 import app.cs_logger
 
 ## SET UP THE DATABASE ENGINE
@@ -30,6 +30,7 @@ BASE_DIR  = os.path.join(TEST_DIR, "../")
 ENV = os.environ['CS_ENV'] ="test"
 
 db_session = DbEngine(os.path.join(TEST_DIR, "../", "config") + "/{env}.json".format(env=ENV)).new_session()
+log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
 def clear_all_tables():
     db_session.rollback()
@@ -62,7 +63,6 @@ def test_archive_reddit_front_page(mock_subreddit, mock_reddit):
     ## I should just be mocking the reddit API
 
     r = mock_reddit.return_value
-    log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
     with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
         sub_data = json.loads(f.read())['data']['children']
@@ -110,7 +110,6 @@ def test_archive_subreddit_page(mock_subreddit, mock_reddit):
     test_subreddit_id = "mouw"
 
     r = mock_reddit.return_value
-    log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
     # with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
     #     sub_data = json.loads(f.read())['data']['children']
@@ -167,7 +166,6 @@ def test_archive_subreddit(mock_subreddit, mock_reddit):
     test_subreddit_id = "mouw"
 
     r = mock_reddit.return_value
-    log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
     mock_subreddit.display_name = test_subreddit_name
     mock_subreddit.id = test_subreddit_id  
@@ -203,7 +201,6 @@ def test_archive_post(mock_reddit):
 
     r = mock_reddit.return_value
     test_subreddit_name = "science"
-    log = app.cs_logger.get_logger(ENV, BASE_DIR)
     patch('praw.')
 
     assert len(db_session.query(Post).all()) == 0
@@ -236,7 +233,6 @@ def test_fetch_post_comments(mock_submission, mock_reddit):
     mock_submission.comments = post_comments
     mock_submission.num_comments = len(post_comments)
     r.get_submission.return_value = mock_submission
-    log = app.cs_logger.get_logger(ENV, BASE_DIR)
     patch('praw.')
 
     ## ADD THE FIXTURE POST TO THE DATABASE
@@ -269,7 +265,6 @@ def test_archive_all_missing_subreddit_post_comments(mock_submission, mock_reddi
 
     ## SET UP MOCKS 
     r = mock_reddit.return_value
-    log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
     ## TO START, LOAD POST FIXTURES
     post_fixture_names = ["post.json", "post2.json"]
@@ -329,7 +324,6 @@ def test_archive_all_missing_subreddit_post_comments(mock_submission, mock_reddi
 @patch('praw.Reddit', autospec=True)
 def test_archive_last_thousand_comments(mock_reddit):
     r = mock_reddit.return_value
-    log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
     
     subreddit_name = "science"
@@ -402,7 +396,6 @@ def test_archive_last_thousand_comments(mock_reddit):
 @patch('praw.Reddit', autospec=True)
 def test_archive_mod_action_page(mock_reddit):
     r = mock_reddit.return_value
-    log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
     ## TO START, LOAD MOD ACTION FIXTURES
     mod_action_fixtures = []
@@ -466,7 +459,6 @@ def test_fetch_post_comments(mock_submission, mock_reddit):
     mock_submission.comments = post_comments
     mock_submission.num_comments = len(post_comments)
     r.get_submission.return_value = mock_submission
-    log = app.cs_logger.get_logger(ENV, BASE_DIR)
     patch('praw.')
 
     ## ADD THE FIXTURE POST TO THE DATABASE
@@ -498,7 +490,6 @@ def test_archive_all_missing_subreddit_post_comments(mock_submission, mock_reddi
 
     ## SET UP MOCKS 
     r = mock_reddit.return_value
-    log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
     ## TO START, LOAD POST FIXTURES
     post_fixture_names = ["post.json", "post2.json"]
@@ -562,7 +553,6 @@ def test_archive_user(mock_reddit):
 
   r = mock_reddit.return_value
   test_subreddit_name = "science"
-  log = app.cs_logger.get_logger(ENV, BASE_DIR)
   patch('praw.')
 
   assert len(db_session.query(User).all()) == 0
@@ -605,7 +595,6 @@ def test_archive_lumen_notices(mock_LumenConnect):
 
     assert len(db_session.query(LumenNotice).all()) == 0
     
-    log = app.cs_logger.get_logger(ENV, BASE_DIR)
     lumen = app.controllers.lumen_controller.LumenController(db_session, lc, log)
 
     topics = ["Copyright"]
@@ -642,7 +631,6 @@ def mocked_requests_get(url):
 
 @patch('requests.get', side_effect=mocked_requests_get)
 def test_helper_parse_url_for_username(mock_get):
-    log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
     test_cases = [
         ("https://twitter.com/sooos243/status/852942353321140224", "sooos243"),
@@ -669,7 +657,6 @@ def test_parse_notices_archive_users(mock_LumenConnect, mock_get):
 
     assert len(db_session.query(LumenNoticeToTwitterUser).all()) == 0
     
-    log = app.cs_logger.get_logger(ENV, BASE_DIR)
     lumen = app.controllers.lumen_controller.LumenController(db_session, lc, log)
 
     with open("{script_dir}/fixture_data/anon_lumen_notices_0.json".format(script_dir=TEST_DIR)) as f:
@@ -712,7 +699,6 @@ def test_archive_new_users(mock_TwitterConnect, mock_twitter_api, mock_twitter_e
     
     assert len(db_session.query(TwitterUser).all()) == 0
 
-    log = app.cs_logger.get_logger(ENV, BASE_DIR)
     twitter = app.controllers.twitter_controller.TwitterController(db_session, tc, log)
 
     with open("{script_dir}/fixture_data/anon_twitter_username_list.json".format(script_dir=TEST_DIR)) as f:
@@ -764,7 +750,6 @@ def test_archive_old_users(mock_TwitterConnect, mock_twitter_api, mock_twitter_e
     assert len(db_session.query(TwitterUser).all()) == 0
     assert len(db_session.query(TwitterUserSnapshot).all()) == 0
 
-    log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
     now = datetime.datetime.utcnow()
 
@@ -952,7 +937,6 @@ def test_archive_user_tweets(mock_TwitterConnect, mock_twitter_api):
     
     assert len(db_session.query(TwitterStatus).all()) == 0
 
-    log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
 
     t_controller = app.controllers.twitter_controller.TwitterController(db_session, tc, log)
@@ -1015,7 +999,6 @@ def test_query_and_archive_user_snapshots_and_tweets(mock_TwitterConnect, mock_t
 
     assert len(db_session.query(TwitterUser).all()) == 0
 
-    log = app.cs_logger.get_logger(ENV, BASE_DIR)
     twitter = app.controllers.twitter_controller.TwitterController(db_session, tc, log)
 
     with open("{script_dir}/fixture_data/twitter_username_list.json".format(script_dir=TEST_DIR)) as f:
