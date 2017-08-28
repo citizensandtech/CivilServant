@@ -206,6 +206,7 @@ class TwitterObservationalAnalysisController:
     def get_users_to_snapshots(self):
         twitter_users_to_snapshots = {} # {user_id: [snapshot]}
         num_snapshots = 0
+
         for uid in self.user_ids_to_not_found_ids:
             snapshots = self.db_session.query(TwitterUserSnapshot).filter(
                 or_(TwitterUserSnapshot.twitter_user_id == uid,
@@ -215,6 +216,7 @@ class TwitterObservationalAnalysisController:
 
             for snapshot in snapshots:
                 if snapshot.twitter_user_id and snapshot.twitter_not_found_id and snapshot.twitter_user_id != snapshot.twitter_not_found_id:
+                    # if we found a "found id" that we didn't know of before
                     if snapshot.twitter_not_found_id==uid and NOT_FOUND_TWITTER_USER_STR in uid:
                         # only 2 class attributes that are set before get_users_to_snapshots is run:
                         self.user_ids_to_not_found_ids.pop(uid, None)
@@ -225,16 +227,19 @@ class TwitterObservationalAnalysisController:
 
                         uid = snapshot.twitter_user_id
 
+                    # else...    
                     elif snapshot.twitter_user_id==uid:
                         if self.user_ids_to_not_found_ids[uid] is not None and self.user_ids_to_not_found_ids[uid] != snapshot.twitter_not_found_id:
                             self.log.info("Unexpected multiple-id-switches= uid: {0}, not_found: {1}, new_not_found: {2}".format(
                                 uid, self.user_ids_to_not_found_ids[uid], snapshot.twitter_not_found_id))
+
+                        # update self.user_ids_to_not_found_ids 
                         self.user_ids_to_not_found_ids[uid] = snapshot.twitter_not_found_id
                         # and this doesn't change self.twitter_users_to_notice_dates keys
 
+
             twitter_users_to_snapshots[uid] = snapshots
             num_snapshots += len(snapshots)
-
         self.log.info("Retrieved {0} TwitterUserSnapshot.".format(num_snapshots))
         return twitter_users_to_snapshots
 
@@ -283,7 +288,7 @@ class TwitterObservationalAnalysisController:
                 # look for media entities
                 # https://dev.twitter.com/overview/api/entities-in-twitter-objects
                 status_data_json = json.loads(tweet.status_data)
-                if "entities" in status_data_json and "media" in status_data_json["entities"]:
+                if "entities" in status_data_json and status_data_json["entities"] is not None and "media" in status_data_json["entities"]:
                     twitter_users_day_nums[uid][day_num]["num_media_tweets"] += 1                    
 
             # suspended, deleted, protected
@@ -322,7 +327,7 @@ class TwitterObservationalAnalysisController:
                 qualifying_user_ids.add(uid)
             else:
                 # not best design...
-                self.user_ids_to_not_found_ids.pop(uid, None) 
+                self.user_ids_to_not_found_ids.pop(uid, None)
 
             if (prune and uid in qualifying_user_ids) or (not prune):
                 # prune this_day_nums so that aggregate calculations are accurate
@@ -444,6 +449,8 @@ class TwitterObservationalAnalysisController:
                 
                 self.tweet_day_dataframe[uid][i] = this_user_tweet_day
 
+
+
 ################################################
 ############## basic_profiling
 ################################################
@@ -453,6 +460,8 @@ def append_to_csv(fname, row):
     with open(fname, "a") as f:
         f.write(",".join(row) + "\n")
 
+
+# mostly an adhoc thing. not going to test
 class TwitterBasicProfilingController:
     def __init__(self, output_dir, db_session, log):
          self.output_dir = output_dir

@@ -21,7 +21,7 @@ def teardown_function(function):
 @patch('app.connections.lumen_connect.LumenConnect', autospec=True)
 def test_archive_lumen_notices(mock_LumenConnect):
     lc = mock_LumenConnect.return_value
-    with open("{script_dir}/fixture_data/lumen_notices_0.json".format(script_dir=TEST_DIR)) as f:
+    with open("{script_dir}/fixture_data/anon_lumen_notices_0.json".format(script_dir=TEST_DIR)) as f:
         data = f.read()
         lc.get_notices_to_twitter.return_value = json.loads(data)
     patch('app.connections.lumen_connect.')

@@ -173,7 +173,7 @@ class TwitterController():
                 this_users = user_names[prev_limit:limit]
                 users_info = []
                 try:
-                    users_info = self.t.api.UsersLookup(screen_name=this_users)
+                    users_info = self.t.query(self.t.api.UsersLookup,screen_name=this_users)
                 except twitter.error.TwitterError as e:
                     failed_users.update(this_users)
                     self.log.error("Failed to query for {0} Twitter users using api.UsersLookup: {1}".format(limit-prev_limit, str(e)))
@@ -303,7 +303,7 @@ class TwitterController():
     def is_user_suspended_or_deleted(self, username):
         user_state = TwitterUserState.NOT_FOUND
         try:
-            user = self.t.api.GetUser(screen_name=username)
+            user = self.t.query(self.t.api.GetUser,screen_name=username)
         except twitter.error.TwitterError as e:
             if e.message[0]['code'] == 50 and e.message[0]['message'] == 'User not found.':
                 user_state = TwitterUserState.NOT_FOUND
@@ -385,9 +385,9 @@ class TwitterController():
                     self.log.error("Caught error where this_users is too long??? : len(this_users) = {0}".format(len(this_users)))
                 try:
                     if has_ids:
-                        users_info = self.t.api.UsersLookup(user_id=this_users)
+                        users_info = self.t.query(self.t.api.UsersLookup,user_id=this_users)
                     else:
-                        users_info = self.t.api.UsersLookup(screen_name=this_users)
+                        users_info = self.t.query(self.t.api.UsersLookup,screen_name=this_users)
                 except twitter.error.TwitterError as e:
                     # this message means no users_info found: "[{'code': 17, 'message': 'No user matches for specified terms.'}]"
                     if e.message[0]['code'] != 17:

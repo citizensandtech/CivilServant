@@ -16,6 +16,7 @@ class ThingType(Enum):
     COMMENT = 2
     SUBREDDIT = 3
     USER = 4
+    STYLESHEET = 5    
 
 # not formalized...
 class TwitterUserState(Enum):
@@ -39,7 +40,6 @@ def generate_not_found_twitter_user_id(screen_name=""):
         capped_screen_name, 
         time_since_epoch_ms(datetime.datetime.utcnow())
         )
-
 
 def update_all_CS_JobState(row_to_state, field, db_session, log):
     if len(row_to_state) == 0:
@@ -73,6 +73,11 @@ def update_CS_JobState(rows, field, to_state, db_session, log):
 class ParseUsernameSuspendedUserFound(Exception):
     pass
 
+
+class EventWhen(Enum):
+    BEFORE = 1
+    AFTER = 2
+
 class DbEngine:
     def __init__(self, config_path):
         self.config_path = config_path
@@ -88,7 +93,7 @@ class DbEngine:
             host = DBCONFIG['host'],
             user = DBCONFIG['user'],
             password = DBCONFIG['password'],
-            database = DBCONFIG['database']))
+            database = DBCONFIG['database']), pool_recycle=3600)
 
         Base.metadata.bind = db_engine
         DBSession = sessionmaker(bind=db_engine)
