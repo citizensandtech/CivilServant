@@ -194,10 +194,11 @@ class TwitterObservationalAnalysisController:
             uid = ntu.twitter_user_id
 
             # remove None because that means 
-            if uid not in twitter_users_to_notice_dates:
+            if uid is not None:
+              if uid not in twitter_users_to_notice_dates:
                 twitter_users_to_notice_dates[uid] = []
-            notice_date = notice_id_to_date[ntu.notice_id]
-            twitter_users_to_notice_dates[uid].append(notice_date)
+              notice_date = notice_id_to_date[ntu.notice_id]
+              twitter_users_to_notice_dates[uid].append(notice_date)
 
         self.log.info("Retrieved {0} TwitterUser.".format(len(twitter_users_to_notice_dates)))        
         return twitter_users_to_notice_dates
@@ -245,6 +246,7 @@ class TwitterObservationalAnalysisController:
 
         num_tweets = 0
         for (i, uid) in enumerate(this_uids):
+            self.log.info(uid)
             tweets = self.db_session.query(TwitterStatus).filter(
                 or_(TwitterStatus.user_id == uid,
                     TwitterStatus.user_id == self.user_ids_to_not_found_ids[uid])).all()
