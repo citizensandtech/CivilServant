@@ -13,6 +13,7 @@ import app.controllers.comment_controller
 import app.controllers.moderator_controller
 import app.controllers.lumen_controller
 import app.controllers.twitter_controller
+import app.connections.twitter_connect
 from utils.common import PageType, DbEngine, json2obj, TwitterUserState
 import requests
 import twitter
@@ -684,11 +685,11 @@ def test_parse_notices_archive_users(mock_LumenConnect, mock_get):
 # TODO: currently this test does not test user list with len>90, so as to not call api.UsersLookup more than once, which is difficult to mock
 @patch('twitter.error', autospec=True)
 @patch('twitter.Api', autospec=True)
-@patch('app.connections.twitter_connect.TwitterConnect', autospec=True)
-def test_archive_new_users(mock_TwitterConnect, mock_twitter_api, mock_twitter_error):
-    tc = mock_TwitterConnect.return_value
+def test_archive_new_users(mock_twitter_api, mock_twitter_error):
     api = mock_twitter_api.return_value
     te = mock_twitter_error.return_value
+    tc = app.connections.twitter_connect.TwitterConnect()
+
     with open("{script_dir}/fixture_data/anon_twitter_users.json".format(script_dir=TEST_DIR)) as f:
         data = f.read()
         api.UsersLookup.return_value = json.loads(data)
@@ -741,11 +742,11 @@ def test_archive_new_users(mock_TwitterConnect, mock_twitter_api, mock_twitter_e
 # TODO: currently this test does not test user list with len>90, so as to not call api.UsersLookup more than once, which is difficult to mock
 @patch('twitter.error', autospec=True)
 @patch('twitter.Api', autospec=True)
-@patch('app.connections.twitter_connect.TwitterConnect', autospec=True)
-def test_archive_old_users(mock_TwitterConnect, mock_twitter_api, mock_twitter_error):
-    tc = mock_TwitterConnect.return_value
+def test_archive_old_users(mock_twitter_api, mock_twitter_error):
     api = mock_twitter_api.return_value
     te = mock_twitter_error.return_value
+    tc = app.connections.twitter_connect.TwitterConnect()
+
 
     # for is_user_suspended_or_deleted
     api.GetUser.side_effect = te.TwitterError([{'message': 'User not found.', 'code': 50}])
