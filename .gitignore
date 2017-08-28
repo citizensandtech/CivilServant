@@ -11,6 +11,7 @@ logs/*
 prawserver/supervise
 prawserver/run
 dump.rdb
+.vscode
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
