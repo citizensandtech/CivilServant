@@ -7,11 +7,7 @@ os.environ['CS_ENV'] = ENV
 BASE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..")
 sys.path.append(BASE_DIR)
 
-<<<<<<< HEAD
 from utils.common import PageType, ThingType, TwitterUserState
-=======
-from utils.common import PageType, ThingType
->>>>>>> 7ac23d957d071e0160eb3f53fdfe101338ac0914
 
 with open(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV), "r") as config:
   DBCONFIG = json.loads(config.read())
