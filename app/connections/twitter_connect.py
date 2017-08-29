@@ -107,6 +107,7 @@ class TwitterConnect():
                                access_token_secret = token['oauth_token_secret'])
         try:
             verification = self.api.VerifyCredentials()
+            self.api.InitializeRateLimit()            
         except twitter.error.TwitterError as e:
             self.log.error("Twitter: Failed to connect to API with User ID {0}. Remove from token set. Error: {1}.".format(token['user_id'], str(e)))
             token['valid'] = False

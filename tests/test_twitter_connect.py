@@ -49,6 +49,7 @@ def test_exception_retry(mock_rate_limit, mock_twitter):
     t = mock_twitter.return_value
     t.rate_limit = mock_rate_limit
     t.VerifyCredentials.return_value = True
+    t.InitializeRateLimit.return_value = True
 
     conn = app.connections.twitter_connect.TwitterConnect()
 
