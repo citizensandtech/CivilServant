@@ -16,7 +16,7 @@ def main():
                         help="The subreddit to query (or all for the frontpage)")
 
     parser.add_argument("pagetype",
-                        choices=["new", "top", "contr", "hot", "comments", "modactions"],
+                        choices=["new", "top", "contr", "hot", "comments", "new_modactions", "modactions"],
                         help="For front pages, what page to query")
     parser.add_argument("interval",
                         default = 120, # default 2 minutes
@@ -71,6 +71,15 @@ def main():
                     interval=int(args.interval),
                     repeat=None,
                     result_ttl = ttl)
+        elif(page_type == "new_modactions"):
+            scheduler.schedule(
+                    scheduled_time=datetime.utcnow(),
+                    func=app.controller.fetch_new_mod_actions,
+                    args=[args.sub],
+                    interval=int(args.interval),
+                    repeat=None,
+                    result_ttl = ttl)            
+
         else:
             page_type = getattr(PageType, args.pagetype.upper())
             scheduler.schedule(
