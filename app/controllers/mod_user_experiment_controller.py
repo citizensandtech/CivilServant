@@ -142,14 +142,15 @@ class ModeratorExperimentController(ExperimentController):
         # get banned users from mod actions on shadow subreddit, if mod actions within experiment time
         # {user id: praw.objects.ModAction}
         # need to preserve multiple mod actions on same user
+        
         banactions = [action for action in instance.mod_actions if action.action == BAN_USER_STR and 
             datetime.datetime.fromtimestamp(action.created_utc) >= self.experiment.start_time and 
             datetime.datetime.fromtimestamp(action.created_utc) <= self.experiment.end_time]
         all_banned_users = [action.target_fullname.replace("t2_", "") for action in banactions]
-
+        
         banned_users_set = set(all_banned_users)
         banned_user_id_to_usermetadata_main = self.get_existing_banned_user_id_to_usermetadata(self.subreddit_id, all_banned_users)
-
+        
         # update user metadata records for shadow subreddit
         banned_user_id_to_usermetadata_shadow = self.update_and_archive_user_metadata(
             self.shadow_subreddit_id, all_banned_users, 
@@ -631,18 +632,18 @@ class ModUserExperimentController(ModeratorExperimentController):
         # only 1 condition, so all return True
         return True
 
-    ## CONTROL GROUP
-    def intervene_main_arm_0(self, experiment_thing):
-        self.log.info(">>>Attempting intervene_main_arm_0 control on user {0}, details={1}, description={2}".format(
-            experiment_thing.id,
-            json.loads(experiment_thing.metadata_json)["shadow_modaction"]["details"],
-            json.loads(experiment_thing.metadata_json)["shadow_modaction"]["description"]
-            ))
-        return self.make_control_nonaction(experiment_thing, group="control")
+    ### CONTROL GROUP
+    #def intervene_main_arm_0(self, experiment_thing):
+    #    self.log.info(">>>Attempting intervene_main_arm_0 control on user {0}, details={1}, description={2}".format(
+    #        experiment_thing.id,
+    #        json.loads(experiment_thing.metadata_json)["shadow_modaction"]["details"],
+    #        json.loads(experiment_thing.metadata_json)["shadow_modaction"]["description"]
+    #        ))
+    #    return self.make_control_nonaction(experiment_thing, group="control")
         
     ## TREATMENT GROUP 1: perma ban
-    def intervene_main_arm_1(self, experiment_thing):
-        self.log.info(">>>Attempting intervene_main_arm_1 perma ban on user {0}, details={1}, description={2}".format(
+    def intervene_main_arm_0(self, experiment_thing):
+        self.log.info(">>>Attempting intervene_main_arm_0 perma ban on user {0}, details={1}, description={2}".format(
             experiment_thing.id,
             json.loads(experiment_thing.metadata_json)["shadow_modaction"]["details"],
             json.loads(experiment_thing.metadata_json)["shadow_modaction"]["description"]
@@ -650,8 +651,8 @@ class ModUserExperimentController(ModeratorExperimentController):
         return self.apply_perma_ban(experiment_thing, group="treatment")
 
     ## TREATMENT GROUP 2: temp ban
-    def intervene_main_arm_2(self, experiment_thing):
-        self.log.info(">>>Attempting intervene_main_arm_2 temp ban on user {0}, details={1}, description={2}".format(
+    def intervene_main_arm_1(self, experiment_thing):
+        self.log.info(">>>Attempting intervene_main_arm_1 temp ban on user {0}, details={1}, description={2}".format(
             experiment_thing.id,
             json.loads(experiment_thing.metadata_json)["shadow_modaction"]["details"],
             json.loads(experiment_thing.metadata_json)["shadow_modaction"]["description"]

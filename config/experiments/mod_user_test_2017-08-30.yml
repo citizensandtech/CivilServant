@@ -1,0 +1,34 @@
+development:
+  subreddit: CivilServantBotTest_A
+  subreddit_id: 3o2z6
+  shadow_subreddit: cs_leagueoflegends
+  shadow_subreddit_id: 3o2uq
+  username: CivilServantBot2
+  conditions: 
+    main:
+        randomizations: mod_user_test_2017-08-30.conditions.csv
+        next_randomization: 0 
+        arms:
+            arm_0: 
+              reason_text: This is arm 0 of the 1st condition (perma ban)
+              pm_subject: PM Subject Line (perma ban) 
+              pm_text: Hello, this is the message for arm 0 of the 1st condition (perma ban).
+              duration: null
+            arm_1: 
+              reason_text: This is arm 1 of the 1st condition (temp ban)
+              pm_subject: PM Subject Line (temp ban)
+              pm_text: Hello, this is the message for arm 1 of the 1st condition (temp ban).
+              duration: 1
+  controller: ModUserExperimentController
+  start_time: 08/30/2017 00:35:00 UTC
+  end_time: 12/30/2020 23:59:59 UTC
+  max_ban_duration: 1
+  event_hooks:
+    treat_first_time_banned:
+      is_active: True
+      call_when: EventWhen.AFTER
+      caller_controller: ModeratorController
+      caller_method: archive_mod_action_history_with_event_hooks
+      callee_module: app.controllers.mod_user_experiment_controller
+      callee_controller: ModUserExperimentController
+      callee_method: update_experiment
