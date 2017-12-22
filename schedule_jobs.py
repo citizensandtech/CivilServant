@@ -41,6 +41,7 @@ def main():
     timeout_seconds = 172800 ## two days in seconds
     if(timeout_seconds <= int(args.interval) + 3600):
         timeout_seconds = int(args.interval) + 3600
+    ttl = int(args.interval) + 180
 
     if(args.sub =="all"):
         page_type = getattr(PageType, args.pagetype.upper())
@@ -50,7 +51,8 @@ def main():
                 args=[page_type],
                 interval=int(args.interval),
                 repeat=None,
-                timeout = timeout_seconds)
+                timeout = timeout_seconds,
+                result_ttl = ttl)
     else:
         if(page_type == "comments"):
             scheduler.schedule(
@@ -59,7 +61,8 @@ def main():
                     args=[args.sub],
                     interval=int(args.interval),
                     repeat=None,
-                    timeout = timeout_seconds)
+                    timeout = timeout_seconds,
+                    result_ttl = ttl)
         elif(page_type == "modactions"):
             scheduler.schedule(
                     scheduled_time=datetime.utcnow(),
@@ -67,7 +70,8 @@ def main():
                     args=[args.sub],
                     interval=int(args.interval),
                     repeat=None,
-                    timeout = timeout_seconds)
+                    timeout = timeout_seconds,
+                    result_ttl = ttl)
         else:
             page_type = getattr(PageType, args.pagetype.upper())
             scheduler.schedule(
@@ -76,7 +80,8 @@ def main():
                     args=[args.sub, page_type],
                     interval=int(args.interval),
                     repeat=None,
-                    timeout = timeout_seconds)
+                    timeout = timeout_seconds,
+                    result_ttl = ttl)
 
 if __name__ == '__main__':
     main()
