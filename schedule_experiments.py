@@ -39,9 +39,9 @@ def main():
     scheduler = Scheduler(queue_name = os.environ['CS_ENV'], connection=Redis())
 
 
-    ttl = 172800 ## two days in seconds
-    if(ttl <= int(args.interval) + 3600):
-        ttl = int(args.interval) + 3600
+    timeout_seconds = 172800 ## two days in seconds
+    if(timeout_seconds <= int(args.interval) + 3600):
+        timeout_seconds = int(args.interval) + 3600
 
     experiment_file = os.path.join(BASE_DIR, "config", "experiments") + "/" + args.experiment + ".yml"
     if(os.path.isfile(experiment_file) == False):
@@ -56,7 +56,7 @@ def main():
                 args=[args.experiment],
                 interval=int(args.interval),
                 repeat=None,
-                result_ttl = ttl)
+                timeout = timeout_seconds)
     elif(args.job == "tidy"):
         scheduler.schedule(
                 scheduled_time=datetime.utcnow(),
@@ -64,7 +64,7 @@ def main():
                 args=[args.experiment],
                 interval=int(args.interval),
                 repeat=None,
-                result_ttl = ttl)
+                timeout = timeout_seconds)
     elif(args.job == "archive_submissions"):
         scheduler.schedule(
                 scheduled_time=datetime.utcnow(),
@@ -72,7 +72,7 @@ def main():
                 args=[args.experiment],
                 interval=int(args.interval),
                 repeat=None,
-                result_ttl = ttl)
+                timeout = timeout_seconds)
 
 if __name__ == '__main__':
     main()
