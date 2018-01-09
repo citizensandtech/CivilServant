@@ -12,3 +12,5 @@ log_requests = 1
 default_content_limit = 1000
 domain = www.reddit.com
 ssl_domain =  www.reddit.com
+
+store_json_result = True
