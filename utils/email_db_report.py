@@ -161,9 +161,11 @@ def generate_reddit_front_page(today=datetime.datetime.utcnow(), days=7):
 
 def generate_reddit_subreddit_page(today=datetime.datetime.utcnow(), days=7):
     query_str = """
-        SELECT subreddit_id, page_type, YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) 
-        FROM subreddit_pages WHERE created_at <= :to_date and created_at >= :from_date 
-        GROUP BY subreddit_id, page_type, YEAR(created_at), MONTH(created_at), DAY(created_at)"""
+        SELECT sr.name, srp.page_type, YEAR(srp.created_at), MONTH(srp.created_at), DAY(srp.created_at), count(*) 
+        FROM subreddit_pages srp
+        JOIN subreddits sr ON sr.id = srp.subreddit_id
+        WHERE srp.created_at <= :to_date and srp.created_at >= :from_date 
+        GROUP BY sr.name, srp.page_type, YEAR(srp.created_at), MONTH(srp.created_at), DAY(srp.created_at)"""
     result = run_query_for_days(query_str, today, days=days)
     result = [("({0}, {1})".format(a, PageType(b).name), c, d, e, f) for (a,b,c,d,e,f) in result]
     return generate_html_table(result, 
@@ -183,9 +185,11 @@ def generate_reddit_subreddit(today=datetime.datetime.utcnow(), days=7):
 
 def generate_reddit_post(today=datetime.datetime.utcnow(), days=7):
     query_str = """
-        SELECT subreddit_id, YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) 
-        FROM posts WHERE created_at <= :to_date and created_at >= :from_date 
-        GROUP BY subreddit_id, YEAR(created_at), MONTH(created_at), DAY(created_at)"""
+        SELECT sr.name, YEAR(p.created_at), MONTH(p.created_at), DAY(p.created_at), count(*) 
+        FROM posts p
+        JOIN subreddits sr ON sr.id = p.subreddit_id
+        WHERE p.created_at <= :to_date and p.created_at >= :from_date 
+        GROUP BY sr.name, YEAR(p.created_at), MONTH(p.created_at), DAY(p.created_at)"""
     result = run_query_for_days(query_str, today, days=days)
     return generate_html_table(result, 
                                str_to_date(date_to_str(today)), 
@@ -193,9 +197,11 @@ def generate_reddit_post(today=datetime.datetime.utcnow(), days=7):
 
 def generate_reddit_comment(today=datetime.datetime.utcnow(), days=7):
     query_str = """
-        SELECT subreddit_id, YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) 
-        FROM comments WHERE created_at <= :to_date and created_at >= :from_date 
-        GROUP BY subreddit_id, YEAR(created_at), MONTH(created_at), DAY(created_at)"""
+        SELECT sr.name, YEAR(c.created_at), MONTH(c.created_at), DAY(c.created_at), count(*) 
+        FROM comments c
+        JOIN subreddits sr ON sr.id = c.subreddit_id
+        WHERE c.created_at <= :to_date and c.created_at >= :from_date 
+        GROUP BY sr.name, YEAR(c.created_at), MONTH(c.created_at), DAY(c.created_at)"""
     result = run_query_for_days(query_str, today, days=days)
     return generate_html_table(result, 
                                str_to_date(date_to_str(today)), 
@@ -214,9 +220,11 @@ def generate_reddit_user(today=datetime.datetime.utcnow(), days=7):
 
 def generate_reddit_mod_action(today=datetime.datetime.utcnow(), days=7):
     query_str = """
-        SELECT subreddit_id, YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) 
-        FROM mod_actions WHERE created_at <= :to_date and created_at >= :from_date 
-        GROUP BY subreddit_id, YEAR(created_at), MONTH(created_at), DAY(created_at)"""
+        SELECT sr.name, YEAR(ma.created_at), MONTH(ma.created_at), DAY(ma.created_at), count(*) 
+        FROM mod_actions ma
+        JOIN subreddits sr ON sr.id = ma.subreddit_id
+        WHERE ma.created_at <= :to_date and ma.created_at >= :from_date 
+        GROUP BY sr.name, YEAR(ma.created_at), MONTH(ma.created_at), DAY(ma.created_at)"""
     result = run_query_for_days(query_str, today, days=days)
     return generate_html_table(result, 
                                str_to_date(date_to_str(today)), 
