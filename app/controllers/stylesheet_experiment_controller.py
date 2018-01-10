@@ -116,6 +116,9 @@ class StylesheetExperimentController:
                 last_experiment_created = last_experiment_action.created_at.replace(tzinfo=pytz.utc)
                 interval_since_last_action = (current_time - last_experiment_created).total_seconds()
                 eligible = ((interval_since_last_action < self.experiment_settings['intervention_interval_seconds'] + self.experiment_settings['intervention_window_seconds']) and (interval_since_last_action >= self.experiment_settings['intervention_interval_seconds'] - self.experiment_settings['intervention_window_seconds']))
+                ## if more than 36 hours have elapsed, then we're eligible
+                if(interval_since_last_action>129600):
+                    eligible = True
         if(eligible==False):
             self.log.info("{0}: Experiment {1} code run. Ineligible to Continue. Begin Time: {2}. End Time: {3}. Last Intervention: {4} ".format(
                 self.__class__.__name__,
@@ -296,7 +299,8 @@ class StylesheetExperimentController:
               id = post.id,
               object_type = ThingType.SUBMISSION.value,
               experiment_id = self.experiment.id,
-              object_created = post.created
+              object_created = post.created,
+              metadata_json = last_action.metadata_json
             )
             self.db_session.add(et)
             added_experiment_things += 1
