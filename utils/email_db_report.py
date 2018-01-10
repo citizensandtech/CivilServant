@@ -2,8 +2,10 @@ import os, sys
 import datetime
 import simplejson as json
 
-ENV = sys.argv[1] # "production"
-os.environ['CS_ENV'] = ENV
+if __name__ == "__main__" and len(sys.argv) > 1:
+    os.environ["CS_ENV"] = sys.argv[1]
+ENV = os.environ["CS_ENV"]
+
 BASE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..")
 sys.path.append(BASE_DIR)
 
@@ -143,7 +145,7 @@ def send_email(fromaddr, toaddrs, subject, html):
 ######### REDDIT 		  ############################################
 ######################################################################
 
-def generate_reddit_front_page(today=datetime.datetime.utcnow(), days=7):
+def generate_reddit_front_page(today=datetime.datetime.utcnow(), days=7, html=True):
     #query_str = "SELECT min(created_at), max(created_at) FROM front_pages"
     #result = db_session.execute(query_str).fetchall()    
     #print(result)
@@ -154,12 +156,14 @@ def generate_reddit_front_page(today=datetime.datetime.utcnow(), days=7):
         GROUP BY page_type, YEAR(created_at), MONTH(created_at), DAY(created_at)"""
     result = run_query_for_days(query_str, today, days=days)
     result = [(PageType(a).name, b, c, d, e) for (a,b,c,d,e) in result]
+    if not html:
+        return result
     return generate_html_table(result, 
                                str_to_date(date_to_str(today)), 
                                "New FrontPage count, by pagetype")  # to make everything 00:00:00 
 
 
-def generate_reddit_subreddit_page(today=datetime.datetime.utcnow(), days=7):
+def generate_reddit_subreddit_page(today=datetime.datetime.utcnow(), days=7, html=True):
     query_str = """
         SELECT sr.name, srp.page_type, YEAR(srp.created_at), MONTH(srp.created_at), DAY(srp.created_at), count(*) 
         FROM subreddit_pages srp
@@ -168,22 +172,26 @@ def generate_reddit_subreddit_page(today=datetime.datetime.utcnow(), days=7):
         GROUP BY sr.name, srp.page_type, YEAR(srp.created_at), MONTH(srp.created_at), DAY(srp.created_at)"""
     result = run_query_for_days(query_str, today, days=days)
     result = [("({0}, {1})".format(a, PageType(b).name), c, d, e, f) for (a,b,c,d,e,f) in result]
+    if not html:
+        return result
     return generate_html_table(result, 
                                str_to_date(date_to_str(today)), 
                                "New SubredditPage count, by (subreddit, pagetype)")  # to make everything 00:00:00     
 
 
-def generate_reddit_subreddit(today=datetime.datetime.utcnow(), days=7):
+def generate_reddit_subreddit(today=datetime.datetime.utcnow(), days=7, html=True):
     query_str = """
         SELECT '{0}', YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) 
         FROM subreddits WHERE created_at <= :to_date and created_at >= :from_date 
         GROUP BY YEAR(created_at), MONTH(created_at), DAY(created_at)""".format(TOTAL_LABEL)
     result = run_query_for_days(query_str, today, days=days)
+    if not html:
+        return result
     return generate_html_table(result, 
                                str_to_date(date_to_str(today)), 
                                "New Subreddit count")  # to make everything 00:00:00     
 
-def generate_reddit_post(today=datetime.datetime.utcnow(), days=7):
+def generate_reddit_post(today=datetime.datetime.utcnow(), days=7, html=True):
     query_str = """
         SELECT sr.name, YEAR(p.created_at), MONTH(p.created_at), DAY(p.created_at), count(*) 
         FROM posts p
@@ -191,11 +199,13 @@ def generate_reddit_post(today=datetime.datetime.utcnow(), days=7):
         WHERE p.created_at <= :to_date and p.created_at >= :from_date 
         GROUP BY sr.name, YEAR(p.created_at), MONTH(p.created_at), DAY(p.created_at)"""
     result = run_query_for_days(query_str, today, days=days)
+    if not html:
+        return result
     return generate_html_table(result, 
                                str_to_date(date_to_str(today)), 
                                "New Post count, by subreddit")  # to make everything 00:00:00     
 
-def generate_reddit_comment(today=datetime.datetime.utcnow(), days=7):
+def generate_reddit_comment(today=datetime.datetime.utcnow(), days=7, html=True):
     query_str = """
         SELECT sr.name, YEAR(c.created_at), MONTH(c.created_at), DAY(c.created_at), count(*) 
         FROM comments c
@@ -203,22 +213,26 @@ def generate_reddit_comment(today=datetime.datetime.utcnow(), days=7):
         WHERE c.created_at <= :to_date and c.created_at >= :from_date 
         GROUP BY sr.name, YEAR(c.created_at), MONTH(c.created_at), DAY(c.created_at)"""
     result = run_query_for_days(query_str, today, days=days)
+    if not html:
+        return result
     return generate_html_table(result, 
                                str_to_date(date_to_str(today)), 
                                "New Comment count, by subreddit")  # to make everything 00:00:00     
 
 
-def generate_reddit_user(today=datetime.datetime.utcnow(), days=7):
+def generate_reddit_user(today=datetime.datetime.utcnow(), days=7, html=True):
     query_str = """
         SELECT '{0}', YEAR(first_seen), MONTH(first_seen), DAY(first_seen), count(*) 
         FROM users WHERE first_seen <= :to_date and first_seen >= :from_date 
         GROUP BY YEAR(first_seen), MONTH(first_seen), DAY(first_seen)""".format(TOTAL_LABEL)
     result = run_query_for_days(query_str, today, days=days)
+    if not html:
+        return result
     return generate_html_table(result, 
                                str_to_date(date_to_str(today)), 
                                "New User count")  # to make everything 00:00:00     
 
-def generate_reddit_mod_action(today=datetime.datetime.utcnow(), days=7):
+def generate_reddit_mod_action(today=datetime.datetime.utcnow(), days=7, html=True):
     query_str = """
         SELECT sr.name, YEAR(ma.created_at), MONTH(ma.created_at), DAY(ma.created_at), count(*) 
         FROM mod_actions ma
@@ -226,6 +240,8 @@ def generate_reddit_mod_action(today=datetime.datetime.utcnow(), days=7):
         WHERE ma.created_at <= :to_date and ma.created_at >= :from_date 
         GROUP BY sr.name, YEAR(ma.created_at), MONTH(ma.created_at), DAY(ma.created_at)"""
     result = run_query_for_days(query_str, today, days=days)
+    if not html:
+        return result
     return generate_html_table(result, 
                                str_to_date(date_to_str(today)), 
                                "New Mod actions count")  # to make everything 00:00:00     
@@ -274,17 +290,19 @@ GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_a
 ######################################################################
 
 ######### EXPERIMENT #########
-def generate_experiment_new(today=datetime.datetime.utcnow(), days=7):
+def generate_experiment_new(today=datetime.datetime.utcnow(), days=7, html=True):
     query_str = """
         SELECT '{0}', YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) 
         FROM experiments WHERE created_at <= :to_date and created_at >= :from_date 
         GROUP BY YEAR(created_at), MONTH(created_at), DAY(created_at)""".format(TOTAL_LABEL)
     result = run_query_for_days(query_str, today, days=days)
+    if not html:
+        return result
     return generate_html_table(result, 
                                str_to_date(date_to_str(today)), 
                                "New Experiment count")  # to make everything 00:00:00     
 
-def generate_experiment_active(today=datetime.datetime.utcnow(), days=7):
+def generate_experiment_active(today=datetime.datetime.utcnow(), days=7, html=True):
     query_str = """
         SELECT id, start_time, end_time 
         FROM experiments WHERE start_time <= :to_date and end_time >= :from_date"""
@@ -298,40 +316,48 @@ def generate_experiment_active(today=datetime.datetime.utcnow(), days=7):
         for (eid, start, end) in result:
             if start <= day and day <= end:
                 type_to_date_to_val[TOTAL_LABEL][day] += 1
+    if not html:
+        return type_to_date_to_val
     return generate_html_table_from_dict(type_to_date_to_val, 
                                str_to_date(date_to_str(today)), 
                                "Active Experiment count")  # to make everything 00:00:00     
     
-def generate_experiment_thing(today=datetime.datetime.utcnow(), days=7):
+def generate_experiment_thing(today=datetime.datetime.utcnow(), days=7, html=True):
     query_str = """
         SELECT experiment_id, object_type, YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) 
         FROM experiment_things WHERE created_at <= :to_date and created_at >= :from_date 
         GROUP BY experiment_id, object_type, YEAR(created_at), MONTH(created_at), DAY(created_at)"""
     result = run_query_for_days(query_str, today, days=days)
     result = [("({0}, {1})".format(a, ThingType(b).name), c, d, e, f) for (a,b,c,d,e,f) in result]
+    if not html:
+        return result
     return generate_html_table(result, 
                                str_to_date(date_to_str(today)), 
-                               "ExperimentThing count, by (experiment, objecttype)")  # to make everything 00:00:00 
+                               "Experiment280/(24*60)Thing count, by (experiment, objecttype)")  # to make everything 00:00:00 
 
-def generate_experiment_thing_snapshot(today=datetime.datetime.utcnow(), days=7):
+def generate_experiment_thing_snapshot(today=datetime.datetime.utcnow(), days=7, html=True):
     query_str = """
         SELECT experiment_id, object_type, YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) 
         FROM experiment_thing_snapshots WHERE created_at <= :to_date and created_at >= :from_date 
         GROUP BY experiment_id, object_type, YEAR(created_at), MONTH(created_at), DAY(created_at)"""
     result = run_query_for_days(query_str, today, days=days)
     result = [("({0}, {1})".format(a, ThingType(b).name), c, d, e, f) for (a,b,c,d,e,f) in result]
+    if not html:
+        return result
     return generate_html_table(result, 
                                str_to_date(date_to_str(today)), 
                                "ExperimentThingSnapshot count, by (experiment, objecttype)")  # to make everything 00:00:00 
 
 
-def generate_experiment_action(today=datetime.datetime.utcnow(), days=7):
+def generate_experiment_action(today=datetime.datetime.utcnow(), days=7, html=True):
     query_str = """
         SELECT experiment_id, action, YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) 
         FROM experiment_actions WHERE created_at <= :to_date and created_at >= :from_date 
         GROUP BY experiment_id, action, YEAR(created_at), MONTH(created_at), DAY(created_at)"""
     result = run_query_for_days(query_str, today, days=days)
     result = [("({0}, {1})".format(a, b), c, d, e, f) for (a,b,c,d,e,f) in result]
+    if not html:
+        return result
     return generate_html_table(result, 
                                str_to_date(date_to_str(today)), 
                                "ExperimentAction count, by (experiment, action)")  # to make everything 00:00:00 
@@ -375,7 +401,6 @@ td.highlight {
 </style>
 """
 
-
 def generate_report(today=datetime.datetime.utcnow(), days=7):
     html = "<html><head>" + css + "</head><body>"
     html += "<h2>Number of records stored per day</h2>"
@@ -405,8 +430,11 @@ def generate_report(today=datetime.datetime.utcnow(), days=7):
 
 
 if __name__ == "__main__":
-	today = datetime.datetime.utcnow() # str_to_date("2016-08-26 23:59:59", by_day=False)
-	html = generate_report(today, days=7)
-	toaddrs = EMAIL_CONFIG["toaddrs"]    
-	send_db_report(toaddrs, today, html)
+    now = datetime.datetime.utcnow()
+    end = datetime.datetime.combine(now, datetime.time())
+    today = end - datetime.timedelta(seconds=1)
+
+    html = generate_report(today, days=7)
+    toaddrs = EMAIL_CONFIG["toaddrs"]    
+    send_db_report(toaddrs, today, html)
 

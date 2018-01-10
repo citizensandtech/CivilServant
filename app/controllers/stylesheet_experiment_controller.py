@@ -14,7 +14,6 @@ from app.models import Experiment, ExperimentThing, ExperimentAction, Experiment
 from app.models import EventHook
 from sqlalchemy import and_, or_, desc, asc
 from app.controllers.subreddit_controller import SubredditPageController
-import numpy as np
 
 ### LOAD ENVIRONMENT VARIABLES
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), "..","..")
