@@ -38,25 +38,13 @@ sys.path.append(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentf
 # then import the models and load them
 from app import models
 
-# options: development, test, production, all
-ENV = os.environ['CS_ENV']
-
 metadata = {
-      'development':models.Base.metadata,
-      'test':models.Base.metadata,
-      'production':models.Base.metadata 
-  }
+    'development': models.Base.metadata,
+    'test': models.Base.metadata,
+    'production': models.Base.metadata}
 
-
-if(ENV != "all"):
-  target_metadata = {}
-  for key in metadata.keys():
-    if ENV == key:
-      target_metadata[key] = metadata[key]
-else:
-  target_metadata = metadata
-
-#print(target_metadata)
+args = context.get_x_argument()
+target_metadata = {env:metadata[env] for env in args} if args else metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
