@@ -48,6 +48,12 @@ rqscheduler
 export CS_ENV=development 
 
 ## MIGRATING WITH ALEMBIC
+# All alembic commands will now default to 
+# apply to all environments.
+# To specify an environment, use
+# alembic -x ENV COMMAND ARGS
+# for example:
+# alembic -x development upgrade head
 
 alembic upgrade head
 
