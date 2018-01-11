@@ -14,3 +14,8 @@ airbrake
 pyyaml
 pytz
 numpy
+
+#if you have trouble with mysqlclient on OSX High Sierra
+# run:
+# xcode-select --install
+# LDFLAGS=-L/usr/local/opt/openssl/lib pip install mysqlclient
