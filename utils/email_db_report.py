@@ -14,9 +14,6 @@ from utils.common import PageType, ThingType
 with open(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV), "r") as config:
   DBCONFIG = json.loads(config.read())
 
-with open(os.path.join(BASE_DIR, "config") + "/email_db_report.json".format(env=ENV), "r") as config:
-  EMAIL_CONFIG = json.loads(config.read())
-
 ### LOAD SQLALCHEMY
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -114,10 +111,11 @@ def generate_html_table_from_dict(type_to_date_to_val, today, title):
     return html
 
 
-def send_db_report(toaddrs, date, html):
-    fromaddr = EMAIL_CONFIG["fromaddr"]
+def send_db_report(date, html):
+    with open(os.path.join(BASE_DIR, "config") + "/email_db_report.json".format(env=ENV), "r") as f:
+        email_config = json.loads(f.read())
     subject = "CivilServant Database Report: {0}".format(date_to_str(date))
-    send_email(fromaddr, toaddrs, subject, html)
+    send_email(email_config["fromaddr"], email_config["toaddrs"], subject, html)
 
 def send_email(fromaddr, toaddrs, subject, html):
     import smtplib
@@ -435,6 +433,5 @@ if __name__ == "__main__":
     today = end - datetime.timedelta(seconds=1)
 
     html = generate_report(today, days=7)
-    toaddrs = EMAIL_CONFIG["toaddrs"]    
-    send_db_report(toaddrs, today, html)
+    send_db_report(today, html)
 
