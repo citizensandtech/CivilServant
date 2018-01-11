@@ -8,6 +8,7 @@ from mock import Mock, patch
 import imp
 import os
 import pytest
+import random
 
 ENV = os.environ["CS_ENV"] = "test"
 import utils.email_db_report
@@ -18,22 +19,27 @@ BASE_DIR  = os.path.join(TEST_DIR, "../")
 END_DT = datetime(2017,12,31)
 DAYS = 7
 
-DEFAULT_COUNT = 10
-PAGES_PER_DAY = DEFAULT_COUNT
-POSTS_PER_DAY = DEFAULT_COUNT
-COMMENTS_PER_POST = DEFAULT_COUNT
-USERS_PER_DAY = DEFAULT_COUNT
-MOD_ACTIONS_PER_DAY = DEFAULT_COUNT
-EXPERIMENTS_PER_DAY = DEFAULT_COUNT
-THINGS_PER_EXPERIMENT = DEFAULT_COUNT
-SNAPSHOTS_PER_THING = DEFAULT_COUNT
-ACTIONS_PER_EXPERIMENT = DEFAULT_COUNT
+get_count = lambda: random.choice(range(5,15))
+PAGES_PER_DAY = get_count()
+POSTS_PER_DAY = get_count()
+COMMENTS_PER_POST = get_count()
+USERS_PER_DAY = get_count()
+MOD_ACTIONS_PER_DAY = get_count()
+EXPERIMENTS_PER_DAY = get_count()
+THINGS_PER_EXPERIMENT = get_count()
+SNAPSHOTS_PER_THING = get_count()
+ACTIONS_PER_EXPERIMENT = get_count()
 
 SUBREDDIT_ID = "mouw"
 SUBREDDIT_NAME = "science"
 
 db_session = DbEngine(os.path.join(TEST_DIR, "../", "config") + "/{env}.json".format(env=ENV)).new_session()
 log = app.cs_logger.get_logger(ENV, BASE_DIR)
+experiment_test_info = {}
+
+def get_experiment_test_info(day, num):
+    name = "%d_%d" % (day, num)
+    return experiment_test_info[name], name
 
 def clear_all_tables():
     for table in reversed(Base.metadata.sorted_tables):
@@ -45,6 +51,7 @@ def setup_function(function):
 
 def teardown_function(function):
     clear_all_tables()
+    experiment_test_info = {}
 
 @pytest.fixture
 def init_front_pages():
@@ -93,9 +100,8 @@ def init_posts(init_subreddits):
     
     for day in range(DAYS):
         for post in range(POSTS_PER_DAY):
-            post_num = day * DAYS + post * POSTS_PER_DAY
             db_session.add(Post(
-                id = "%s_%d" % (SUBREDDIT_ID, post_num),
+                id = "%s_%d_%d" % (SUBREDDIT_ID, day, post),
                 created_at = END_DT - timedelta(days=day),
                 subreddit_id = SUBREDDIT_ID))
 
@@ -109,14 +115,13 @@ def init_comments(init_posts):
     
     for day in range(DAYS):
         for post in range(POSTS_PER_DAY):
-            post_id = day * DAYS + post * POSTS_PER_DAY
+            post_id = "%s_%d_%d" % (SUBREDDIT_ID, day, post)
             for comment in range(COMMENTS_PER_POST):
-                comment_id = post_id + comment * COMMENTS_PER_POST
                 db_session.add(Comment(
-                    id = "%s_%d_%d" % (SUBREDDIT_ID, post_id, comment_id),
+                    id = "%s_%s" % (post_id, comment),
                     created_at = END_DT - timedelta(days=day),
                     subreddit_id = SUBREDDIT_ID,
-                    post_id = "%s_%s" % (SUBREDDIT_ID, str(post_id))))
+                    post_id = post_id))
 
     db_session.commit()
 
@@ -128,7 +133,7 @@ def init_users():
         for user in range(USERS_PER_DAY):
             dt = END_DT - timedelta(days=day)
             db_session.add(User(
-                name = "user_%d" % (day * DAYS + user * USERS_PER_DAY),
+                name = "user_%d_%d" % (day, user),
                 created = dt,
                 first_seen = dt,
                 last_seen = dt))
@@ -142,9 +147,8 @@ def init_mod_actions(init_subreddits):
 
     for day in range(DAYS):
         for mod_action in range(MOD_ACTIONS_PER_DAY):
-            mod_action_id = day * DAYS + mod_action * MOD_ACTIONS_PER_DAY
             db_session.add(ModAction(
-                id = "%s_%d" % (SUBREDDIT_ID, mod_action_id),
+                id = "%s_%d_%d" % (SUBREDDIT_ID, day, mod_action),
                 created_at = END_DT - timedelta(days=day),
                 subreddit_id = SUBREDDIT_ID))
 
@@ -157,12 +161,15 @@ def init_experiments():
     for day in range(DAYS):
         for experiment in range(EXPERIMENTS_PER_DAY):
             dt = END_DT - timedelta(days=day)
-            db_session.add(Experiment(
-                name = "ex_%d" % (day * DAYS + experiment * EXPERIMENTS_PER_DAY),
+            experiment = Experiment(
+                name = "%d_%d" % (day, experiment),
                 controller = "dummy_controller",
                 created_at = dt,
                 start_time = dt,
-                end_time = dt))
+                end_time = dt)
+            db_session.add(experiment)
+            db_session.flush()
+            experiment_test_info[experiment.name] = experiment.id
 
     db_session.commit()
 
@@ -173,10 +180,10 @@ def init_experiment_things(init_experiments):
 
     for day in range(DAYS):
         for experiment in range(EXPERIMENTS_PER_DAY):
-            experiment_id = day * DAYS + experiment * EXPERIMENTS_PER_DAY
+            experiment_id, experiment_name = get_experiment_test_info(day, experiment)
             for thing in range(THINGS_PER_EXPERIMENT):
                 db_session.add(ExperimentThing(
-                    id = "thing_%d_%d" % (experiment_id, thing),
+                    id = "%s_%d" % (experiment_name, thing),
                     created_at = END_DT - timedelta(days=day),
                     object_type = ThingType.SUBMISSION.value,
                     experiment_id = experiment_id))
@@ -192,9 +199,9 @@ def init_experiment_thing_snapshots(init_experiment_things):
 
     for day in range(DAYS):
         for experiment in range(EXPERIMENTS_PER_DAY):
-            experiment_id = day * DAYS + experiment * EXPERIMENTS_PER_DAY
+            experiment_id, experiment_name = get_experiment_test_info(day, experiment)
             for thing in range(THINGS_PER_EXPERIMENT):
-                experiment_thing_id = "thing_%d_%d" % (experiment_id, thing)
+                experiment_thing_id = "%s_%d" % (experiment_name, thing)
                 for snapshot in range(SNAPSHOTS_PER_THING):
                     db_session.add(ExperimentThingSnapshot(
                         experiment_thing_id = experiment_thing_id,
@@ -211,7 +218,7 @@ def init_experiment_actions(init_experiments):
 
     for day in range(DAYS):
         for experiment in range(EXPERIMENTS_PER_DAY):
-            experiment_id = day * DAYS + experiment * EXPERIMENTS_PER_DAY
+            experiment_id, _ = get_experiment_test_info(day, experiment)
             for action in range(ACTIONS_PER_EXPERIMENT):
                 db_session.add(ExperimentAction(
                     action = "test",
@@ -339,9 +346,9 @@ def test_generate_experiment_thing(init_experiment_things):
     for day in range(DAYS):
         dt = END_DT - timedelta(days=day)
         for experiment in range(EXPERIMENTS_PER_DAY):
-            experiment_id = day * DAYS + experiment * EXPERIMENTS_PER_DAY
+            experiment_id, _ = get_experiment_test_info(day, experiment)
             label = "(%s, %s)" % (experiment_id, ThingType.SUBMISSION.name)
-            record = (label, dt.year, dt.month, dt.day, EXPERIMENTS_PER_DAY)
+            record = (label, dt.year, dt.month, dt.day, THINGS_PER_EXPERIMENT)
             assert record in output
 
 def test_generate_experiment_thing_snapshot(init_experiment_thing_snapshots):
@@ -351,11 +358,11 @@ def test_generate_experiment_thing_snapshot(init_experiment_thing_snapshots):
     report = imp.reload(utils.email_db_report)
     output = set(report.generate_experiment_thing_snapshot(END_DT, DAYS, html=False))
     assert len(output) == DAYS * EXPERIMENTS_PER_DAY
-    
+
     for day in range(DAYS):
         dt = END_DT - timedelta(days=day)
         for experiment in range(EXPERIMENTS_PER_DAY):
-            experiment_id = day * DAYS + experiment * EXPERIMENTS_PER_DAY
+            experiment_id, _ = get_experiment_test_info(day, experiment)
             label = "(%s, %s)" % (experiment_id, ThingType.SUBMISSION.name)
             record = (label, dt.year, dt.month, dt.day, SNAPSHOTS_PER_THING * THINGS_PER_EXPERIMENT)
             assert record in output
@@ -371,8 +378,8 @@ def test_generate_experiment_action(init_experiment_actions):
     for day in range(DAYS):
         dt = END_DT - timedelta(days=day)
         for experiment in range(EXPERIMENTS_PER_DAY):
-            experiment_id = day * DAYS + experiment * EXPERIMENTS_PER_DAY
+            experiment_id, _ = get_experiment_test_info(day, experiment)
             label = "(%s, %s)" % (experiment_id, "test")
-            record = (label, dt.year, dt.month, dt.day, EXPERIMENTS_PER_DAY)
+            record = (label, dt.year, dt.month, dt.day, ACTIONS_PER_EXPERIMENT)
             assert record in output
 
