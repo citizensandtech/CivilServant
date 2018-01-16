@@ -36,7 +36,7 @@ def bulkUnshorten(urls,workers=25):
 
     for key in urls:
         if urls[key]['success'] is not None: continue
-        if urls[key]['hops'] >= 10: continue
+        if urls[key]['hops'] >= HOPS_LIMIT: continue
         futures.append(session.head(key,timeout=REQUEST_TIMEOUT))
 
     if futures:
