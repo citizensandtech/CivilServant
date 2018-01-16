@@ -8,7 +8,7 @@ def bulkUnshorten(urls,workers=25):
     # The second optional argument is the number of workers to run in parallel
 
     # When initially called, an array of string objects will be passed to the function.
-    # The function will then create an array of dicts to keep track of all urls, the number of hops and
+    # The function will then create a dictionary to keep track of all urls, the number of hops and
     # the final destination url.  If there is an error, a status code of 4xx is recorded within the dict.
     # Otherwise, a status code of 200 should be returned.
 
