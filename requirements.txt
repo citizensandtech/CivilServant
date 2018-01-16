@@ -16,3 +16,6 @@ pytz
 numpy
 python-twitter
 retrying
+requests
+requests_futures
+
