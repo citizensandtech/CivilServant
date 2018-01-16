@@ -213,6 +213,15 @@ class LumenNotice(Base):
     notice_data         = Column(MEDIUMTEXT)
     CS_parsed_usernames = Column(Integer, default=1) # see CS_JobState Enum
 
+class LumenNoticeExpandedURL(Base):
+    __tablename__   = 'lumen_notice_expanded_urls'
+    id              = Column(BigInteger, primary_key = True)
+    created_at      = Column(DateTime, default=datetime.datetime.utcnow())
+    notice_id       = Column(BigInteger, index=True)
+    original_url    = Column(MEDIUMTEXT)
+    expanded_url    = Column(MEDIUMTEXT)
+    number_of_hops  = Column(Integer)
+
 # twitter_username is the username parsed from the notice; may change later, but these changes will not be reflected in this record.
 # use twitter_use_id to join with TwitterUser, TwitterUserSnapshot, TwistterStatus
 class LumenNoticeToTwitterUser(Base):
