@@ -29,7 +29,9 @@ def bulkUnshorten(urls,workers=25):
         url_objects = urls[:]
         urls = {}
         for url in url_objects:
-            urls[url] = {"hops":0,"status_code":None,"success":None,"final_url":None,"error":None,"original_url":url}
+            req = requests.Request('HEAD',url)
+            normalized_url = req.prepare().url
+            urls[normalized_url] = {"hops":0,"status_code":None,"success":None,"final_url":None,"error":None,"original_url":url}
 
     session = FuturesSession(max_workers=workers)
     futures = []
@@ -61,6 +63,17 @@ def bulkUnshorten(urls,workers=25):
                 urls[result.url]['status_code'] = result.status_code
             elif result.status_code == 301 or result.status_code == 302:
                 redirect_url = result.headers['location']
+
+                # Handle a location header that returns a relative path instead of an absolute path.  This is now allowed
+                # under RFC 7231.  If the returned location does not begin with http, then it is a relative path and should
+                # be concatenated to the original url
+                if not redirect_url.lower().startswith("http"):
+                    redirect_url = result.url + redirect_url
+
+                # Normalize the url using the requests module
+                req = requests.Request('HEAD',redirect_url)
+                redirect_url = req.prepare().url
+
                 urls[result.url]['hops'] += 1
                 urls[result.url]['final_url'] = redirect_url
                 urls[result.url]['status_code'] = result.status_code
