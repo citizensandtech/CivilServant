@@ -28,7 +28,7 @@ def main():
     parser.add_argument("-p", "--profile",
                         required = False,
                         action = 'store_true',
-                        help="Run the performance profiler and save the results in the logs directory")
+                        help="Run the performance profiler and save the results in the logs/profiles directory")
 
     args = parser.parse_args()
 

@@ -93,7 +93,7 @@ class CommentNode:
 def profilable(fn):
     @wraps(fn)
     def _run_profiler(*args, **kwargs):
-        if not kwargs.pop("_profile"):
+        if not kwargs.pop("_profile", False):
             return fn(*args, **kwargs)
         
         profile = cProfile.Profile()
@@ -108,10 +108,10 @@ def profilable(fn):
         profile_filename = PROFILE_FILENAME % (start_dt, end_dt, fn.__name__, 'profile')
         stats_filename = PROFILE_FILENAME % (start_dt, end_dt, fn.__name__, 'txt')
        
-        with open(pathlib.Path(PROFILES_DIR, stats_filename), "w") as f:
+        with open(str(pathlib.Path(PROFILES_DIR, stats_filename)), "w") as f:
             stats = pstats.Stats(profile, stream=f)
             stats.print_stats()
-            stats.dump_stats(pathlib.Path(PROFILES_DIR, profile_filename))
+            stats.dump_stats(str(pathlib.Path(PROFILES_DIR, profile_filename)))
         
         return result
 
