@@ -28,6 +28,10 @@ def main():
                         choices=['development', 'test', 'production'],
                         required = False,
                         help="Run within a specific environment. Otherwise run under the environment defined in the environment variable CS_ENV")
+    parser.add_argument("-p", "--profile",
+                        required = False,
+                        action = 'store_true',
+                        help="Run the performance profiler and save the results in the logs directory")
 
     args = parser.parse_args()
 
@@ -55,6 +59,7 @@ def main():
                 scheduled_time=datetime.utcnow(),
                 func=app.controller.conduct_sticky_comment_experiment,
                 args=[args.experiment],
+                kwargs={'_profile': args.profile},
                 interval=int(args.interval),
                 repeat=None,
                 timeout = timeout_seconds
@@ -64,6 +69,7 @@ def main():
                 scheduled_time=datetime.utcnow(),
                 func=app.controller.remove_experiment_replies,
                 args=[args.experiment],
+                kwargs={'_profile': args.profile},
                 interval=int(args.interval),
                 repeat=None,
                 timeout = timeout_seconds,
@@ -73,6 +79,7 @@ def main():
                 scheduled_time=datetime.utcnow(),
                 func=app.controller.archive_experiment_submission_metadata,
                 args=[args.experiment],
+                kwargs={'_profile': args.profile},
                 interval=int(args.interval),
                 repeat=None,
                 timeout = timeout_seconds)

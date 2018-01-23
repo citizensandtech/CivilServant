@@ -1,7 +1,18 @@
 from enum import Enum
+from functools import wraps
+import cProfile, pstats
+import datetime
+import pathlib
 import simplejson as json
 from collections import namedtuple
 
+BASE_DIR = str(pathlib.Path(__file__).parents[1])
+LOGS_DIR = str(pathlib.Path(BASE_DIR, "logs"))
+PROFILES_DIR = str(pathlib.Path(LOGS_DIR, "profiles"))
+pathlib.Path(PROFILES_DIR).mkdir(parents=True, exist_ok=True)
+
+DATETIME_FORMAT = "%Y%m%d%H%M%S%f"
+PROFILE_FILENAME = "%s_%s_%s.%s"
 
 class PageType(Enum):
     TOP = 1
@@ -78,3 +89,31 @@ class CommentNode:
 
 	def __str__(self):
 		return str(self.id)
+
+def profilable(fn):
+    @wraps(fn)
+    def _run_profiler(*args, **kwargs):
+        if not kwargs.pop("_profile"):
+            return fn(*args, **kwargs)
+        
+        profile = cProfile.Profile()
+        start_dt = datetime.datetime.now().strftime(DATETIME_FORMAT)
+        try:
+            profile.enable()
+            result = fn(*args, **kwargs)
+        finally:
+            profile.disable()
+        end_dt = datetime.datetime.now().strftime(DATETIME_FORMAT)
+        
+        profile_filename = PROFILE_FILENAME % (start_dt, end_dt, fn.__name__, 'profile')
+        stats_filename = PROFILE_FILENAME % (start_dt, end_dt, fn.__name__, 'txt')
+       
+        with open(pathlib.Path(PROFILES_DIR, stats_filename), "w") as f:
+            stats = pstats.Stats(profile, stream=f)
+            stats.print_stats()
+            stats.dump_stats(pathlib.Path(PROFILES_DIR, profile_filename))
+        
+        return result
+
+    return _run_profiler
+

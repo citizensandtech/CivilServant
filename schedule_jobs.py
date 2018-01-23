@@ -25,6 +25,10 @@ def main():
                         choices=['development', 'test', 'production', 'CivilServantBot2'],
                         required = False,
                         help="Run within a specific environment. Otherwise run under the environment defined in the environment variable CS_ENV")
+    parser.add_argument("-p", "--profile",
+                        required = False,
+                        action = 'store_true',
+                        help="Run the performance profiler and save the results in the logs directory")
 
     args = parser.parse_args()
 
@@ -43,12 +47,14 @@ def main():
         timeout_seconds = int(args.interval) + 3600
     ttl = int(args.interval) + 180
 
+
     if(args.sub =="all"):
         page_type = getattr(PageType, args.pagetype.upper())
         scheduler.schedule(
                 scheduled_time=datetime.utcnow(),
                 func=app.controller.fetch_reddit_front,
                 args=[page_type],
+                kwargs={'_profile': args.profile},
                 interval=int(args.interval),
                 repeat=None,
                 timeout = timeout_seconds,
@@ -59,6 +65,7 @@ def main():
                     scheduled_time=datetime.utcnow(),
                     func=app.controller.fetch_last_thousand_comments,
                     args=[args.sub],
+                    kwargs={'_profile': args.profile},
                     interval=int(args.interval),
                     repeat=None,
                     timeout = timeout_seconds,
@@ -68,6 +75,7 @@ def main():
                     scheduled_time=datetime.utcnow(),
                     func=app.controller.fetch_mod_action_history,
                     args=[args.sub],
+                    kwargs={'_profile': args.profile},
                     interval=int(args.interval),
                     repeat=None,
                     timeout = timeout_seconds,
@@ -78,6 +86,7 @@ def main():
                     scheduled_time=datetime.utcnow(),
                     func=app.controller.fetch_subreddit_front,
                     args=[args.sub, page_type],
+                    kwargs={'_profile': args.profile},
                     interval=int(args.interval),
                     repeat=None,
                     timeout = timeout_seconds,
