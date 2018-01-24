@@ -62,7 +62,7 @@ def main():
                 kwargs={'_profile': args.profile},
                 interval=int(args.interval),
                 repeat=None,
-                timeout = timeout_seconds
+                timeout = timeout_seconds,
                 result_ttl = ttl)
     elif(args.job == "tidy"):
         scheduler.schedule(
