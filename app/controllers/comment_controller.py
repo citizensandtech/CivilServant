@@ -10,6 +10,7 @@ from app.models import Base, SubredditPage, Subreddit, Post, Comment
 from sqlalchemy import and_
 from sqlalchemy import text
 import sqlalchemy
+import warnings
 
 class CommentController:
     def __init__(self, db_session, r, log):
@@ -111,7 +112,10 @@ class CommentController:
                         "user_id": comment['author'],
                         "comment_data": json.dumps(comment)
                     })
-                self.db_session.execute(Comment.__table__.insert().prefix_with("IGNORE"), db_comments)
+
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", "\(1062, \"Duplicate entry")
+                    self.db_session.execute(Comment.__table__.insert().prefix_with("IGNORE"), db_comments)
 
 #                comments_added =0
 #                for db_comment in db_comments:
