@@ -1,10 +1,12 @@
 import simplejson as json
 import datetime
-from app.models import Base, LumenNotice, LumenNoticeToTwitterUser, TwitterUser
+from app.models import Base, LumenNotice, LumenNoticeToTwitterUser, TwitterUser, LumenNoticeExpandedURL
 from app.controllers.twitter_controller import TwitterController
 import utils.common
 from utils.common import CS_JobState
 import requests
+from requests_futures.sessions import FuturesSession
+from concurrent.futures import wait
 import app.controllers.twitter_controller
 import sqlalchemy
 from sqlalchemy import or_
@@ -15,7 +17,7 @@ class LumenController():
     def __init__(self, db_session, l, log):
         self.db_session = db_session
         self.l = l
-        self.log = log    
+        self.log = log
 
     # archives lumen notices since date til now(+1day)
     def archive_lumen_notices(self, topics, date):
@@ -31,13 +33,13 @@ class LumenController():
             while next_page is not None:
                 # sleep for 2 seconds if we're calling page 2 or more
                 # for now, implement this here. In future add to connection library
-                if(next_page > 1): 
+                if(next_page > 1):
                   time.sleep(2)
 
                 data = self.l.get_notices_to_twitter([topic], 50, next_page, date, nowish)
                 if not data:
                     # error is already logged by get_notices_to_twitter
-                    return 
+                    return
 
                 notices_json = data["notices"]
                 next_page = data["meta"]["next_page"]
@@ -69,7 +71,7 @@ class LumenController():
 
                 try:
                     self.db_session.commit()
-                except:         
+                except:
                     self.log.error("Error while saving {0} lumen notices in DB Session".format(len(added_notices_ids)), extra=sys.exc_info()[0])
                 else:
                     self.log.info("Saved {0} lumen notices.".format(len(newly_added_notices_ids) - prev_add_notices_size))
@@ -121,7 +123,7 @@ class LumenController():
                 for url_obj in work["infringing_urls"]:
                     url = url_obj["url"]
                     try:
-                        username = helper_parse_url_for_username(url, self.log)    
+                        username = helper_parse_url_for_username(url, self.log)
                     except utils.common.ParseUsernameSuspendedUserFound:
                         suspended_user_count += 1
                     except Exception as e:
@@ -130,7 +132,7 @@ class LumenController():
                         if username:
                             # if no username, then no username found
                             notice_users.add(username)
-                        
+
                 if len(work["copyrighted_urls"]) > 0:  # I've only seen this empty
                     self.log.error("method helper_parse_notices_archive_users: maybe missed something in notice_json['works']['copyrighted_urls']; notice id = {0}".format(notice_json["id"]))                
                     job_state = CS_JobState.NEEDS_RETRY
@@ -184,6 +186,116 @@ class LumenController():
 
         return notice_to_state
 
+        def bulk_unshorten(self,notice_id,urls,workers=10):
+
+            # This function will unshorten an array of shortened URLS
+            # The second optional argument is the number of workers to run in parallel
+
+            # When initially called, an array of string objects will be passed to the function.
+            # The function will then create a dictionary to keep track of all urls, the number of hops and
+            # the final destination url.  If there is an error, a status code of 4xx is recorded within the dict.
+            # Otherwise, a status code of 200 should be returned.
+
+            # Global timeouts
+            # - REQUEST_TIMEOUT is the timeout when waiting for a reply from a remote server
+            # - HOPS_LIMIT is the maximum number of redirect hops allowed
+
+            REQUEST_TIMEOUT = 10
+            HOPS_LIMIT = 10
+
+            # Allow passing in of one url as a string object
+            if (isinstance(urls,str)):
+                urls = [urls]
+
+            # If method is being called initally, create a dictionary for the urls passed.  When the method calls
+            # itself, it will pass this object to itself as needed.
+            if (isinstance(urls,list)):
+                url_objects = urls[:]
+                urls = {}
+                for url in url_objects:
+                    req = requests.Request('HEAD',url)
+                    normalized_url = req.prepare().url
+                    urls[normalized_url] = {"notice_id":notice_id,"hops":0,"status_code":None,"success":None,"final_url":None,"error":None,"original_url":url}
+
+            while True:
+
+                session = FuturesSession(max_workers=workers)
+                futures = []
+
+                for key in urls:
+                    if urls[key]['success'] is not None: continue
+                    if urls[key]['hops'] >= HOPS_LIMIT: continue
+                    futures.append(session.head(key,timeout=REQUEST_TIMEOUT))
+
+                if futures:
+                    done, incomplete = wait(futures)
+                    self.log.info("Making {0} simultaneous requests to unshorten urls for notice {1}.".format(len(futures),notice_id))
+                    for obj in done:
+                        try:
+                            result = obj.result()
+                        except requests.exceptions.ConnectTimeout as e:
+                            url = e.request.url
+                            urls[url]['error'] = "ConnectTimeout"
+                            urls[url]['success'] = False
+                            continue
+                        except requests.exceptions.ReadTimeout as e:
+                            url = e.request.url
+                            urls[url]['error'] = "ReadTimeout"
+                            urls[url]['success'] = False
+                            continue
+
+                        if result.status_code == 200:
+                            urls[result.url]['success'] = True
+                            urls[result.url]['final_url'] = result.url
+                            urls[result.url]['status_code'] = result.status_code
+                        elif result.status_code == 301 or result.status_code == 302:
+                            redirect_url = result.headers['location']
+
+                            # Handle a location header that returns a relative path instead of an absolute path.  This is now allowed
+                            # under RFC 7231.  If the returned location does not begin with http, then it is a relative path and should
+                            # be concatenated to the original url
+
+                            if not redirect_url.lower().startswith("http"):
+                                redirect_url = result.url + redirect_url
+
+                            # Normalize the url using the requests module
+                            req = requests.Request('HEAD',redirect_url)
+                            redirect_url = req.prepare().url
+
+                            urls[result.url]['hops'] += 1
+                            urls[result.url]['final_url'] = redirect_url
+                            urls[result.url]['status_code'] = result.status_code
+                            urls[redirect_url] = urls.pop(result.url)
+                        else:
+                            urls[result.url]['success'] = False
+                            urls[result.url]['status_code'] = result.status_code
+
+                else:
+
+                    url_dict = {}
+
+                    for key in urls:
+                        if urls[key]['status_code'] == 200:
+                            now = datetime.datetime.utcnow()
+                            url_record = LumenNoticeExpandedURL (
+                                created_at = now,
+                                notice_id = urls[key]['notice_id'],
+                                original_url = urls[key]['original_url'],
+                                expanded_url = urls[key]['final_url'],
+                                number_of_hops = urls[key]['hops'])
+                            self.db_session.add(url_record)
+                        original_url = urls[key]['original_url']
+                        url_dict[original_url] = urls[key]
+
+                    try:
+                        self.db_session.commit()
+                    except:
+                        self.log.error("Error while committing expanded urls for notice {0}".format(notice_id), extra=sys.exc_info()[0])
+                    else:
+                        self.log.info("Saved expanded urls for lumen notice {0}".format(notice_id))
+
+                    return url_dict
+
 
 # assume url is of the form 'https://twitter.com/sooos243/status/852942353321140224' 
 # OR check if a t.co url extends to a twitter.com url 
@@ -198,7 +310,8 @@ def helper_parse_url_for_username(url, log):
     # TODO: how to resolve t.co urls without hitting twitter.com without auth tokens (since we're getting rate limited?) 
     # calling requests.get is very time inefficient
     if len(url_split) >= 3 and url_split[2] == tco_domain:
-        log.error("t.co url that we didn't attempt to resolve: {0}".format(url))
+        pass
+        #log.error("t.co url that we didn't attempt to resolve: {0}".format(url))
         # try to get request and unshorten the url
 
         #####r = None
@@ -219,6 +332,6 @@ def helper_parse_url_for_username(url, log):
 
     if len(url_split) >= 3 and url_split[2] == twitter_domain:
         username = url_split[3].lower()
-        
+
 
     return username
