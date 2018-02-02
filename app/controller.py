@@ -7,7 +7,8 @@ import app.controllers.comment_controller
 import app.controllers.moderator_controller
 import app.controllers.stylesheet_experiment_controller
 import app.controllers.sticky_comment_experiment_controller
-from utils.common import PageType, DbEngine, profilable
+from utils.common import PageType, DbEngine
+from utils.perftest import profilable
 import app.cs_logger
 from app.models import Base, SubredditPage, Subreddit, Post, ModAction, Experiment
 
