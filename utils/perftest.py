@@ -110,7 +110,7 @@ class Aggregator:
 
         for function, lists in functions.items():
             self._results[function] = Aggregator.Result(
-                num_calls_median = median(lists["num_calls"]),
+                num_calls_median = int(median(lists["num_calls"])),
                 total_time_mean = mean(lists["total_time"]),
                 total_time_stdev = stdev(lists["total_time"]),
                 cum_time_mean = mean(lists["cum_time"]),
