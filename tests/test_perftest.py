@@ -42,8 +42,9 @@ def return_value(n):
     return n
 
 @utils.perftest.profilable
-def run_sleep(n):
-    time.sleep(n)
+def run_sleep(n, calls=2):
+    for _ in range(calls):
+        time.sleep(n)
 
 def test_profilable_disabled():
     val = return_value(1)
@@ -57,10 +58,14 @@ def test_profilable_enabled(tmpdir):
 
 def test_aggregator_results(sleep_aggregator):
     agg, _ = sleep_aggregator
-    sleep_pattern = ".*perftest.py:[0-9]+\(run_sleep\)"
-
-    assert any(re.match(sleep_pattern, function) for function in agg.results)
+    sleep_regex = re.compile(".*perftest.py:[0-9]+\(run_sleep\)")
+    assert any(sleep_regex.match(function) for function in agg.results)
     assert len(agg.results) == count_frames(time.sleep, 0)
+
+def test_aggregator_median_function_calls(sleep_aggregator):
+    agg, _ = sleep_aggregator
+    valid = lambda fn, res: "time.sleep" in fn and res.num_calls_median == 2
+    assert any(valid(fn, result) for fn, result in agg.results.items())
 
 def test_aggregator_run_time_stats(sleep_aggregator):
     agg, sleep_times = sleep_aggregator
