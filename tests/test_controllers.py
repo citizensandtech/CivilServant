@@ -40,14 +40,14 @@ def clear_all_tables():
     db_session.query(SubredditPage).delete()
     db_session.query(Subreddit).delete()
     db_session.query(Post).delete()
-    db_session.query(User).delete()  
-    db_session.query(ModAction).delete()    
-    db_session.query(Comment).delete()      
-    db_session.query(LumenNotice).delete()    
+    db_session.query(User).delete()
+    db_session.query(ModAction).delete()
+    db_session.query(Comment).delete()
+    db_session.query(LumenNotice).delete()
     db_session.query(LumenNoticeToTwitterUser).delete()
     db_session.query(TwitterUser).delete()
-    db_session.query(TwitterUserSnapshot).delete()    
-    db_session.query(TwitterStatus).delete()                  
+    db_session.query(TwitterUserSnapshot).delete()
+    db_session.query(TwitterStatus).delete()
     db_session.commit()
 
 def setup_function(function):
@@ -58,7 +58,7 @@ def teardown_function(function):
 
 
 @patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Subreddit', autospec=True)    
+@patch('praw.objects.Subreddit', autospec=True)
 def test_archive_reddit_front_page(mock_subreddit, mock_reddit):
     ### TEST THE MOCK SETUP AND MAKE SURE IT WORKS
     ## TODO: I should not be mocking SQLAlchemy
@@ -71,19 +71,19 @@ def test_archive_reddit_front_page(mock_subreddit, mock_reddit):
     mock_subreddit.get_top.return_value = sub_data
     mock_subreddit.get_controversial.return_value = sub_data
     mock_subreddit.get_new.return_value = sub_data
-    mock_subreddit.get_hot.return_value = sub_data  
+    mock_subreddit.get_hot.return_value = sub_data
     patch('praw.')
 
-    r.get_subreddit.return_value = mock_subreddit   
+    r.get_subreddit.return_value = mock_subreddit
 
     assert len(db_session.query(FrontPage).all()) == 0
-    
+
     ## NOW START THE TEST for top, controversial, new
     fp = app.controllers.front_page_controller.FrontPageController(db_session, r, log)
     fp.archive_reddit_front_page(PageType.TOP)
     fp.archive_reddit_front_page(PageType.CONTR)
     fp.archive_reddit_front_page(PageType.NEW)
-    fp.archive_reddit_front_page(PageType.HOT)  
+    fp.archive_reddit_front_page(PageType.HOT)
 
     all_pages = db_session.query(FrontPage).all()
     assert len(all_pages) == 4
@@ -98,13 +98,13 @@ def test_archive_reddit_front_page(mock_subreddit, mock_reddit):
     assert new_pages.count() == 1
 
     new_pages = db_session.query(FrontPage).filter(FrontPage.page_type == PageType.HOT.value)
-    assert new_pages.count() == 1  
+    assert new_pages.count() == 1
 
 
 ####  basic test for method archive_subreddit_page to insert timestamped pages to subreddit_pages table.
 ####  analogous to test_archive_reddit_front_page.
 @patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Subreddit', autospec=True)    
+@patch('praw.objects.Subreddit', autospec=True)
 def test_archive_subreddit_page(mock_subreddit, mock_reddit):
     ### TODO: TEST THE MOCK SETUP WITH AN ACTUAL QUERY
 
@@ -127,17 +127,17 @@ def test_archive_subreddit_page(mock_subreddit, mock_reddit):
     mock_subreddit.get_top.return_value = sub_data
     mock_subreddit.get_controversial.return_value = sub_data
     mock_subreddit.get_new.return_value = sub_data
-    mock_subreddit.get_hot.return_value = sub_data  
+    mock_subreddit.get_hot.return_value = sub_data
     patch('praw.')
 
     mock_subreddit.display_name = test_subreddit_name
-    mock_subreddit.id = test_subreddit_id  
-    r.get_subreddit.return_value = mock_subreddit    
+    mock_subreddit.id = test_subreddit_id
+    r.get_subreddit.return_value = mock_subreddit
 
     assert len(db_session.query(SubredditPage).all()) == 0
-    sp = app.controllers.subreddit_controller.SubredditPageController(test_subreddit_name, db_session, r, log)  
+    sp = app.controllers.subreddit_controller.SubredditPageController(test_subreddit_name, db_session, r, log)
 
-    ## NOW START THE TEST for top, controversial, new  
+    ## NOW START THE TEST for top, controversial, new
     sp.archive_subreddit_page(PageType.TOP)
     sp.archive_subreddit_page(PageType.CONTR)
     sp.archive_subreddit_page(PageType.NEW)
@@ -162,7 +162,7 @@ def test_archive_subreddit_page(mock_subreddit, mock_reddit):
 
 
 @patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Subreddit', autospec=True)    
+@patch('praw.objects.Subreddit', autospec=True)
 def test_archive_subreddit(mock_subreddit, mock_reddit):
     test_subreddit_name = "science"
     test_subreddit_id = "mouw"
@@ -170,14 +170,14 @@ def test_archive_subreddit(mock_subreddit, mock_reddit):
     r = mock_reddit.return_value
 
     mock_subreddit.display_name = test_subreddit_name
-    mock_subreddit.id = test_subreddit_id  
+    mock_subreddit.id = test_subreddit_id
     patch('praw.')
 
     assert len(db_session.query(Subreddit).all()) == 0
-    sp = app.controllers.subreddit_controller.SubredditPageController(test_subreddit_name, db_session, r, log)  
+    sp = app.controllers.subreddit_controller.SubredditPageController(test_subreddit_name, db_session, r, log)
 
     ## NOW START THE TEST
-    # TODO: should you even be allowed to archive a different subreddit than the one sp was made for?  
+    # TODO: should you even be allowed to archive a different subreddit than the one sp was made for?
     sp.archive_subreddit(mock_subreddit)
 
     all_subs = db_session.query(Subreddit).all()
@@ -192,11 +192,11 @@ def test_archive_subreddit(mock_subreddit, mock_reddit):
 @patch('praw.Reddit', autospec=True)
 def test_archive_post(mock_reddit):
 
-    # dummy post just to pass the test. 
+    # dummy post just to pass the test.
     # TODO: carefully describe what the types of these 'archive' method args should be...
     post = {
-        'id': 1, 
-        'subreddit_id': 't5_mouw', 
+        'id': 1,
+        'subreddit_id': 't5_mouw',
         'created': 1467348033.0,
         'created_utc': 1467319233.0
     }
@@ -206,7 +206,7 @@ def test_archive_post(mock_reddit):
     patch('praw.')
 
     assert len(db_session.query(Post).all()) == 0
-    sp = app.controllers.subreddit_controller.SubredditPageController(test_subreddit_name, db_session, r, log)  
+    sp = app.controllers.subreddit_controller.SubredditPageController(test_subreddit_name, db_session, r, log)
 
     ## NOW START THE TEST
     sp.archive_post(post)
@@ -224,13 +224,13 @@ def test_archive_post(mock_reddit):
     assert len(all_posts) == 1
 
 @patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Submission', autospec=True)    
+@patch('praw.objects.Submission', autospec=True)
 def test_fetch_post_comments(mock_submission, mock_reddit):
     with open("{script_dir}/fixture_data/post2.json".format(script_dir=TEST_DIR)) as f:
         post = json.loads(f.read())
     with open("{script_dir}/fixture_data/post2_comments.json".format(script_dir=TEST_DIR)) as f:
         post_comments = json.loads(f.read())
-    
+
     r = mock_reddit.return_value
     mock_submission.comments = post_comments
     mock_submission.num_comments = len(post_comments)
@@ -240,10 +240,10 @@ def test_fetch_post_comments(mock_submission, mock_reddit):
     ## ADD THE FIXTURE POST TO THE DATABASE
     assert len(db_session.query(Post).all()) == 0
     test_subreddit_name = "science"
-    sp = app.controllers.subreddit_controller.SubredditPageController(test_subreddit_name, db_session, r, log)  
+    sp = app.controllers.subreddit_controller.SubredditPageController(test_subreddit_name, db_session, r, log)
     sp.archive_post(post)
     all_posts = db_session.query(Post).all()
-    assert len(all_posts) == 1    
+    assert len(all_posts) == 1
 
     db_session.commit()
     dbpost = db_session.query(Post).filter(Post.id == post['id']).first()
@@ -262,10 +262,10 @@ def test_fetch_post_comments(mock_submission, mock_reddit):
 
 
 @patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Submission', autospec=True)    
+@patch('praw.objects.Submission', autospec=True)
 def test_archive_all_missing_subreddit_post_comments(mock_submission, mock_reddit):
 
-    ## SET UP MOCKS 
+    ## SET UP MOCKS
     r = mock_reddit.return_value
 
     ## TO START, LOAD POST FIXTURES
@@ -282,7 +282,7 @@ def test_archive_all_missing_subreddit_post_comments(mock_submission, mock_reddi
         post_comment_fixture_name = post_comment_fixture_names[i]
 
         with open("{script_dir}/fixture_data/{file}".format(script_dir=TEST_DIR, file=post_fixture_name)) as f:
-            post = json.loads(f.read())   
+            post = json.loads(f.read())
             post_fixtures.append(post)
 
         if(i == test_post_index):
@@ -295,7 +295,7 @@ def test_archive_all_missing_subreddit_post_comments(mock_submission, mock_reddi
         else:
             post_fixture_comments.append(None)
 
-        sp = app.controllers.subreddit_controller.SubredditPageController(post['subreddit_id'], db_session, r, log)  
+        sp = app.controllers.subreddit_controller.SubredditPageController(post['subreddit_id'], db_session, r, log)
         sp.archive_post(post)
     db_session.commit()
 
@@ -323,12 +323,12 @@ def test_archive_all_missing_subreddit_post_comments(mock_submission, mock_reddi
     assert dbpost.comments_queried_at == None
 
 ### this test doesn't pass right now. not related to twitter/lumen code
-### this test may have been deleted at some point? 
+### this test may have been deleted at some point?
 @patch('praw.Reddit', autospec=True)
 def test_archive_last_thousand_comments(mock_reddit):
     r = mock_reddit.return_value
 
-    
+
     subreddit_name = "science"
     subreddit_id = "mouw"
 
@@ -358,7 +358,7 @@ def test_archive_last_thousand_comments(mock_reddit):
 
     ## add science subreddit
     db_session.add(Subreddit(
-        id = subreddit_id, 
+        id = subreddit_id,
         name = subreddit_name))
     db_session.commit()
 
@@ -372,7 +372,7 @@ def test_archive_last_thousand_comments(mock_reddit):
     assert db_comment.subreddit_id == subreddit_id
     assert db_comment.post_id == comment_fixtures[0][-1]['link_id'].replace("t3_","")
     assert db_comment.user_id == comment_fixtures[0][-1]['author']
-    assert len(db_comment.comment_data) > 0 
+    assert len(db_comment.comment_data) > 0
 
     ## NOW TEST THAT NO OVERLAPPING IDS ARE ADDED
     first_ids = [x['id'] for x in comment_fixtures[0]]
@@ -436,7 +436,7 @@ def test_archive_mod_action_page(mock_reddit):
     assert db_action.action_data != None
     assert len(db_action.action_data) > 0
 
-    
+
     # NOW TRY TO ADD DUPLICATES
     # AND ASSERT THAT NO DUPLICATES WERE ADDED
     mac.archive_mod_action_page()
@@ -451,13 +451,13 @@ def test_archive_mod_action_page(mock_reddit):
     assert last_action_id == mod_action_fixtures[1][-1]['id']
 
 @patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Submission', autospec=True)    
+@patch('praw.objects.Submission', autospec=True)
 def test_fetch_post_comments(mock_submission, mock_reddit):
     with open("{script_dir}/fixture_data/post2.json".format(script_dir=TEST_DIR)) as f:
         post = json.loads(f.read())
     with open("{script_dir}/fixture_data/post2_comments.json".format(script_dir=TEST_DIR)) as f:
         post_comments = json.loads(f.read())
-    
+
     r = mock_reddit.return_value
     mock_submission.comments = post_comments
     mock_submission.num_comments = len(post_comments)
@@ -467,10 +467,10 @@ def test_fetch_post_comments(mock_submission, mock_reddit):
     ## ADD THE FIXTURE POST TO THE DATABASE
     assert len(db_session.query(Post).all()) == 0
     test_subreddit_name = "science"
-    sp = app.controllers.subreddit_controller.SubredditPageController(test_subreddit_name, db_session, r, log)  
+    sp = app.controllers.subreddit_controller.SubredditPageController(test_subreddit_name, db_session, r, log)
     sp.archive_post(post)
     all_posts = db_session.query(Post).all()
-    assert len(all_posts) == 1    
+    assert len(all_posts) == 1
 
     db_session.commit()
     dbpost = db_session.query(Post).filter(Post.id == post['id']).first()
@@ -488,10 +488,10 @@ def test_fetch_post_comments(mock_submission, mock_reddit):
 
 
 @patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Submission', autospec=True)    
+@patch('praw.objects.Submission', autospec=True)
 def test_archive_all_missing_subreddit_post_comments(mock_submission, mock_reddit):
 
-    ## SET UP MOCKS 
+    ## SET UP MOCKS
     r = mock_reddit.return_value
 
     ## TO START, LOAD POST FIXTURES
@@ -508,7 +508,7 @@ def test_archive_all_missing_subreddit_post_comments(mock_submission, mock_reddi
         post_comment_fixture_name = post_comment_fixture_names[i]
 
         with open("{script_dir}/fixture_data/{file}".format(script_dir=TEST_DIR, file=post_fixture_name)) as f:
-            post = json.loads(f.read())   
+            post = json.loads(f.read())
             post_fixtures.append(post)
 
         if(i == test_post_index):
@@ -521,7 +521,7 @@ def test_archive_all_missing_subreddit_post_comments(mock_submission, mock_reddi
         else:
             post_fixture_comments.append(None)
 
-        sp = app.controllers.subreddit_controller.SubredditPageController(post['subreddit_id'], db_session, r, log)  
+        sp = app.controllers.subreddit_controller.SubredditPageController(post['subreddit_id'], db_session, r, log)
         sp.archive_post(post)
     db_session.commit()
 
@@ -559,7 +559,7 @@ def test_archive_user(mock_reddit):
   patch('praw.')
 
   assert len(db_session.query(User).all()) == 0
-  sp = app.controllers.subreddit_controller.SubredditPageController(test_subreddit_name, db_session, r, log)  
+  sp = app.controllers.subreddit_controller.SubredditPageController(test_subreddit_name, db_session, r, log)
 
   ## NOW START THE TEST
   sp.archive_user(username, seen_at)
@@ -567,15 +567,15 @@ def test_archive_user(mock_reddit):
   all_users = db_session.query(User).all()
   assert len(all_users) == 1
 
-  user = db_session.query(User).first()  
+  user = db_session.query(User).first()
   old_last_seen = user.last_seen
 
   ## trying to archive it again should update last_seen field
   sp.archive_user(username, seen_at)
 
   all_users = db_session.query(User).all()
-  assert len(all_users) == 1  
-  user = db_session.query(User).first()  
+  assert len(all_users) == 1
+  user = db_session.query(User).first()
   new_last_seen = user.last_seen
   assert(old_last_seen <= new_last_seen)
 
@@ -597,7 +597,7 @@ def test_archive_lumen_notices(mock_LumenConnect):
     patch('app.connections.lumen_connect.')
 
     assert len(db_session.query(LumenNotice).all()) == 0
-    
+
     lumen = app.controllers.lumen_controller.LumenController(db_session, lc, log)
 
     topics = ["Copyright"]
@@ -648,7 +648,7 @@ def test_helper_parse_url_for_username(mock_get):
             assert app.controllers.lumen_controller.helper_parse_url_for_username(url, log) == result
         except utils.common.ParseUsernameSuspendedUserFound:
             if result == utils.common.ParseUsernameSuspendedUserFound:
-                assert True 
+                assert True
             else:
                 assert False
 
@@ -660,20 +660,30 @@ def test_parse_notices_archive_users(mock_LumenConnect, mock_get):
     patch('app.connections.lumen_connect.')
 
     assert len(db_session.query(LumenNoticeToTwitterUser).all()) == 0
-    
+
     lumen = app.controllers.lumen_controller.LumenController(db_session, lc, log)
 
     with open("{script_dir}/fixture_data/anon_lumen_notices_0.json".format(script_dir=TEST_DIR)) as f:
         data = json.loads(f.read())
         notices = data["notices"][:30] # to make test faster, but get >100 users
+        for notice in notices:
+            notice_record = LumenNotice(
+                id                  = notice["id"],
+                sender              = notice["sender_name"],
+                principal           = notice["principal_name"],
+                recipient           = notice["recipient_name"],
+                notice_data         = json.dumps(notice))
+            db_session.add(notice_record)
+        db_session.commit()
 
-    lumen.parse_notices_archive_users(notices)
+    lumen_notices = db_session.query(LumenNotice).all()
+    lumen.parse_notices_archive_users(lumen_notices)
     all_notices = db_session.query(LumenNoticeToTwitterUser).all()
     assert len(all_notices) == 175 # 140 if not anon fixture data
 
     not_found_users = [nu for nu in all_notices if utils.common.NOT_FOUND_TWITTER_USER_STR in nu.twitter_username]
-    # because we are currently not unshortening t.co, we will know at least the username for each twitter user we find 
-    assert len(not_found_users) == 0 
+    # because we are currently not unshortening t.co, we will know at least the username for each twitter user we find
+    assert len(not_found_users) == 0
 
 
 
@@ -681,7 +691,7 @@ def test_parse_notices_archive_users(mock_LumenConnect, mock_get):
 # currently, it is NOT responsible for updating existing TwitterUser objects
 # (archive_old_users is responsible for that, e.g. in the case that a user goes from found to not found)
 # however, it should make sure that it doesn't add duplicate entries for the same user
-# 
+#
 # TODO: currently this test does not test user list with len>90, so as to not call api.UsersLookup more than once, which is difficult to mock
 @patch('twitter.error', autospec=True)
 @patch('twitter.Api', autospec=True)
@@ -700,13 +710,17 @@ def test_archive_new_users(mock_twitter_api, mock_twitter_error):
     patch('twitter.')
     patch('app.connections.twitter_connect.')
 
-    
+
     assert len(db_session.query(TwitterUser).all()) == 0
 
     twitter = app.controllers.twitter_controller.TwitterController(db_session, tc, log)
 
     with open("{script_dir}/fixture_data/anon_twitter_username_list.json".format(script_dir=TEST_DIR)) as f:
         users = json.loads(f.read())
+        for name in users:
+            noticeuser_record = LumenNoticeToTwitterUser(twitter_username = name)
+            db_session.add(noticeuser_record)
+        db_session.commit()
 
     for j in range(2):
         # archive_new_users should be idempotent
@@ -720,7 +734,12 @@ def test_archive_new_users(mock_twitter_api, mock_twitter_error):
 
         prev_limit = 0
         for (i, result) in params_results:
-            twitter.archive_new_users(users[prev_limit:i])
+            users_list = users[prev_limit:i]
+            noticeusers_list = db_session.query(LumenNoticeToTwitterUser).filter(
+                LumenNoticeToTwitterUser.twitter_username.in_(users_list)).all()
+            assert len(users_list) == len(noticeusers_list)
+
+            twitter.archive_new_users(noticeusers_list)
             prev_limit = i
 
             found_users = db_session.query(TwitterUser).filter(TwitterUser.user_state == TwitterUserState.FOUND.value).all()
@@ -750,7 +769,7 @@ def test_archive_old_users(mock_twitter_api, mock_twitter_error):
 
     # for is_user_suspended_or_deleted
     api.GetUser.side_effect = te.TwitterError([{'message': 'User not found.', 'code': 50}])
-    
+
     assert len(db_session.query(TwitterUser).all()) == 0
     assert len(db_session.query(TwitterUserSnapshot).all()) == 0
 
@@ -768,7 +787,7 @@ def test_archive_old_users(mock_twitter_api, mock_twitter_error):
         created_at = now,
         record_created_at = now,
         lang = "en",
-        user_state = TwitterUserState.FOUND.value,                
+        user_state = TwitterUserState.FOUND.value,
         CS_oldest_tweets_archived = CS_JobState.NOT_PROCESSED.value)
 
     user_B_record = TwitterUser(
@@ -778,7 +797,7 @@ def test_archive_old_users(mock_twitter_api, mock_twitter_error):
         created_at = None,
         record_created_at = now,
         lang = None,
-        user_state = TwitterUserState.NOT_FOUND.value,                
+        user_state = TwitterUserState.NOT_FOUND.value,
         CS_oldest_tweets_archived = CS_JobState.PROCESSED.value) # no tweets to find
 
     db_session.add(user_A_record)
@@ -787,7 +806,7 @@ def test_archive_old_users(mock_twitter_api, mock_twitter_error):
 
     users = db_session.query(TwitterUser).all()
     key_to_user_A = {u.id: u for u in users if u.id == user_A_id}
-    key_to_user_B =  {u.screen_name: u for u in users if u.id == user_B_not_found_id} 
+    key_to_user_B =  {u.screen_name: u for u in users if u.id == user_B_not_found_id}
 
     ####################################################################
 
@@ -835,7 +854,7 @@ def test_archive_old_users(mock_twitter_api, mock_twitter_error):
     user_A_not_found_id = users[0].not_found_id
 
     snapshots = db_session.query(TwitterUserSnapshot).filter(
-        or_(TwitterUserSnapshot.twitter_user_id == user_A_id, 
+        or_(TwitterUserSnapshot.twitter_user_id == user_A_id,
             TwitterUserSnapshot.twitter_user_id == user_A_not_found_id)).all()
     assert len(snapshots) == 2
     for snapshot in snapshots:
@@ -868,7 +887,7 @@ def test_archive_old_users(mock_twitter_api, mock_twitter_error):
             TwitterUserSnapshot.twitter_user_id == user_B_not_found_id).all()
     assert len(snapshots) == 1
     assert snapshots[0].twitter_not_found_id and snapshots[0].twitter_not_found_id == user_B_not_found_id
-        
+
 
     ####################################################################
 
@@ -936,7 +955,7 @@ def test_archive_user_tweets(mock_TwitterConnect, mock_twitter_api):
     tc.api = api
     patch('twitter.')
     patch('app.connections.twitter_connect.')
-    
+
     assert len(db_session.query(TwitterStatus).all()) == 0
 
 
@@ -989,7 +1008,7 @@ def test_query_and_archive_user_snapshots_and_tweets(mock_TwitterConnect, mock_t
     patch('twitter.')
     patch('app.connections.twitter_connect.')
 
-    
+
 
     tc.api = api
 
@@ -1031,7 +1050,7 @@ def test_query_and_archive_user_snapshots_and_tweets(mock_TwitterConnect, mock_t
 
     for i in range(2,4):
         twitter.query_and_archive_user_snapshots_and_tweets(future, is_test=True) # to archive all
-        
+
         found_users = db_session.query(TwitterUser).filter(TwitterUser.user_state == TwitterUserState.FOUND.value).all()
         found_user_snapshots = db_session.query(TwitterUserSnapshot).filter(TwitterUserSnapshot.user_state == TwitterUserState.FOUND.value).all()
         assert len(found_users) == 80

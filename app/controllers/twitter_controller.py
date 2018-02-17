@@ -128,28 +128,18 @@ class TwitterController():
                 else:
                     do nothing
 
-        returns
-            user_name_to_id = {name: id}
-            noticeuser_to_state = {LumenNoticeToTwitterUser: CS_JobState}
-
-
 
     """
     def archive_new_users(self, unarchived_notice_users, test_exception=False):
-
         if len(unarchived_notice_users) == 0:
             return (None, None)
 
-        is_test = type(unarchived_notice_users[0]) is not LumenNoticeToTwitterUser
         if len(unarchived_notice_users) <= 0:
             return (None, None)
-        user_names_to_notice_user = {nu.twitter_username: nu for nu in unarchived_notice_users if utils.common.NOT_FOUND_TWITTER_USER_STR not in nu.twitter_username}
-        unarchived_user_names = set(user_names_to_notice_user.keys()) if not is_test else set([name for name in unarchived_notice_users if utils.common.NOT_FOUND_TWITTER_USER_STR not in name]) # to accomodate tests...
-        user_names = list(unarchived_user_names)
 
-        # to return
-        user_name_to_id = {name: None for name in user_names}
-        noticeuser_to_state = {nu: CS_JobState.FAILED for nu in unarchived_notice_users} if not is_test else {} # to accomodate tests....
+        user_names_to_notice_user = {nu.twitter_username: nu for nu in unarchived_notice_users if utils.common.NOT_FOUND_TWITTER_USER_STR not in nu.twitter_username}
+        unarchived_user_names = set(user_names_to_notice_user.keys())
+        user_names = list(unarchived_user_names)
 
         # query batch_size at a time
         batch_size = 100 # limit should be 100
@@ -255,7 +245,6 @@ class TwitterController():
 
         for name in left_users:
             uid = utils.common.generate_not_found_twitter_user_id(name)
-            user_name_to_id[name] = uid
 
             # disambiguate between NOT_FOUND, SUSPENDED
             user_state = self.is_user_suspended_or_deleted(name)
