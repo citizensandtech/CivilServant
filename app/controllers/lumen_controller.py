@@ -89,23 +89,16 @@ class LumenController():
     """
     def query_and_parse_notices_archive_users(self, test_exception = False):
         unparsed_notices = self.db_session.query(LumenNotice).filter(LumenNotice.CS_parsed_usernames == CS_JobState.NOT_PROCESSED.value).all()
-        notice_to_state = self.parse_notices_archive_users(unparsed_notices, test_exception)
+        self.parse_notices_archive_users(unparsed_notices, test_exception)
 
     """
         unparsed_notices = list of LumenNotices
-
-        returns:
-            notice_to_state = {LumenNotice: CS_JobState}
     """
     def parse_notices_archive_users(self, unparsed_notices, test_exception = False):
         if len(unparsed_notices) == 0:
             return {}
 
         is_test = type(unparsed_notices[0]) is not LumenNotice
-        if not is_test: # to accomodate test fixture data
-            notice_to_state = {notice: CS_JobState.FAILED for notice in unparsed_notices }
-        else:
-            notice_to_state = {json.dumps(notice): CS_JobState.FAILED for notice in unparsed_notices }
 
         if(test_exception):
             counter = 0
@@ -194,7 +187,6 @@ class LumenController():
                         len(notice_users),
                         sum(len(work["infringing_urls"]) for work in notice_json["works"]),
                         notice_json["id"]), extra=sys.exc_info()[0])
-                    ####return notice_to_state
                 else:
                     self.log.info("Saved {0} twitter users from {1} infringing_urls in notice {2}.".format(
                         len(notice_users),
@@ -202,9 +194,6 @@ class LumenController():
                         notice_json["id"]))
 
                     key = notice if not is_test else json.dumps(notice)
-                    notice_to_state[key] = job_state
-
-        return notice_to_state
 
         def bulk_unshorten(self,notice_id,urls,workers=10):
 
