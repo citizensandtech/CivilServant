@@ -188,3 +188,7 @@ def anonymize_twitter_tweets(fname, user_id=None):
 ## to test 
 # fname = "twitter_tweets_ex.json"
 # anonymize_twitter_tweets(fname)
+
+## 02.17.2018 tests for archive_new_users (users_lookup_0.json)
+#fname = "users_lookup_0.json"
+#anonymize_twitter_users(fname)
