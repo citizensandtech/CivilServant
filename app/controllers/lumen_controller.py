@@ -87,10 +87,14 @@ class LumenController():
     """
     For all LumenNotices with CS_parsed_usernames=NOT_PROCESSED, parse for twitter accounts
     """
-    def query_and_parse_notices_archive_users(self):
+    def query_and_parse_notices_archive_users(self, test_exception = False):
         unparsed_notices = self.db_session.query(LumenNotice).filter(LumenNotice.CS_parsed_usernames == CS_JobState.NOT_PROCESSED.value).all()
 
         utils.common.update_CS_JobState(unparsed_notices, "CS_parsed_usernames", CS_JobState.IN_PROGRESS, self.db_session, self.log)
+
+        if(test_exception):
+            raise Exception("Throwing an exception for test purposes")
+
 
         notice_to_state = self.parse_notices_archive_users(unparsed_notices)
 
