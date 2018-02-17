@@ -188,7 +188,6 @@ class TwitterController():
                 users_json = [json.loads(json.dumps(user_info._json).encode("utf-8", "replace")) if type(user_info) is twitter.models.User else user_info for user_info in users_info] # to accomodate test fixture data
 
                 this_found_ids = set([user_json["id"] for user_json in users_json])
-                this_found_screen_names = set([user_json["screen_name"] for user_json in users_json])
                 existing_ids = [uid[0] for uid in self.db_session.query(TwitterUser.id).filter(TwitterUser.id.in_(list(this_found_ids))).all()]
                 all_existing_ids.update(existing_ids)
 
