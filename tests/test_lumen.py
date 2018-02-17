@@ -40,7 +40,7 @@ def test_archive_lumen_notices(mock_LumenConnect):
 
     ## NOW START THE TEST
     from_date = datetime.datetime.utcnow() - datetime.timedelta(days=2)
-    to_date = datetime.datetime.utcnow()   
+    to_date = datetime.datetime.utcnow()
     data_json = lc.get_notices_to_twitter(["Copyright"], 50, 1, from_date, to_date)
     notices_json = data_json["notices"]
     assert len(notices_json) == 50
@@ -72,9 +72,12 @@ def test_parse_lumen_notices(mock_LumenConnect):
     try:
         l.query_and_parse_notices_archive_users(test_exception=True)
     except:
-        pass
         ## AT THIS POINT, WE HAVE THINGS THAT SHOULD BE "NOT PROCESSED" THAT ARE
         ## LABELED CS_JobState==2 (e.g. IN PROGRESS) DESPITE HAVING THE CODE FAIL
-    notices = [x for x in db_session.query(LumenNotice).all()]
-    for notice in notices:
-        assert notice.CS_parsed_usernames == CS_JobState.NOT_PROCESSED
+        notices = [x for x in db_session.query(LumenNotice).all()]
+        for notice in notices:
+            assert notice.CS_parsed_usernames != CS_JobState.IN_PROGRESS.value
+        assert notice[0].CS_parsed_usernames != CS_JobState.NOT_PROCESSED.value
+        assert notice[-1].CS_parsed_usernames == CS_JobState.NOT_PROCESSED.value
+    else:
+        assert False # expected query_and_parse_notices_archive_users to throw test_exception
