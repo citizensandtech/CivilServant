@@ -511,8 +511,13 @@ class TwitterController():
             if limit > prev_limit:
                 this_users = unarchived_users[prev_limit:limit]
                 utils.common.update_CS_JobState(this_users, "CS_oldest_tweets_archived", CS_JobState.IN_PROGRESS, self.db_session, self.log)
-                user_to_state = self.with_user_records_archive_tweets(this_users, backfill=backfill, is_test=is_test) # backfill hacky
-                utils.common.update_all_CS_JobState(user_to_state, "CS_oldest_tweets_archived", self.db_session, self.log)
+                try:
+                    self.with_user_records_archive_tweets(this_users, backfill=backfill, is_test=is_test) # backfill hacky
+                except:
+                    raise # re-raise the exception
+                finally:
+                    # reset progress whether or not exception is raised
+                    utils.common.reset_CS_JobState_In_Progress(this_users, "CS_oldest_tweets_archived", self.db_session, self.log) # if still marked IN_PROGRESS (e.g. because of unchecked exception), reset it to NOT_PROCESSED
                 prev_limit = limit
 
             self.log.info("Queried and archived tweets for {0} out of {1} users; backfill={2}".format(prev_limit, len(unarchived_users), backfill))
@@ -522,15 +527,23 @@ class TwitterController():
 
         returns user_to_state
     """
-    def with_user_records_archive_tweets(self, user_records, backfill=False, is_test=False):
+    def with_user_records_archive_tweets(self, user_records, backfill=False, is_test=False, test_exception=False):
         if len(user_records) == 0:
             return
 
-        user_to_state = {}  # only need for when CS_JobState.NOT_PROCESSED...
+        if test_exception:
+            counter = 0
+
         for user in user_records:
             job_state = self.archive_user_tweets(user, backfill=backfill, is_test=is_test)
-            user_to_state[user] = job_state
-        return user_to_state
+            user.CS_oldest_tweets_archived = job_state.value
+            self.db_session.add(user)
+            self.db_session.commit()
+
+            if test_exception:
+                counter += 1
+                if counter >= len(user_records) / 2:
+                    raise Exception("Throwing an exception for test purposes")
 
     """
         returns (statuses, user_state, job_state)

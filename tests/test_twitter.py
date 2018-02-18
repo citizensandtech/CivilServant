@@ -50,7 +50,6 @@ def populate_notice_users():
             db_session.add(notice_user_record)
         db_session.commit()
 
-# @patch('app.connections.twitter_connect.TwitterConnect', autospec=True)
 @patch('twitter.Api', autospec=True)
 def test_archive_twitter_new_users(mock_twitter, populate_notice_users):
     t = mock_twitter.return_value
@@ -70,3 +69,64 @@ def test_archive_twitter_new_users(mock_twitter, populate_notice_users):
             assert noticeuser.CS_account_archived != CS_JobState.IN_PROGRESS.value
     else:
         assert False # expected query_and_archive_new_users to throw test_exception
+
+@patch('twitter.Api', autospec=True)
+@patch('app.connections.twitter_connect.TwitterConnect', autospec=True)
+def test_with_user_records_archive_tweets(mock_TwitterConnect, mock_twitter_api):
+    tc = mock_TwitterConnect.return_value
+    api = mock_twitter_api.return_value
+
+    def mocked_GetUserTimeline(user_id, count=None, max_id=None):
+        with open("{script_dir}/fixture_data/anon_twitter_tweets.json".format(script_dir=TEST_DIR)) as f:
+            data = json.loads(f.read())
+        assert len(data) == 200
+        if user_id == "2" or user_id == "3": # suspended_user or protected_user
+            raise twitter.error.TwitterError("Not authorized.") # not mocking TwitterError
+        elif user_id == "1": # deleted_user
+            raise twitter.error.TwitterError([{'message': 'Sorry, that page does not exist.', 'code': 34}])
+        else:   # # existing_user ?
+            return data
+
+
+    m = Mock()
+    m.side_effect = mocked_GetUserTimeline
+    api.GetUserTimeline = m
+    tc.api = api
+    patch('twitter.')
+    patch('app.connections.twitter_connect.')
+
+    assert len(db_session.query(TwitterStatus).all()) == 0
+
+
+
+    t_controller = app.controllers.twitter_controller.TwitterController(db_session, tc, log)
+
+    user_results = [
+        ({"screen_name": "existing_user", "id": "888", "user_state": TwitterUserState.FOUND.value}, {"status_count": 200, "user_state": TwitterUserState.FOUND.value}),
+        ({"screen_name": "deleted_user", "id": "1", "user_state": TwitterUserState.NOT_FOUND.value}, {"status_count": 0, "user_state": TwitterUserState.NOT_FOUND.value}),
+        ({"screen_name": "suspended_user", "id": "2", "user_state": TwitterUserState.NOT_FOUND.value}, {"status_count": 0, "user_state": TwitterUserState.SUSPENDED.value}),
+        ({"screen_name": "protected_user", "id": "3", "user_state": TwitterUserState.PROTECTED.value}, {"status_count": 0, "user_state": TwitterUserState.PROTECTED.value})
+    ]
+
+    user_records = []
+    for i, (user, result) in enumerate(user_results):
+        # need to create TwitterUser records first
+        user_record = TwitterUser(
+            id = user["id"],
+            screen_name = user["screen_name"],
+            user_state = user["user_state"])
+        db_session.add(user_record)
+        db_session.commit()
+        user_records.append(user_record)
+
+
+    try:
+        t_controller.with_user_records_archive_tweets(user_records, backfill=True, is_test=True)
+    except:
+        user_records = [x for x in db_session.query(TwitterUser).all()]
+        for user_record in user_records:
+            assert user_record.CS_oldest_tweets_archived != CS_JobState.IN_PROGRESS.value
+        assert len([x for x in user_records if x.CS_oldest_tweets_archived == CS_JobState.PROCESSED.value]) > 0
+    else:
+        assert False # expected query_and_archive_new_users to throw test_exception
+

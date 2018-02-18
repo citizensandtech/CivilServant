@@ -77,7 +77,6 @@ def test_parse_lumen_notices(mock_LumenConnect):
         notices = [x for x in db_session.query(LumenNotice).all()]
         for notice in notices:
             assert notice.CS_parsed_usernames != CS_JobState.IN_PROGRESS.value
-        assert notices[0].CS_parsed_usernames != CS_JobState.NOT_PROCESSED.value
-        assert notices[-1].CS_parsed_usernames == CS_JobState.NOT_PROCESSED.value
+        assert len([x for x in notices if x.CS_parsed_usernames == CS_JobState.PROCESSED.value]) > 0
     else:
         assert False # expected query_and_parse_notices_archive_users to throw test_exception
