@@ -166,6 +166,7 @@ class TwitterController():
                 try:
                     users_info = self.t.query(self.t.api.UsersLookup,screen_name=this_users)
                 except twitter.error.TwitterError as e:
+                    self.t.try_counter = 0 ## this line prevents the retry code from looping
                     commit_users_failed(this_users)
                     self.log.error("Failed to query for {0} Twitter users using api.UsersLookup: {1}".format(limit-prev_limit, str(e)))
                 else:
@@ -292,6 +293,7 @@ class TwitterController():
         try:
             user = self.t.query(self.t.api.GetUser,screen_name=username)
         except twitter.error.TwitterError as e:
+            self.t.try_counter = 0 ## this line prevents the retry code from looping
             if e.message[0]['code'] == 50 and e.message[0]['message'] == 'User not found.':
                 user_state = TwitterUserState.NOT_FOUND
             elif e.message[0]['code'] == 63 and e.message[0]['message'] == 'User has been suspended.':
@@ -376,6 +378,7 @@ class TwitterController():
                     else:
                         users_info = self.t.query(self.t.api.UsersLookup,screen_name=this_users)
                 except twitter.error.TwitterError as e:
+                    self.t.try_counter = 0 ## this line prevents the retry code from looping
                     # this message means no users_info found: "[{'code': 17, 'message': 'No user matches for specified terms.'}]"
                     if e.message[0]['code'] != 17:
                         self.log.error("Unexpected error while querying for {0} Twitter users using api.UsersLookup: {1}; users: {2}".format(limit-prev_limit, str(e), this_users))

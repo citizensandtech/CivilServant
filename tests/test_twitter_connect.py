@@ -22,6 +22,9 @@ def teardown_function(function):
 def test_twitter_connect(mock_twitter):
     t = mock_twitter.return_value
     conn = app.connections.twitter_connect.TwitterConnect()
+
+    #assert len(conn.rate_limit_resources.values()), 3
+
     friend_accounts = []
     with open("{script_dir}/fixture_data/twitter_get_friends.json".format(script_dir=TEST_DIR)) as f:
         fixture = json.loads(f.read())

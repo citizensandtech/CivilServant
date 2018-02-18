@@ -38,9 +38,10 @@ def main():
 
     page_type = args.pagetype.lower()
 
-    ttl = 172800 ## two days in seconds
-    if(ttl <= int(args.interval) + 3600):
-        ttl = int(args.interval) + 3600
+    timeout_seconds = 172800 ## two days in seconds
+    if(timeout_seconds <= int(args.interval) + 3600):
+        timeout_seconds = int(args.interval) + 3600
+    ttl = int(args.interval) + 180
 
     if(args.sub =="all"):
         page_type = getattr(PageType, args.pagetype.upper())
@@ -50,6 +51,7 @@ def main():
                 args=[page_type],
                 interval=int(args.interval),
                 repeat=None,
+				timeout = timeout_seconds,
                 result_ttl = ttl)
 #                result_ttl=int(args.interval)+10)
                 ## we set the result_ttl to longer than the interval
@@ -62,6 +64,7 @@ def main():
                     args=[args.sub],
                     interval=int(args.interval),
                     repeat=None,
+				    timeout = timeout_seconds,
                     result_ttl = ttl)
         elif(page_type == "modactions"):
             scheduler.schedule(
@@ -70,6 +73,7 @@ def main():
                     args=[args.sub],
                     interval=int(args.interval),
                     repeat=None,
+				    timeout = timeout_seconds,
                     result_ttl = ttl)
         else:
             page_type = getattr(PageType, args.pagetype.upper())
@@ -79,8 +83,8 @@ def main():
                     args=[args.sub, page_type],
                     interval=int(args.interval),
                     repeat=None,
+				    timeout = timeout_seconds,
                     result_ttl = ttl)
-    #                result_ttl=int(args.interval)+10)
 
 if __name__ == '__main__':
     main()
