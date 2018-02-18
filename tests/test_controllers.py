@@ -693,6 +693,9 @@ def test_parse_notices_archive_users(mock_LumenConnect, mock_get):
 # however, it should make sure that it doesn't add duplicate entries for the same user
 #
 # TODO: currently this test does not test user list with len>90, so as to not call api.UsersLookup more than once, which is difficult to mock
+
+#### TODO: add a test for the case where multiple lumen notices mention an account that is not retrieved from Twitter
+#### look in how user_names_to_notice_user is handled in the method
 @patch('twitter.error', autospec=True)
 @patch('twitter.Api', autospec=True)
 def test_archive_new_users(mock_twitter_api, mock_twitter_error):

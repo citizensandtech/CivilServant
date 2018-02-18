@@ -2,13 +2,13 @@ import twitter
 import simplejson as json
 import datetime
 from app.models import Base, TwitterUser, TwitterStatus, LumenNoticeToTwitterUser, TwitterUserSnapshot
-import utils.common
 import requests
 import sqlalchemy
 from sqlalchemy import and_, or_, func
 import utils.common
 from utils.common import TwitterUserState, NOT_FOUND_TWITTER_USER_STR, CS_JobState
 import sys
+from collections import defaultdict
 
 TWITTER_DATETIME_STR_FORMAT = "%a %b %d %H:%M:%S %z %Y"
 
@@ -71,7 +71,7 @@ class TwitterController():
     ################### ARCHIVE NEW USERS CODE
     #########################################################
 
-    def query_and_archive_new_users(self, test_exception=True):
+    def query_and_archive_new_users(self, test_exception=False):
         # get unprocessed LumenNoticeToTwitterUser records with real twitter usernames
         unarchived_notice_users = self.db_session.query(LumenNoticeToTwitterUser).filter(
             #or_(
@@ -103,8 +103,9 @@ class TwitterController():
         except:
             raise # re-raise the exception
         finally:
-            # reset progress whether or not exception is raised
-            utils.common.reset_CS_JobState_In_Progress(unprocessed_unarchived_notice_users, "CS_account_archived", self.db_session, self.log) # if still marked IN_PROGRESS (e.g. because of unchecked exception), reset it to NOT_PROCESSED
+            # reset progress for any remaining in-progress items whether or not exception is raised
+            notice_users_to_reset = [notice_user for notice_user in unprocessed_unarchived_notice_users if notice_user.CS_account_archived == CS_JobState.IN_PROGRESS.value]
+            utils.common.reset_CS_JobState_In_Progress(notice_users_to_reset, "CS_account_archived", self.db_session, self.log) # if still marked IN_PROGRESS (e.g. because of unchecked exception), reset it to NOT_PROCESSED
 
 
     """
@@ -137,7 +138,14 @@ class TwitterController():
         if len(unarchived_notice_users) <= 0:
             return (None, None)
 
-        user_names_to_notice_user = {nu.twitter_username: nu for nu in unarchived_notice_users if utils.common.NOT_FOUND_TWITTER_USER_STR not in nu.twitter_username}
+        #JNM NOTE TODO: SHOULD PROBABLY BE A DICT OF LISTS, NOT A DICT OF OBJECTS
+        # HERE WE ASSUME THAT ACCOUNTS THAT HAVE THE SAME SCREEN NAME
+        # AND WHICH ARE IN THIS SCRAPING SESSION ARE THE SAME ACCOUNT
+        user_names_to_notice_user = defaultdict(list)
+        for nu in unarchived_notice_users:
+            if(utils.common.NOT_FOUND_TWITTER_USER_STR not in nu.twitter_username):
+                user_names_to_notice_user[nu.twitter_username].append(nu)
+#        user_names_to_notice_user = {nu.twitter_username: nu for nu in unarchived_notice_users if utils.common.NOT_FOUND_TWITTER_USER_STR not in nu.twitter_username}
         unarchived_user_names = set(user_names_to_notice_user.keys())
         user_names = list(unarchived_user_names)
 
@@ -149,10 +157,10 @@ class TwitterController():
         all_existing_ids = set([]) # all ids already stored in db
 
         def commit_users_failed(user):
-            noticeuser = user_names_to_notice_user[user]
-            noticeuser.CS_account_archived = CS_JobState.FAILED.value
-            # noticeuser.twitter_user_id = user_name_to_id[noticeuser.twitter_username]
-            self.db_session.add(noticeuser)
+            for noticeuser in user_names_to_notice_user[user]:
+                noticeuser.CS_account_archived = CS_JobState.FAILED.value
+                # noticeuser.twitter_user_id = user_name_to_id[noticeuser.twitter_username]
+                self.db_session.add(noticeuser)
             self.db_session.commit()
 
         if test_exception:
@@ -167,8 +175,9 @@ class TwitterController():
                     users_info = self.t.query(self.t.api.UsersLookup,screen_name=this_users)
                 except twitter.error.TwitterError as e:
                     self.t.try_counter = 0 ## this line prevents the retry code from looping
-                    commit_users_failed(this_users)
-                    self.log.error("Failed to query for {0} Twitter users using api.UsersLookup: {1}".format(limit-prev_limit, str(e)))
+                    #for this_user in this_users:
+                    #    commit_users_failed(this_user)
+                    self.log.info("Failed to query for {0} Twitter users using api.UsersLookup: {1} {2}".format(limit-prev_limit, ",".join(this_users), str(e)))
                 else:
                     self.log.info("Queried for {0} Twitter users out of a total of {1} users, got {2} out of {3} users".format(
                         limit, len(user_names), len(users_info), limit-prev_limit))
@@ -220,10 +229,13 @@ class TwitterController():
                             all_existing_ids.add(uid)
                             left_users.discard(screen_name) # discard doesn't throw an error
 
-                            noticeuser = user_names_to_notice_user[screen_name]
-                            noticeuser.CS_account_archived = CS_JobState.PROCESSED.value
-                            noticeuser.twitter_user_id = uid
-                            self.db_session.add(noticeuser)
+                            ## iterate through the list of notice users and
+                            ## update all of the records
+                            noticeusers = user_names_to_notice_user[screen_name]
+                            for nu in noticeusers:
+                                nu.CS_account_archived = CS_JobState.PROCESSED.value
+                                nu.twitter_user_id = uid
+                                self.db_session.add(nu)
 
                             if test_exception:
                                 counter += 1
@@ -240,8 +252,20 @@ class TwitterController():
                             commit_users_failed(screen_name)
 
         # at end, for left_users (users not found), commit to db
-        # first, remove left_users that already have a TwitterUser record (with the same screen_name)
         left_existing_users = self.db_session.query(TwitterUser).filter(TwitterUser.screen_name.in_(list(left_users))).all()
+        
+        # first, update lumen notices that are already associated with a twitter user
+        for twitter_user in left_existing_users:
+            screen_name = twitter_user.screen_name
+            if screen_name in user_names_to_notice_user.keys():
+                for notice_user in user_names_to_notice_user[screen_name]:
+                    if(notice_user.CS_account_archived == CS_JobState.IN_PROGRESS.value):
+                        notice_user.twitter_user_id = twitter_user.id
+                        notice_user.CS_account_archived = CS_JobState.PROCESSED.value
+                        self.db_session.add(notice_user)
+        self.db_session.commit()
+
+        # next, remove left_users that already have a TwitterUser record (with the same screen_name)
         left_users = left_users - set([u.screen_name for u in left_existing_users])
 
         for name in left_users:
@@ -273,10 +297,11 @@ class TwitterController():
                     user_json = None)
                 self.db_session.add(user_snapshot_record)
 
-                noticeuser = user_names_to_notice_user[name]
-                noticeuser.CS_account_archived = CS_JobState.PROCESSED.value
-                noticeuser.twitter_user_id = uid
-                self.db_session.add(noticeuser)
+                noticeusers = user_names_to_notice_user[name]
+                for noticeuser in noticeusers:
+                    noticeuser.CS_account_archived = CS_JobState.PROCESSED.value
+                    noticeuser.twitter_user_id = uid
+                    self.db_session.add(noticeuser)
 
                 try:
                     self.db_session.commit()
