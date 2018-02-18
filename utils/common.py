@@ -16,7 +16,7 @@ class ThingType(Enum):
     COMMENT = 2
     SUBREDDIT = 3
     USER = 4
-    STYLESHEET = 5    
+    STYLESHEET = 5
 
 # not formalized...
 class TwitterUserState(Enum):
@@ -36,8 +36,8 @@ class CS_JobState(Enum):
 def generate_not_found_twitter_user_id(screen_name=""):
     capped_screen_name = screen_name if len(screen_name)<30 else screen_name[:30] + "..."
     return "{0}_{1}_{2}".format(
-        NOT_FOUND_TWITTER_USER_STR, 
-        capped_screen_name, 
+        NOT_FOUND_TWITTER_USER_STR,
+        capped_screen_name,
         time_since_epoch_ms(datetime.datetime.utcnow())
         )
 
@@ -58,7 +58,7 @@ def update_all_CS_JobState(row_to_state, field, db_session, log):
 
 def update_CS_JobState(rows, field, to_state, db_session, log):
     if len(rows) == 0:
-        log.info("Updated 0 CS_JobState fields.")        
+        log.info("Updated 0 CS_JobState fields.")
         return
 
     for row in rows:
@@ -68,6 +68,23 @@ def update_CS_JobState(rows, field, to_state, db_session, log):
         log.info("Updated {0} {1} {2} fields to {3}.".format(len(rows), type(rows[0]), field, to_state))
     except:
         log.error("Error while saving DB Session for updating {0} {1} {2} fields to {3}.".format(len(rows), type(rows[0]), field, to_state), extra=sys.exc_info()[0])
+
+def reset_CS_JobState_In_Progress(rows, field, db_session, log):
+    if len(rows) == 0:
+        log.info("Updated 0 CS_JobState fields.")
+        return
+
+    changed_rows = []
+    for row in rows:
+        if getattr(row, field) == CS_JobState.IN_PROGRESS.value:
+            setattr(row, field, CS_JobState.NOT_PROCESSED.value)
+            changed_rows.append(row)
+
+    try:
+        db_session.commit()
+        log.info("Updated {0} {1} {2} fields to CS_JobState NOT_PROCESSED.".format(len(changed_rows), type(rows[0]), field))
+    except:
+        log.error("Error while saving DB Session for updating {0} {1} {2} fields to CS_JobState NOT_PROCESSED.".format(len(changed_rows), type(rows[0]), field), extra=sys.exc_info()[0])
 
 
 class ParseUsernameSuspendedUserFound(Exception):
