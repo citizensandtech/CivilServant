@@ -140,4 +140,4 @@ class CommentNode:
 
 def time_since_epoch_ms(dt):
     epoch = datetime.datetime.utcfromtimestamp(0)
-    return (dt - epoch).total_seconds() * 1000.0
+    return int((dt - epoch).total_seconds() * 1000.0)

@@ -110,7 +110,8 @@ def anonymize_twitter_user(user, user_id=None):
     user["created_at"] = fuzz_date(user["created_at"], TWITTER_DATETIME_STR_FORMAT)
 
     if "status" in user and user["status"]:
-        user["status"] = anonymize_twitter_tweet(user["status"], user_id=user_id) ##
+        user['status'] = {}
+        #user["status"] = anonymize_twitter_tweet(user["status"], user_id=user_id) ##
 
     # throw out... current tests don't depend on knowing these fields
     if "entities" in user and user["entities"]:
