@@ -584,6 +584,7 @@ class TwitterController():
             statuses = self.t.api.GetUserTimeline(user_id=user_id, count=count, max_id=max_id)
         except twitter.error.TwitterError as e:
             self.log.info(e)
+            self.t.try_counter = 0 ## this line prevents the retry code from looping
             # TODO: un-jankify this error handling/parsing code. might not get much better though
             if e.message == "Not authorized.":
                 # Account is either protected or suspended

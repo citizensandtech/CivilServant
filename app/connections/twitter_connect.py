@@ -7,11 +7,22 @@ from retrying import retry
 
 
 ENV =  os.environ['CS_ENV']
+BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), "../..")
+
+
+## LOAD CONFIG TO GET TOKEN INFO (copied from below, sigh)
+config_path = os.path.join(BASE_DIR, "config", "twitter_configuration_" + ENV + ".json")
+with open(config_path, "r") as config:
+	config = json.loads(config.read())
+
+if(config['key_path'][0] == "/"):
+	token_path = config['key_path']
+else:
+	token_path = os.path.join(BASE_DIR, config['key_path'])
 
 ## HOW MANY TIMES TO RETRY?
-## IN THEORY, SHOULDN'T NEED
-## TO RETRY MORE THAN ONCE
-RETRY_LIMIT = 10
+## WE SHOULD RETRY FOR AS MANY TIMES AS THERE ARE KEYS
+RETRY_LIMIT = len(glob.glob(os.path.join(token_path, "*.json")))
 
 def rate_limit_retry(func):
 

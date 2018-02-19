@@ -4,7 +4,7 @@ mock
 simplejson
 redis
 rq
-rq-scheduler
+rq-scheduler==0.7.0
 rq-dashboard
 mysqlclient
 sqlalchemy

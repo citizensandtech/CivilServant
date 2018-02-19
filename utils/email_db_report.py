@@ -2,18 +2,17 @@ import os, sys
 import datetime
 import simplejson as json
 
-ENV = sys.argv[1] # "production"
-os.environ['CS_ENV'] = ENV
+if __name__ == "__main__" and len(sys.argv) > 1:
+    os.environ["CS_ENV"] = sys.argv[1]
+ENV = os.environ["CS_ENV"]
+
 BASE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..")
 sys.path.append(BASE_DIR)
 
-from utils.common import PageType, ThingType, TwitterUserState
+from utils.common import PageType, ThingType
 
 with open(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV), "r") as config:
   DBCONFIG = json.loads(config.read())
-
-with open(os.path.join(BASE_DIR, "config") + "/email_db_report.json".format(env=ENV), "r") as config:
-  EMAIL_CONFIG = json.loads(config.read())
 
 ### LOAD SQLALCHEMY
 from sqlalchemy import create_engine
@@ -53,50 +52,8 @@ def run_query_for_days(query_str, today, days=7):
     today_str = date_to_str(today, by_day=False)
     last_week = today - datetime.timedelta(days=days)
     last_week_str = date_to_str(last_week, by_day=False)
-
     result = db_session.execute(query_str, {"from_date": last_week_str, "to_date": today_str}).fetchall()
     return result
-
-# query that doesn't take in arguments
-def run_simple_query(query_str):
-    result = db_session.execute(query_str).fetchall()
-    return result
-
-# result should be an iterable of primitives
-# column_names should be an iterable of strings
-# expects arbitrary number of columns, 2 rows (one of which is the heading)
-def generate_simple_html_table(result, column_names, title):
-    html = "<tr><th>{0}</th>".format(title)
-
-    for column in column_names:
-        html += "<th>{0}</th>".format(column)
-    html += "</tr><tr><td></td>"
-
-    for value in result:
-        html += "<td>{0}</td>".format(value)
-    html += "</tr>"
-
-    return html
-
-# result should be [(label, count), (label, count), (label, count)...]
-# expects 2 columns, arbitrary number of rows
-def generate_group_by_html_table(result, title):
-    html = """
-        <tr>
-            <th>{0}</th>
-            <th>count</th>
-        </tr>            
-            """.format(title)
-
-    html += "<tr>"
-    for (label, count) in result:
-        html += """
-            <td>{0}</td>
-            <td>{1}</td>            
-            """.format(label, count)
-    html += "</tr>"
-
-    return html
 
 def transform_result_to_dict(result):
     type_to_date_to_val = {}
@@ -109,11 +66,11 @@ def transform_result_to_dict(result):
         type_to_date_to_val[this_type][date] = count
     return type_to_date_to_val
     
-def generate_days_html_table(result, today, title):
+def generate_html_table(result, today, title):
     d = transform_result_to_dict(result)  
-    return generate_simple_html_table_from_dict(d, today, title)
+    return generate_html_table_from_dict(d, today, title)
     
-def generate_days_html_table_from_dict(type_to_date_to_val, today, title):                
+def generate_html_table_from_dict(type_to_date_to_val, today, title):                
     days_str = [date_to_str(today - datetime.timedelta(days=i)) for i in range(0,7)]
     days = [str_to_date(d) for d in days_str] # to make everything 00:00:00 
     past_days = days[1:]
@@ -153,10 +110,11 @@ def generate_days_html_table_from_dict(type_to_date_to_val, today, title):
     return html
 
 
-def send_db_report(toaddrs, date, html):
-    fromaddr = EMAIL_CONFIG["fromaddr"]
+def send_db_report(date, html):
+    with open(os.path.join(BASE_DIR, "config") + "/email_db_report.json".format(env=ENV), "r") as f:
+        email_config = json.loads(f.read())
     subject = "CivilServant Database Report: {0}".format(date_to_str(date))
-    send_email(fromaddr, toaddrs, subject, html)
+    send_email(email_config["fromaddr"], email_config["toaddrs"], subject, html)
 
 def send_email(fromaddr, toaddrs, subject, html):
     import smtplib
@@ -181,10 +139,10 @@ def send_email(fromaddr, toaddrs, subject, html):
 
 
 ######################################################################
-######### REDDIT          ############################################
+######### REDDIT 		  ############################################
 ######################################################################
 
-def generate_reddit_front_page(today=datetime.datetime.utcnow(), days=7):
+def generate_reddit_front_page(today=datetime.datetime.utcnow(), days=7, html=True):
     #query_str = "SELECT min(created_at), max(created_at) FROM front_pages"
     #result = db_session.execute(query_str).fetchall()    
     #print(result)
@@ -195,71 +153,93 @@ def generate_reddit_front_page(today=datetime.datetime.utcnow(), days=7):
         GROUP BY page_type, YEAR(created_at), MONTH(created_at), DAY(created_at)"""
     result = run_query_for_days(query_str, today, days=days)
     result = [(PageType(a).name, b, c, d, e) for (a,b,c,d,e) in result]
-    return generate_days_html_table(result, 
-        str_to_date(date_to_str(today)), 
-        "New FrontPage count, by pagetype")  # to make everything 00:00:00 
+    if not html:
+        return result
+    return generate_html_table(result, 
+                               str_to_date(date_to_str(today)), 
+                               "New FrontPage count, by pagetype")  # to make everything 00:00:00 
 
 
-def generate_reddit_subreddit_page(today=datetime.datetime.utcnow(), days=7):
+def generate_reddit_subreddit_page(today=datetime.datetime.utcnow(), days=7, html=True):
     query_str = """
-        SELECT subreddit_id, page_type, YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) 
-        FROM subreddit_pages WHERE created_at <= :to_date and created_at >= :from_date 
-        GROUP BY subreddit_id, page_type, YEAR(created_at), MONTH(created_at), DAY(created_at)"""
+        SELECT sr.name, srp.page_type, YEAR(srp.created_at), MONTH(srp.created_at), DAY(srp.created_at), count(*) 
+        FROM subreddit_pages srp
+        JOIN subreddits sr ON sr.id = srp.subreddit_id
+        WHERE srp.created_at <= :to_date and srp.created_at >= :from_date 
+        GROUP BY sr.name, srp.page_type, YEAR(srp.created_at), MONTH(srp.created_at), DAY(srp.created_at)"""
     result = run_query_for_days(query_str, today, days=days)
     result = [("({0}, {1})".format(a, PageType(b).name), c, d, e, f) for (a,b,c,d,e,f) in result]
-    return generate_days_html_table(result, 
+    if not html:
+        return result
+    return generate_html_table(result, 
                                str_to_date(date_to_str(today)), 
                                "New SubredditPage count, by (subreddit, pagetype)")  # to make everything 00:00:00     
 
 
-def generate_reddit_subreddit(today=datetime.datetime.utcnow(), days=7):
+def generate_reddit_subreddit(today=datetime.datetime.utcnow(), days=7, html=True):
     query_str = """
         SELECT '{0}', YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) 
         FROM subreddits WHERE created_at <= :to_date and created_at >= :from_date 
         GROUP BY YEAR(created_at), MONTH(created_at), DAY(created_at)""".format(TOTAL_LABEL)
     result = run_query_for_days(query_str, today, days=days)
-    return generate_days_html_table(result, 
+    if not html:
+        return result
+    return generate_html_table(result, 
                                str_to_date(date_to_str(today)), 
                                "New Subreddit count")  # to make everything 00:00:00     
 
-def generate_reddit_post(today=datetime.datetime.utcnow(), days=7):
+def generate_reddit_post(today=datetime.datetime.utcnow(), days=7, html=True):
     query_str = """
-        SELECT subreddit_id, YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) 
-        FROM posts WHERE created_at <= :to_date and created_at >= :from_date 
-        GROUP BY subreddit_id, YEAR(created_at), MONTH(created_at), DAY(created_at)"""
+        SELECT sr.name, YEAR(p.created_at), MONTH(p.created_at), DAY(p.created_at), count(*) 
+        FROM posts p
+        JOIN subreddits sr ON sr.id = p.subreddit_id
+        WHERE p.created_at <= :to_date and p.created_at >= :from_date 
+        GROUP BY sr.name, YEAR(p.created_at), MONTH(p.created_at), DAY(p.created_at)"""
     result = run_query_for_days(query_str, today, days=days)
-    return generate_days_html_table(result, 
+    if not html:
+        return result
+    return generate_html_table(result, 
                                str_to_date(date_to_str(today)), 
                                "New Post count, by subreddit")  # to make everything 00:00:00     
 
-def generate_reddit_comment(today=datetime.datetime.utcnow(), days=7):
+def generate_reddit_comment(today=datetime.datetime.utcnow(), days=7, html=True):
     query_str = """
-        SELECT subreddit_id, YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) 
-        FROM comments WHERE created_at <= :to_date and created_at >= :from_date 
-        GROUP BY subreddit_id, YEAR(created_at), MONTH(created_at), DAY(created_at)"""
+        SELECT sr.name, YEAR(c.created_at), MONTH(c.created_at), DAY(c.created_at), count(*) 
+        FROM comments c
+        JOIN subreddits sr ON sr.id = c.subreddit_id
+        WHERE c.created_at <= :to_date and c.created_at >= :from_date 
+        GROUP BY sr.name, YEAR(c.created_at), MONTH(c.created_at), DAY(c.created_at)"""
     result = run_query_for_days(query_str, today, days=days)
-    return generate_days_html_table(result, 
+    if not html:
+        return result
+    return generate_html_table(result, 
                                str_to_date(date_to_str(today)), 
                                "New Comment count, by subreddit")  # to make everything 00:00:00     
 
 
-def generate_reddit_user(today=datetime.datetime.utcnow(), days=7):
+def generate_reddit_user(today=datetime.datetime.utcnow(), days=7, html=True):
     query_str = """
         SELECT '{0}', YEAR(first_seen), MONTH(first_seen), DAY(first_seen), count(*) 
         FROM users WHERE first_seen <= :to_date and first_seen >= :from_date 
         GROUP BY YEAR(first_seen), MONTH(first_seen), DAY(first_seen)""".format(TOTAL_LABEL)
     result = run_query_for_days(query_str, today, days=days)
-    return generate_days_html_table(result, 
+    if not html:
+        return result
+    return generate_html_table(result, 
                                str_to_date(date_to_str(today)), 
                                "New User count")  # to make everything 00:00:00     
 
-def generate_reddit_mod_action(today=datetime.datetime.utcnow(), days=7):
+def generate_reddit_mod_action(today=datetime.datetime.utcnow(), days=7, html=True):
     query_str = """
-        SELECT subreddit_id, YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) 
-        FROM mod_actions WHERE created_at <= :to_date and created_at >= :from_date 
-        GROUP BY subreddit_id, YEAR(created_at), MONTH(created_at), DAY(created_at)"""
+        SELECT sr.name, YEAR(ma.created_at), MONTH(ma.created_at), DAY(ma.created_at), count(*) 
+        FROM mod_actions ma
+        JOIN subreddits sr ON sr.id = ma.subreddit_id
+        WHERE ma.created_at <= :to_date and ma.created_at >= :from_date 
+        GROUP BY sr.name, YEAR(ma.created_at), MONTH(ma.created_at), DAY(ma.created_at)"""
     result = run_query_for_days(query_str, today, days=days)
-    return generate_days_html_table(result, 
+    if not html:
+        return result
+    return generate_html_table(result, 
                                str_to_date(date_to_str(today)), 
                                "New Mod actions count")  # to make everything 00:00:00     
 
@@ -271,176 +251,69 @@ def generate_reddit_mod_action(today=datetime.datetime.utcnow(), days=7):
 ######################################################################
 
 
-def generate_lumen_notices(today=datetime.datetime.utcnow(), days=7):
-    query_str = """
-        SELECT '{0}', YEAR(date_received), MONTH(date_received), DAY(date_received), count(*) 
-        FROM lumen_notices WHERE date_received <= :to_date and date_received >= :from_date 
-        GROUP BY YEAR(date_received), MONTH(date_received), DAY(date_received)""".format(TOTAL_LABEL)
+
+# queries for Lumen, Twitter...
+
+def generate_lumen_notices(today=datetime.datetime.utcnow(), days=7, html=True, label="Lumen Notices"):
+    query_str = """SELECT 'lumen', YEAR(date_received), MONTH(date_received), DAY(date_received), count(*) 
+        FROM lumen_notices WHERE date_received <= :to_date and date_received >= :from_date
+        GROUP BY YEAR(date_received), MONTH(date_received), DAY(date_received);"""
     result = run_query_for_days(query_str, today, days=days)
-    return generate_days_html_table(result, 
-                               str_to_date(date_to_str(today)), 
-                               "New Lumen Notices per day count")     
+    if not html:
+        return result
+    return generate_html_table(result,
+                               str_to_date(date_to_str(today)),
+                               label)  # to make everything 00:00:00 
 
-def generate_lumen_notices_collected(today=datetime.datetime.utcnow(), days=7):
+def generate_lumen_notice_to_twitter_user(today=datetime.datetime.utcnow(), days=7, html=True, label="Lumen Notices to Twitter Users"):
     query_str = """
-        SELECT '{0}', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
-        FROM lumen_notices WHERE record_created_at <= :to_date and record_created_at >= :from_date 
-        GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at)""".format(TOTAL_LABEL)
-    result = run_query_for_days(query_str, today, days=days)
-    return generate_days_html_table(result, 
-                               str_to_date(date_to_str(today)), 
-                               "New Lumen Notices collected per day count")     
-
-#job state query
-def generate_lumen_notices_job_state():
-    query_str = """
-        SELECT CS_parsed_usernames, count(*)
-        FROM lumen_notices
-        GROUP BY CS_parsed_usernames
-        """
-    result = run_simple_query(query_str)
-    return generate_group_by_html_table(
-        [(TwitterUserState(label).name, count) for (label, count) in result], 
-        "LumenNotices.CS_parsed_usernames")
-
-
-
-def generate_lumen_notice_to_twitter_user_collected(today=datetime.datetime.utcnow(), days=7):
-    query_str = """
-        SELECT '{0}', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
+        SELECT 'lumen', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
         FROM lumen_notice_to_twitter_user WHERE record_created_at <= :to_date and record_created_at >= :from_date 
-        GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at)""".format(TOTAL_LABEL)
+        GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);"""
     result = run_query_for_days(query_str, today, days=days)
-    return generate_days_html_table(result, 
-                               str_to_date(date_to_str(today)), 
-                               "New Total LumenNoticeToTwitterUser collected per day count")     
+    if not html:
+        return result
+    return generate_html_table(result,
+                               str_to_date(date_to_str(today)),
+                               label)  # to make everything 00:00:00 
 
-
-def generate_lumen_notice_to_twitter_user_incomplete(today=datetime.datetime.utcnow(), days=7):
+def generate_twitter_users(today=datetime.datetime.utcnow(), days=7, html=True, label="Twitter Users"):
     query_str = """
-        SELECT '{0}', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
-        FROM lumen_notice_to_twitter_user WHERE record_created_at <= :to_date and record_created_at >= :from_date 
-        and twitter_user_id is NULL
-        GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at)""".format(TOTAL_LABEL)
+        SELECT 'lumen', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
+        FROM twitter_users WHERE record_created_at <= :to_date and record_created_at >= :from_date
+        GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);"""
     result = run_query_for_days(query_str, today, days=days)
-    return generate_days_html_table(result, 
-                               str_to_date(date_to_str(today)), 
-                               "Incomplete LumenNoticeToTwitterUser per day count")     
-
-
-
-# simple count query
-def generate_lumen_notice_to_twitter_user_simple_counts():
-    query_str = """
-        SELECT count(*), count(notice_id), count(twitter_username)
-        FROM lumen_notice_to_twitter_user
-        """
-    result = run_simple_query(query_str)
-    return generate_simple_html_table(result, "LumenNoticeToTwitterUser counts")
-
-# simple count query
-def generate_lumen_notice_to_twitter_user_incomplete_simple_counts():
-    query_str = """
-        SELECT count(*), count(notice_id), count(twitter_username)
-        FROM lumen_notice_to_twitter_user
-        WHERE twitter_user_id is NULL
-        """
-    result = run_simple_query(query_str)
-    return generate_simple_html_table(result, "Incomplete LumenNoticeToTwitterUser counts")
-
-
-#job state query
-def generate_lumen_notice_to_twitter_user_job_state():
-    query_str = """
-        SELECT CS_account_archived, count(*) 
-        FROM lumen_notice_to_twitter_user
-        GROUP BY CS_account_archived
-        """
-    result = run_simple_query(query_str)
-    return generate_group_by_html_table(
-        [(TwitterUserState(label).name, count) for (label, count) in result], 
-        "LumenNoticeToTwitterUser.CS_account_archived")
-
-
-def generate_twitter_user_collected(today=datetime.datetime.utcnow(), days=7):
-    query_str = """
-        SELECT '{0}', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
-        FROM twitter_users WHERE record_created_at <= :to_date and record_created_at >= :from_date 
-        GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at)""".format(TOTAL_LABEL)
-    result = run_query_for_days(query_str, today, days=days)
-    return generate_days_html_table(result,  
-                               str_to_date(date_to_str(today)), 
-                               "New Total Twitter Users collected per day count")     
-
-
-#job state query
-def generate_twitter_users_job_state():
-    query_str = """
-        SELECT CS_oldest_tweets_archived, count(*)
-        FROM twitter_users
-        GROUP BY CS_oldest_tweets_archived
-        """
-    result = run_simple_query(query_str)
-    return generate_group_by_html_table(
-        [(TwitterUserState(label).name, count) for (label, count) in result], 
-        "TwitterUsers.CS_oldest_tweets_archived")
-
-
-# simple count query
-def generate_twitter_users_simple_counts():
-    query_str = """
-        SELECT count(*), count(screen_name) 
-        FROM twitter_users
-        """
-    result = run_simple_query(query_str)
-    return generate_simple_html_table(
-        result[0], 
-        ["count(*)", "count(screen_name)"], 
-        "TwitterUsers counts")
-
-
-# simple count query
-def generate_twitter_user_snapshots_simple_counts():
-    query_str = """
-        SELECT count(*), count(twitter_user_id)
-        FROM twitter_user_snapshots
-        """
-    result = run_simple_query(query_str)
-    return generate_simple_html_table(
-        result[0], 
-        ["count(*)", "count(twitter_user_id)"],
-        "TwitterUserSnapshots counts")
-
-
+    if not html:
+        return result
+    return generate_html_table(result,
+                               str_to_date(date_to_str(today)),
+                               label)  # to make everything 00:00:00 
 
 ##### TAKES (AT LEAST) 5 MIN TO RUN...
-def generate_twitter_user_snapshots_collected(today=datetime.datetime.utcnow(), days=7):
+def generate_twitter_user_snapshots(today=datetime.datetime.utcnow(), days=7, html=True, label="Twitter User Snapshots"):
     query_str = """
-        SELECT '{0}', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
-        FROM twitter_user_snapshots WHERE record_created_at <= :to_date and record_created_at >= :from_date 
-        GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at)""".format(TOTAL_LABEL)
+        SELECT 'lumen', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
+        FROM twitter_user_snapshots WHERE record_created_at <= :to_date and record_created_at >= :from_date
+        GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);"""
     result = run_query_for_days(query_str, today, days=days)
-    return generate_days_html_table(result, 
-                               str_to_date(date_to_str(today)), 
-                               "New Total Twitter User Snapshots collected per day count")     
+    if not html:
+        return result
+    return generate_html_table(result,
+                               str_to_date(date_to_str(today)),
+                               label)  # to make everything 00:00:00 
 
-# simple count query
-def generate_twitter_statuses_simple_counts():
+##### TOO EXPENSIVE....
+def generate_tweets(today=datetime.datetime.utcnow(), days=7, html=True, label="Tweets"):
     query_str = """
-        SELECT count(*), count(user_id)
-        FROM twitter_statuses
-        """
-    result = run_simple_query(query_str)
-    return generate_simple_html_table(
-        result[0], 
-        ["count(*)", "count(user_id)"],
-        "TwitterStatuses counts")
-
-
-# ##### TOO EXPENSIVE.... probably not worth doing.
-# query_str = """SELECT YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
-# FROM twitter_statuses WHERE record_created_at <= "2017-07-19" and record_created_at >= "2017-07-05" 
-# GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);"""
+        SELECT 'lumen', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
+        FROM twitter_statuses WHERE record_created_at <= :to_date and record_created_at >= :from_date
+        GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);"""
+    result = run_query_for_days(query_str, today, days=days)
+    if not html:
+        return result
+    return generate_html_table(result,
+                               str_to_date(date_to_str(today)),
+                               label)  # to make everything 00:00:00 
 
 
 
@@ -449,17 +322,19 @@ def generate_twitter_statuses_simple_counts():
 ######################################################################
 
 ######### EXPERIMENT #########
-def generate_experiment_new(today=datetime.datetime.utcnow(), days=7):
+def generate_experiment_new(today=datetime.datetime.utcnow(), days=7, html=True):
     query_str = """
         SELECT '{0}', YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) 
         FROM experiments WHERE created_at <= :to_date and created_at >= :from_date 
         GROUP BY YEAR(created_at), MONTH(created_at), DAY(created_at)""".format(TOTAL_LABEL)
     result = run_query_for_days(query_str, today, days=days)
-    return generate_days_html_table(result, 
+    if not html:
+        return result
+    return generate_html_table(result, 
                                str_to_date(date_to_str(today)), 
                                "New Experiment count")  # to make everything 00:00:00     
 
-def generate_experiment_active(today=datetime.datetime.utcnow(), days=7):
+def generate_experiment_active(today=datetime.datetime.utcnow(), days=7, html=True):
     query_str = """
         SELECT id, start_time, end_time 
         FROM experiments WHERE start_time <= :to_date and end_time >= :from_date"""
@@ -473,41 +348,49 @@ def generate_experiment_active(today=datetime.datetime.utcnow(), days=7):
         for (eid, start, end) in result:
             if start <= day and day <= end:
                 type_to_date_to_val[TOTAL_LABEL][day] += 1
-    return generate_days_html_table_from_dict(type_to_date_to_val, 
+    if not html:
+        return type_to_date_to_val
+    return generate_html_table_from_dict(type_to_date_to_val, 
                                str_to_date(date_to_str(today)), 
                                "Active Experiment count")  # to make everything 00:00:00     
     
-def generate_experiment_thing(today=datetime.datetime.utcnow(), days=7):
+def generate_experiment_thing(today=datetime.datetime.utcnow(), days=7, html=True):
     query_str = """
         SELECT experiment_id, object_type, YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) 
         FROM experiment_things WHERE created_at <= :to_date and created_at >= :from_date 
         GROUP BY experiment_id, object_type, YEAR(created_at), MONTH(created_at), DAY(created_at)"""
     result = run_query_for_days(query_str, today, days=days)
     result = [("({0}, {1})".format(a, ThingType(b).name), c, d, e, f) for (a,b,c,d,e,f) in result]
-    return generate_days_html_table(result, 
+    if not html:
+        return result
+    return generate_html_table(result, 
                                str_to_date(date_to_str(today)), 
-                               "ExperimentThing count, by (experiment, objecttype)")  # to make everything 00:00:00 
+                               "Experiment280/(24*60)Thing count, by (experiment, objecttype)")  # to make everything 00:00:00 
 
-def generate_experiment_thing_snapshot(today=datetime.datetime.utcnow(), days=7):
+def generate_experiment_thing_snapshot(today=datetime.datetime.utcnow(), days=7, html=True):
     query_str = """
         SELECT experiment_id, object_type, YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) 
         FROM experiment_thing_snapshots WHERE created_at <= :to_date and created_at >= :from_date 
         GROUP BY experiment_id, object_type, YEAR(created_at), MONTH(created_at), DAY(created_at)"""
     result = run_query_for_days(query_str, today, days=days)
     result = [("({0}, {1})".format(a, ThingType(b).name), c, d, e, f) for (a,b,c,d,e,f) in result]
-    return generate_days_html_table(result, 
+    if not html:
+        return result
+    return generate_html_table(result, 
                                str_to_date(date_to_str(today)), 
                                "ExperimentThingSnapshot count, by (experiment, objecttype)")  # to make everything 00:00:00 
 
 
-def generate_experiment_action(today=datetime.datetime.utcnow(), days=7):
+def generate_experiment_action(today=datetime.datetime.utcnow(), days=7, html=True):
     query_str = """
         SELECT experiment_id, action, YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) 
         FROM experiment_actions WHERE created_at <= :to_date and created_at >= :from_date 
         GROUP BY experiment_id, action, YEAR(created_at), MONTH(created_at), DAY(created_at)"""
     result = run_query_for_days(query_str, today, days=days)
     result = [("({0}, {1})".format(a, b), c, d, e, f) for (a,b,c,d,e,f) in result]
-    return generate_days_html_table(result, 
+    if not html:
+        return result
+    return generate_html_table(result, 
                                str_to_date(date_to_str(today)), 
                                "ExperimentAction count, by (experiment, action)")  # to make everything 00:00:00 
 
@@ -526,44 +409,42 @@ table {
     border-collapse: collapse;
     width: 100%;
 }
-
 th {
     background-color:#dddddd
 }
-
 th, td {
     padding: 8px;
     text-align: left;
     border-bottom: 1px solid #ddd;
 }
-
 tr:hover{
     background-color:#f5f5f5
 }
-
 td.highlight {
     background-color:#eeeeee
 }
-
-
-
 </style>
 """
-
 
 def generate_report(today=datetime.datetime.utcnow(), days=7):
     html = "<html><head>" + css + "</head><body>"
     html += "<h2>Number of records stored per day</h2>"
     #html += "<h3>Reddit:</h3>"    
     html += "<table>"
-    html += generate_reddit_front_page(today, days)
-    html += generate_reddit_subreddit_page(today, days)
-    html += generate_reddit_subreddit(today, days)
-    html += generate_reddit_post(today, days)
-    html += generate_reddit_comment(today, days) 
-    html += generate_reddit_user(today, days)
-    html += generate_reddit_mod_action(today, days)
-    #html += "<h3>Experiment:</h3>"    
+    html += "<h3>Lumen Twitter Data Collection</h3>"
+    html += generate_lumen_notices(today, days)
+    html += generate_lumen_notice_to_twitter_user(today, days)
+    html += generate_twitter_users(today, days)
+    html += generate_twitter_user_snapshots(today, days)
+    html += generate_tweets(today, days)
+    #html += generate_reddit_front_page(today, days)
+    #html += generate_reddit_subreddit_page(today, days)
+    #html += generate_reddit_subreddit(today, days)
+    #html += generate_reddit_post(today, days)
+    #html += generate_reddit_comment(today, days) 
+    #html += generate_reddit_user(today, days)
+    #html += generate_reddit_mod_action(today, days)
+    html += "<h3>Experiment:</h3>"    
     html += generate_experiment_new(today, days)
     html += generate_experiment_active(today, days)    
     html += generate_experiment_thing(today, days)
@@ -573,58 +454,6 @@ def generate_report(today=datetime.datetime.utcnow(), days=7):
     html += "</body></html>"
     return html
 
-def generate_twitter_report(today=datetime.datetime.utcnow(), days=7):
-    html = "<html><head>" + css + "</head><body>"
-    html += "<h2>Number of records stored per day</h2>"
-
-    html += "<h3>LumenNotices</h3>"    
-    html += "<table>"
-    html += generate_lumen_notices(today, days)
-    html += generate_lumen_notices_collected(today, days)    
-    html += "</table>"    
-    html += "<table>" 
-    html += generate_lumen_notices_job_state()
-    html += "</table>"    
-
-    html += "<h3>LumenNoticeToTwitterUsers</h3>"    
-    html += "<table>"
-    html += generate_lumen_notice_to_twitter_user_collected(today, days)
-    html += generate_lumen_notice_to_twitter_user_incomplete(today, days)    
-    html += "</table>"    
-    html += "<table>" 
-    html += generate_lumen_notice_to_twitter_user_job_state()
-    html += "</table>"    
-    html += "<table>" 
-    html += generate_lumen_notice_to_twitter_user_simple_counts()
-    html += generate_lumen_notice_to_twitter_user_incomplete_simple_counts()    
-    html += "</table>"    
-
-    html += "<h3>TwitterUsers</h3>"    
-    html += "<table>"
-    html += generate_twitter_user_collected(today, days)
-    html += "</table>"    
-    html += "<table>" 
-    html += generate_twitter_users_job_state()
-    html += "</table>"    
-    html += "<table>" 
-    html += generate_twitter_users_simple_counts()
-    html += "</table>"    
-
-    html += "<h3>TwitterUserSnapshots</h3>"    
-    html += "<table>"
-    html += generate_twitter_user_snapshots_collected(today, days)
-    html += "</table>"    
-    html += "<table>" 
-    html += generate_twitter_user_snapshots_simple_counts()
-    html += "</table>"    
-
-    html += "<h3>TwitterStatuses</h3>"    
-    html += "<table>"
-    html += generate_twitter_statuses_simple_counts()
-    html += "</table>"    
-
-    html += "</body></html>"
-    return html
 
 
 #############################################################
@@ -632,9 +461,9 @@ def generate_twitter_report(today=datetime.datetime.utcnow(), days=7):
 
 
 if __name__ == "__main__":
-    today = datetime.datetime.utcnow() # str_to_date("2016-08-26 23:59:59", by_day=False)
-    html = generate_report(today, days=7)
-    toaddrs = EMAIL_CONFIG["toaddrs"]    
-    send_db_report(toaddrs, today, html)
+    now = datetime.datetime.utcnow()
+    end = datetime.datetime.combine(now, datetime.time())
+    today = end - datetime.timedelta(seconds=1)
 
-    #print(html)
+    html = generate_report(today, days=7)
+    send_db_report(today, html)
