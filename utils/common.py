@@ -1,7 +1,10 @@
 from enum import Enum
 import pathlib
 import simplejson as json
+import sqlalchemy.orm.session
+import warnings
 from collections import namedtuple
+from utils.retry import retryable
 
 BASE_DIR = str(pathlib.Path(__file__).parents[1])
 LOGS_DIR = str(pathlib.Path(BASE_DIR, "logs"))
@@ -24,10 +27,25 @@ class EventWhen(Enum):
     BEFORE = 1
     AFTER = 2
 
+class RetryableDbSession(sqlalchemy.orm.session.Session):
+    @retryable(backoff=True)
+    def execute_retryable(self, clause, params=None, commit=True):
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", r"\(1062, \"Duplicate entry")
+            self.execute(clause, params)
+            if commit:
+                self.commit()
+
+    def insert_retryable(self, model, params, commit=True, ignore_dupes=True):
+        clause = model.__table__.insert()
+        if ignore_dupes:
+            clause = clause.prefix_with("IGNORE")
+        self.execute_retryable(clause, params, commit)
+
 class DbEngine:
 	def __init__(self, config_path):
 		self.config_path = config_path
-
+    
 	def new_session(self):
 		with open(self.config_path, "r") as config:
 		    DBCONFIG = json.loads(config.read())
@@ -42,7 +60,7 @@ class DbEngine:
 		    database = DBCONFIG['database']), pool_recycle=3600)
 
 		Base.metadata.bind = db_engine
-		DBSession = sessionmaker(bind=db_engine)
+		DBSession = sessionmaker(bind=db_engine, class_=RetryableDbSession)
 		db_session = DBSession()
 		return db_session
 
