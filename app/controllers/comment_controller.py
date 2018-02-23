@@ -6,6 +6,7 @@ import reddit.connection
 import reddit.praw_utils as praw_utils
 import reddit.queries
 from utils.common import PageType
+from utils.retry import retryable
 from app.models import Base, SubredditPage, Subreddit, Post, Comment
 from sqlalchemy import and_
 from sqlalchemy import text
@@ -87,8 +88,7 @@ class CommentController:
                 ## sometimes the above line takes a long time to run
                 ## so we expire the session before continuing
                 self.db_session.expire_all()
-
-
+                
                 comments_returned = 0
                 for comment in comment_result:
                     comments_returned += 1
@@ -113,9 +113,13 @@ class CommentController:
                         "comment_data": json.dumps(comment)
                     })
 
-                with warnings.catch_warnings():
-                    warnings.filterwarnings("ignore", "\(1062, \"Duplicate entry")
-                    self.db_session.execute(Comment.__table__.insert().prefix_with("IGNORE"), db_comments)
+                @retryable(backoff=True)
+                def retryable_db_execute():
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings("ignore", r"\(1062, \"Duplicate entry")
+                        self.db_session.execute(Comment.__table__.insert().prefix_with("IGNORE"), db_comments)
+                        self.db_session.commit()
+                retryable_db_execute()
 
 #                comments_added =0
 #                for db_comment in db_comments:
