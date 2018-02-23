@@ -94,8 +94,7 @@ class CommentController:
                     comments_returned += 1
                     if(os.environ['CS_ENV'] !='test'):
                         comment = comment.json_dict
-                    else:
-                        comments.append(comment)
+                    comments.append(comment)
                     after_id = "t1_" + comment['id']
                 if(comment_result is None or comments_returned == 0 ):
                     limit_found = True
