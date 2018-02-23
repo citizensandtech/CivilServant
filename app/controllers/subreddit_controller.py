@@ -77,14 +77,22 @@ class SubredditPageController:
 
     def archive_subreddit_page(self, pg_type=PageType.HOT):
         posts = self.fetch_subreddit_page(pg_type, return_praw_object=False)
-        subreddit_page = SubredditPage(created_at = datetime.datetime.utcnow(),
-                                page_type = pg_type.value, 
-                                subreddit_id = posts[0]['subreddit_id'].replace("t5_",""),
-                                page_data = json.dumps(posts),
-                                is_utc = True
-                                )
-        self.db_session.add(subreddit_page)
-        self.db_session.commit()
+
+        self.db_session.insert_retryable(SubredditPage, {
+            "page_type": pg_type.value,
+            "subreddit_id": posts[0]['subreddit_id'].replace("t5_",""),
+            "page_data": json.dumps(posts),
+            "is_utc": True})
+
+        #posts = self.fetch_subreddit_page(pg_type, return_praw_object=False)
+        #subreddit_page = SubredditPage(created_at = datetime.datetime.utcnow(),
+        #                        page_type = pg_type.value, 
+        #                        subreddit_id = posts[0]['subreddit_id'].replace("t5_",""),
+        #                        page_data = json.dumps(posts),
+        #                        is_utc = True
+        #                        )
+        #self.db_session.add(subreddit_page)
+        #self.db_session.commit()
 
 
     """ 
@@ -96,10 +104,13 @@ class SubredditPageController:
 
         # if sub not in table, add it
         if not queried_sub:
-            new_sub = Subreddit(id = sub.id, 
-                                name = sub.display_name)
-            self.db_session.add(new_sub)
-            self.db_session.commit()
+            self.db_session.insert_retryable(Subreddit, {
+                "id": sub.id,
+                "name": sub.display_name})
+            #new_sub = Subreddit(id = sub.id, 
+            #                    name = sub.display_name)
+            #self.db_session.add(new_sub)
+            #self.db_session.commit()
             return True
 
         # else don't add it to subreddit table
@@ -117,13 +128,18 @@ class SubredditPageController:
 
         # if sub not in table, add it
         if not queried_post:
-            new_post = Post(
-                    id = post_info['id'],
-                    subreddit_id = post_info['subreddit_id'].strip("t5_"), # janky
-                    created = datetime.datetime.fromtimestamp(post_info['created_utc']),        
-                    post_data = json.dumps(post_info))
-            self.db_session.add(new_post)
-            self.db_session.commit()
+            self.db_session.insert_retryable(Post, {
+                "id": post_info['id'],
+                "subreddit_id": post_info['subreddit_id'].strip("t5_"),
+                "created": datetime.datetime.fromtimestamp(post_info['created_utc']),
+                "post_data": json.dumps(post_info)})
+            #new_post = Post(
+            #        id = post_info['id'],
+            #        subreddit_id = post_info['subreddit_id'].strip("t5_"), # janky
+            #        created = datetime.datetime.fromtimestamp(post_info['created_utc']),        
+            #        post_data = json.dumps(post_info))
+            #self.db_session.add(new_post)
+            #self.db_session.commit()
             return True
 
         # else don't add it to post table
@@ -141,15 +157,22 @@ class SubredditPageController:
         user = self.db_session.query(User).filter(User.name == username).first()
 
         if not user:
-            new_user = User(
-                    name = username,
-                    id = None,
-                    created = None,
-                    first_seen = seen_at,
-                    last_seen = seen_at, 
-                    user_data = None)
-            self.db_session.add(new_user)
-            self.db_session.commit()
+            #new_user = User(
+            #        name = username,
+            #        id = None,
+            #        created = None,
+            #        first_seen = seen_at,
+            #        last_seen = seen_at, 
+            #        user_data = None)
+            #self.db_session.add(new_user)
+            #self.db_session.commit()
+            self.db_session.insert_retryable(User, {
+                "name": username,
+                "id": None,
+                "created": None,
+                "first_seen": seen_at,
+                "last_seen": seen_at, 
+                "user_data": None})
             return True
         else:
             if seen_at > user.last_seen:
