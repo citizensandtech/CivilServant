@@ -10,9 +10,9 @@ import time
 from pathlib import Path
 
 import app.cs_logger
-from utils.common import BASE_DIR, LOGS_DIR
 
 ENV = os.environ["CS_ENV"]
+BASE_DIR = str(Path(__file__).parents[1])
 _log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
 RETRY = True
@@ -28,7 +28,12 @@ def retryable(fn=None, retry=RETRY, backoff=BACKOFF, retry_wait=RETRY_WAIT,
               backoff_max_exp=BACKOFF_MAX_EXP,
               backoff_max_times=BACKOFF_MAX_TIMES, _testing=False):
     if fn is None:
-        return functools.partial(retryable)
+        return functools.partial(retryable, retry=retry, backoff=backoff,
+                                 retry_wait=retry_wait,
+                                 retry_max_times=retry_max_times,
+                                 backoff_base=backoff_base,
+                                 backoff_max_exp=backoff_max_exp,
+                                 backoff_max_times=backoff_max_times)
 
     def _backoff_exps():
         valid_exp = lambda i: i if i < backoff_max_exp else backoff_max_exp
@@ -49,7 +54,7 @@ def retryable(fn=None, retry=RETRY, backoff=BACKOFF, retry_wait=RETRY_WAIT,
                 yield retry_wait
                 _log_attempt(False, i+1, retry_max_times, retry_wait)
                 time.sleep(retry_wait if not _testing else 0)
-
+        
         if backoff:
             for i, exp in enumerate(_backoff_exps()):
                 wait = backoff_base + random.randrange(0, backoff_base**exp)
