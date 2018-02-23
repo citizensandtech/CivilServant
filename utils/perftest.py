@@ -133,7 +133,7 @@ class Aggregator:
     def add(self, *paths, recursive=False):
         glob_fn = Path.rglob if recursive else Path.glob
 
-        paths = (p.resolve(strict=True) for p in paths)
+        paths = (p.resolve() for p in paths)
         globs = (glob_fn(p, "*.profile") if p.is_dir() else [p] for p in paths)
         files = [f for g in globs for f in g if f.is_file()]
         
