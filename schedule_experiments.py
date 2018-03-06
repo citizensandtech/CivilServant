@@ -46,7 +46,7 @@ def main():
     timeout_seconds = 172800 ## two days in seconds
     if(timeout_seconds <= int(args.interval) + 3600):
         timeout_seconds = int(args.interval) + 3600
-    ttl = int(args.interval) + 180
+    ttl = timeout_seconds + 180
 
     experiment_file = os.path.join(BASE_DIR, "config", "experiments") + "/" + args.experiment + ".yml"
     if(os.path.isfile(experiment_file) == False):
