@@ -1,0 +1,4 @@
+# m h  dom mon dow   command
+*/10 * * * * /usr/local/civilservant/platform/utils/cron/log_scheduled_jobs.sh
+*/10 * * * * /usr/local/civilservant/platform/utils/cron/log_mysql_size.sh
+
