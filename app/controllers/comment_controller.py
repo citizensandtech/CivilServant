@@ -112,13 +112,7 @@ class CommentController:
                         "comment_data": json.dumps(comment)
                     })
 
-                @retryable(backoff=True)
-                def retryable_db_execute():
-                    with warnings.catch_warnings():
-                        warnings.filterwarnings("ignore", r"\(1062, \"Duplicate entry")
-                        self.db_session.execute(Comment.__table__.insert().prefix_with("IGNORE"), db_comments)
-                        self.db_session.commit()
-                retryable_db_execute()
+                self.db_session.insert_retryable(Comment, db_comments)
 
 #                comments_added =0
 #                for db_comment in db_comments:
