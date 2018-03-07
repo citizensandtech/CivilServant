@@ -6,10 +6,12 @@ import reddit.connection
 import reddit.praw_utils as praw_utils
 import reddit.queries
 from utils.common import PageType
+from utils.retry import retryable
 from app.models import Base, SubredditPage, Subreddit, Post, Comment
 from sqlalchemy import and_
 from sqlalchemy import text
 import sqlalchemy
+import warnings
 
 class CommentController:
     def __init__(self, db_session, r, log):
@@ -78,10 +80,6 @@ class CommentController:
         try:
             limit_found = False
             after_id = None
-            try:
-              comment_ids = [x['id'] for x in self.db_session.execute(text("SELECT id FROM comments FORCE INDEX(ix_comments_subreddit_id_created_at) WHERE subreddit_id='{0}' ORDER BY created_utc DESC LIMIT 1000;".format(subreddit.id)))]
-            except:
-              comment_ids = []
 
             iterations = 0
             while(limit_found == False):
@@ -90,54 +88,50 @@ class CommentController:
                 ## sometimes the above line takes a long time to run
                 ## so we expire the session before continuing
                 self.db_session.expire_all()
-
-
+                
                 comments_returned = 0
                 for comment in comment_result:
                     comments_returned += 1
                     if(os.environ['CS_ENV'] !='test'):
                         comment = comment.json_dict
-                    if(comment['id'] in comment_ids):
-                        limit_found = True
-                    else:
-                        comments.append(comment)
+                    comments.append(comment)
                     after_id = "t1_" + comment['id']
                 if(comment_result is None or comments_returned == 0 ):
                     limit_found = True
 
                 db_comments = []
                 db_comment_ids = []
+                add_comment_page_query = ""
                 for comment in comments:
-                    if((comment['id'] in comment_ids) != True):
-                        db_comment = Comment(
-                            id = comment['id'],
-                            subreddit_id = subreddit_id,
-                            created_utc = datetime.datetime.utcfromtimestamp(comment['created_utc']),
-                            post_id = comment['link_id'].replace("t3_" ,""),
-                            user_id = comment['author'],
-                            comment_data = json.dumps(comment)
-                        )
-                        db_comments.append(db_comment)
-                        db_comment_ids.append(comment['id'])
+                     db_comments.append({
+                        "id": comment['id'],
+                        "subreddit_id": subreddit_id,
+                        "created_utc": datetime.datetime.utcfromtimestamp(comment['created_utc']),
+                        "post_id": comment['link_id'].replace("t3_" ,""),
+                        "user_id": comment['author'],
+                        "comment_data": json.dumps(comment)
+                    })
 
-                comments_added =0
-                for db_comment in db_comments:
-                    try:
-                        self.db_session.add(db_comment)
-                        self.db_session.commit()
-                        comment_ids.append(db_comment.id)
-                        comments_added += 1
-                    except (sqlalchemy.exc.DBAPIError, sqlalchemy.exc.InvalidRequestError) as e:
-                        self.db_session.rollback()
-                        self.db_session.add(db_comment)
-                        self.db_session.commit()
-                        comment_ids.append(db_comment.id)
-                        comments_added += 1
-                self.log.info("  New page fetched: total comments archived from {1}: {0}".format(
-                    comments_added, subreddit_name
-                ))
+                self.db_session.insert_retryable(Comment, db_comments)
+
+#                comments_added =0
+#                for db_comment in db_comments:
+#                    try:
+#                        self.db_session.add(db_comment)
+#                        self.db_session.commit()
+#                        comment_ids.append(db_comment.id)
+#                        comments_added += 1
+#                    except (sqlalchemy.exc.DBAPIError, sqlalchemy.exc.InvalidRequestError) as e:
+#                        self.db_session.rollback()
+#                        self.db_session.add(db_comment)
+#                        self.db_session.commit()
+#                        comment_ids.append(db_comment.id)
+#                        comments_added += 1
+#                self.log.info("  New page fetched: total comments archived from {1}: {0}".format(
+#                    comments_added, subreddit_name
+#                ))
                 
-                total_comments_added += comments_added
+#                total_comments_added += comments_added
 
                 ## BREAK THE LOOP AFTER 15 iterations
                 iterations += 1

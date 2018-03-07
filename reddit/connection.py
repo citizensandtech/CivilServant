@@ -9,6 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from app.models import Base
 import sqlalchemy
 from utils.common import DbEngine
+from reddit.praw_patch import PrawPatch
 
 ENV =  os.environ['CS_ENV']
 
@@ -19,6 +20,10 @@ class Connect:
   # this may become a pattern that we should break out
   # into its own class eventually
   def __init__(self, db_session = None, base_dir="", env=None):
+    praw_patch = PrawPatch()
+    if praw_patch.required:
+      praw_patch.ensure_applied()
+
     self.base_dir = base_dir
     if(env):
       self.env = env

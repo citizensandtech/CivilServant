@@ -1,0 +1,13 @@
+*** objects.py	2018-01-23 07:32:48.122899293 -0500
+--- objects.new.py	2018-01-24 09:39:41.747357235 -0500
+***************
+*** 115,120 ****
+--- 115,122 ----
+          """Set the `name` attribute to `value."""
+          if value and name == 'subreddit':
+              value = Subreddit(self.reddit_session, value, fetch=False)
++         elif name == 'permalink' and isinstance(self, Comment):
++             return
+          elif value and name in REDDITOR_KEYS:
+              if isinstance(value, bool):
+                  pass

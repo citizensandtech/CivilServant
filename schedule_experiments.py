@@ -28,6 +28,10 @@ def main():
                         choices=['development', 'test', 'production'],
                         required = False,
                         help="Run within a specific environment. Otherwise run under the environment defined in the environment variable CS_ENV")
+    parser.add_argument("-p", "--profile",
+                        required = False,
+                        action = 'store_true',
+                        help="Run the performance profiler and save the results in the logs/profiles directory")
 
     args = parser.parse_args()
 
@@ -42,7 +46,7 @@ def main():
     timeout_seconds = 172800 ## two days in seconds
     if(timeout_seconds <= int(args.interval) + 3600):
         timeout_seconds = int(args.interval) + 3600
-    ttl = int(args.interval) + 180
+    ttl = timeout_seconds + 180
 
     experiment_file = os.path.join(BASE_DIR, "config", "experiments") + "/" + args.experiment + ".yml"
     if(os.path.isfile(experiment_file) == False):
@@ -55,15 +59,17 @@ def main():
                 scheduled_time=datetime.utcnow(),
                 func=app.controller.conduct_sticky_comment_experiment,
                 args=[args.experiment],
+                kwargs={'_profile': args.profile},
                 interval=int(args.interval),
                 repeat=None,
-                timeout = timeout_seconds
+                timeout = timeout_seconds,
                 result_ttl = ttl)
     elif(args.job == "tidy"):
         scheduler.schedule(
                 scheduled_time=datetime.utcnow(),
                 func=app.controller.remove_experiment_replies,
                 args=[args.experiment],
+                kwargs={'_profile': args.profile},
                 interval=int(args.interval),
                 repeat=None,
                 timeout = timeout_seconds,
@@ -73,6 +79,7 @@ def main():
                 scheduled_time=datetime.utcnow(),
                 func=app.controller.archive_experiment_submission_metadata,
                 args=[args.experiment],
+                kwargs={'_profile': args.profile},
                 interval=int(args.interval),
                 repeat=None,
                 timeout = timeout_seconds)
