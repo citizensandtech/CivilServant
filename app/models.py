@@ -15,7 +15,7 @@ import socket
 Base = declarative_base()
 
 class FrontPage(Base):
-    __tablename__ = 'front_pages'
+    __tablename__       = 'front_pages'
     id                  = Column(Integer, primary_key = True)
     created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     page_type           = Column(Integer) # see utils/common.py
@@ -23,13 +23,13 @@ class FrontPage(Base):
     is_utc              = Column(Boolean, default=False)
 
 class Subreddit(Base):
-    __tablename__ = 'subreddits'
+    __tablename__       = 'subreddits'
     id                  = Column(String(32), primary_key = True, unique=True, autoincrement=False) # subreddit id
     created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     name                = Column(String(32)) # display_name
 
 class SubredditPage(Base):
-    __tablename__ = 'subreddit_pages'
+    __tablename__       = 'subreddit_pages'
     id                  = Column(Integer, primary_key = True)
     created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     subreddit_id        = Column(String(32))
@@ -38,7 +38,7 @@ class SubredditPage(Base):
     is_utc              = Column(Boolean, default=False)
 
 class Post(Base):
-    __tablename__ = 'posts'
+    __tablename__       = 'posts'
     id                  = Column(String(32), primary_key = True, unique=True, autoincrement=False)	# post id
     #when this record was created:
     created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True) 
@@ -49,7 +49,7 @@ class Post(Base):
     comments_queried_at = Column(DateTime, default=None)  
 
 class ModAction(Base):
-    __tablename__ = "mod_actions"
+    __tablename__       = "mod_actions"
     id                  = Column(String(256), primary_key = True, unique=True, autoincrement=False)
     created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)  
     created_utc         = Column(DateTime)
@@ -62,7 +62,7 @@ class ModAction(Base):
 
 # class for comments that are not needed for operational purposes.
 class ArchivedComments(Base):
-    __tablename__ = "archived_comments"
+    __tablename__       = "archived_comments"
     id                  = Column(String(256), primary_key = True, unique=True, autoincrement=False)
     created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     created_utc         = Column(DateTime)
@@ -72,7 +72,7 @@ class ArchivedComments(Base):
     comment_data        = Column(MEDIUMTEXT)
 
 class Comment(Base):
-    __tablename__ = "comments"
+    __tablename__       = "comments"
     id                  = Column(String(256), primary_key = True, unique=True, autoincrement=False)
     created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     created_utc         = Column(DateTime)
@@ -113,7 +113,7 @@ class Comment(Base):
 Index("ix_comments_subreddit_id_created_at", Comment.subreddit_id, Comment.created_at)
 
 class User(Base):
-    __tablename__ = 'users'
+    __tablename__       = 'users'
     name                = Column(String(32), primary_key = True, unique=True, autoincrement=False)   # redditor's name
     id                  = Column(String(32)) # "redditor's id"
     created             = Column(DateTime) # "created"
@@ -122,7 +122,7 @@ class User(Base):
     user_data           = Column(MEDIUMTEXT)
 
 class PrawKey(Base):
-    __tablename__ = 'praw_keys'
+    __tablename__       = 'praw_keys'
     # IDs will be a string based on the assumption
     # that each device will only have one process
     # at a time handling a particular controller
@@ -144,7 +144,7 @@ class PrawKey(Base):
         return "{0}:{1}:{2}".format(host,env,controller)
 
 class Experiment(Base):
-    __tablename__ = 'experiments'
+    __tablename__       = 'experiments'
     id                  = Column(Integer, primary_key = True)
     created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     name                = Column(String(256), nullable=False, index=True)
@@ -154,7 +154,7 @@ class Experiment(Base):
     settings_json       = Column(MEDIUMTEXT)
 
 class ExperimentThing(Base):
-    __tablename__ = 'experiment_things'
+    __tablename__       = 'experiment_things'
     id                  = Column(String(256), primary_key = True)
     created_at          = Column(DateTime, default = datetime.datetime.utcnow, index=True)
     object_type         = Column(Integer)
@@ -165,7 +165,7 @@ class ExperimentThing(Base):
     metadata_json       = Column(MEDIUMTEXT)
 
 class ExperimentThingSnapshot(Base):
-    __tablename__ = 'experiment_thing_snapshots'
+    __tablename__       = 'experiment_thing_snapshots'
     id                  = Column(Integer, primary_key = True)
     experiment_thing_id = Column(String(256), index = True)
     created_at          = Column(DateTime, default = datetime.datetime.utcnow, index=True)
@@ -174,7 +174,7 @@ class ExperimentThingSnapshot(Base):
     metadata_json       = Column(MEDIUMTEXT)
 
 class ExperimentAction(Base):
-    __tablename__ = 'experiment_actions'
+    __tablename__       = 'experiment_actions'
     id                  = Column(Integer, primary_key = True)
     created_at          = Column(DateTime, default = datetime.datetime.utcnow, index=True)
     experiment_id       = Column(Integer, index = True)
@@ -185,10 +185,9 @@ class ExperimentAction(Base):
     action_object_type  = Column(String(64))
     action_object_id    = Column(String(256), index=True)
     metadata_json       = Column(MEDIUMTEXT)
-
-    
+  
 class EventHook(Base):
-    __tablename__ = "event_hooks"
+    __tablename__       = "event_hooks"
     id                  = Column(Integer, primary_key=True)
     name                = Column(String(256), index=True) 
     created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)
@@ -200,3 +199,17 @@ class EventHook(Base):
     callee_module       = Column(String(256), nullable=False) # module, e.g. "app.controllers.sticky_comment_experiment_controller"    
     callee_controller   = Column(String(256), nullable=False) # class, e.g. "ChangingStickyCommentExperimentController"
     callee_method       = Column(String(256), nullable=False) # method, e.g. "change_sticky_comment_text"
+
+## THIS MODEL IS FOR STORING ALL ATTEMPTS TO SEND MESSAGES
+class MessageLog(Base):
+    __tablename__       = "message_logs"
+    id                  = Column(Integer, primary_key=True)
+    created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    message_sent        = Column(Boolean, nullable=True)
+    message_failure_reason = Column(String(63), default=None)
+    platform            = Column(String(64), index=True)
+    username            = Column(String(256), index=True)
+    subject             = Column(String(256))
+    message_task_id     = Column(String(256), index=True)
+    body                = Column(MEDIUMTEXT)
+    metadata_json       = Column(MEDIUMTEXT)
