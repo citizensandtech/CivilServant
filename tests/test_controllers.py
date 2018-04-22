@@ -549,6 +549,8 @@ def test_archive_last_thousand_comments(mock_reddit):
     assert db_session.query(Comment).count() == 0
     cc.archive_last_thousand_comments(subreddit_name)
     assert db_session.query(Comment).count() == len(comment_fixtures[0])
+    assert cc.last_subreddit_id == subreddit_id
+    assert len(cc.last_queried_comments) == len(comment_fixtures[0])
 
     db_comment = db_session.query(Comment).order_by(app.models.Comment.created_utc.asc()).first()
     assert db_comment.subreddit_id == subreddit_id

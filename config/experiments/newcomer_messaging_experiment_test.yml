@@ -2,10 +2,19 @@ test:
   subreddit: CivilServantBot2
   subreddit_id: 3n1tq
   username: CivilServantBot
+  newcomer_period_interval_days: 180
+  newcomer_supplemental_json_file: tests/fixture_data/file_comments_0.json
+  survey_followup_in_days: 14
+  ## THE SURVEY URL SHOULD HAVE A {userkey} inside
+  survey_url: TBA
+  survey_message_subject: TBA
+  ## THE SURVEY MESSAGE SHOULD HAVE A {username} inside
+  survey_message_text: TBA
   conditions: 
     main:
-        randomizations: messaging_experiment_test_main.conditions.csv
+        randomizations: newcomer_messaging_experiment_test_main.conditions.csv 
         next_randomization: 0
+        
         arms:
             arm_0: null
             arm_1: 
@@ -15,7 +24,7 @@ test:
               reason_text: This is arm 2 of the 1st condition
               pm_subject: PM Subject Line (Arm 2)
               pm_text: Hello, this is the message for arm 2 of the 1st condition.
-  controller: MessagingExperimentController
+  controller: NewcomerMessagingExperimentController
   start_time: 08/16/2015 00:00:00 UTC
   end_time: 12/30/2020 23:59:59 UTC
   event_hooks:
@@ -25,5 +34,5 @@ test:
       caller_controller: CommentController
       caller_method: archive_last_thousand_comments
       callee_module: app.controllers.messaging_experiment_controller
-      callee_controller: MessagingExperimentController
+      callee_controller: NewcomerMessagingExperimentController
       callee_method: enroll_new_participants

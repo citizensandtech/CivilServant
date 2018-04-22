@@ -17,6 +17,15 @@ from sqlalchemy import and_, or_
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), "..","..")
 ENV = os.environ['CS_ENV']
 
+
+class ExperimentConfigurationError(Exception):
+    def __init__(self, message, errors = []):
+        # Call the base class constructor with the parameters it needs
+        super().__init__(message)
+        # Now for your custom code...
+        #self.errors = errors
+
+
 class ExperimentController():
     def __init__(self, experiment_name, db_session, r, log, required_keys):
         self.db_session = db_session

@@ -156,6 +156,7 @@ class Experiment(Base):
 class ExperimentThing(Base):
     __tablename__       = 'experiment_things'
     id                  = Column(String(256), primary_key = True)
+    thing_id           = Column(String(256), index = True)
     created_at          = Column(DateTime, default = datetime.datetime.utcnow, index=True)
     object_type         = Column(Integer)
     experiment_id       = Column(Integer, index = True)
