@@ -239,3 +239,20 @@ def test_newcomer_messaging_eligibility(mock_reddit):
         assert "submission_id" in metadata.keys()
         assert metadata['message_status'] == "TBD"
         assert metadata['survey_status'] == "TBD"
+
+    ## NOW test previously_enrolled
+    previously_enrolled_accounts = mec.previously_enrolled(identified_newcomer_names + ["natematias"])
+    for account in previously_enrolled_accounts:
+        assert account in identified_newcomer_names
+    assert "natematias" not in previously_enrolled_accounts
+
+    ## NOW CONFIRM THAT MORE newcomer_things aren't assigned
+    ## if we identify the same set of newcomers
+    
+    randomization_number = mec.experiment_settings['conditions']['main']['randomizations']
+    mec.assign_randomized_conditions(identified_newcomers)
+    assert mec.experiment_settings['conditions']['main']['randomizations'] == randomization_number
+
+    et_newcomers = db_session.query(ExperimentThing).all()
+
+    assert len(et_newcomers) == len(identified_newcomers)

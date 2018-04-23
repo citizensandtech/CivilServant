@@ -87,18 +87,13 @@ class MessagingExperimentController(ExperimentController):
     #       data migration to set thing_id across the CivilServant database    def accounts_not_already_in_experiment(self, accounts):
 
     def previously_enrolled(self, account_usernames):
-        comment_author_ids = set()
-        # step one: get author IDs from user database
-        for user in self.db_session.query(User).filter(
-            User.name.in_(account_usernames)).all():
-            comment_author_ids.add(user.id)
 
         # step two: get information about past participation in the experiment
         past_participation = defaultdict(list)
         for et_account in self.db_session.query(ExperimentThing).filter(and_(
-            ExperimentThing.object_type == 4,
+            ExperimentThing.object_type == ThingType.USER.value,
             ExperimentThing.experiment_id == self.experiment.id,
-            ExperimentThing.thing_id.in_(comment_author_ids)
+            ExperimentThing.thing_id.in_(account_usernames)
             )).all():
                 past_participation[et_account.thing_id].append(et_account)
         
@@ -178,17 +173,6 @@ class NewcomerMessagingExperimentController(MessagingExperimentController):
                 if author not in previous_commenters]
 
 
-        # comment_thing = ExperimentThing(
-        #     experiment_id = self.experiment.id,
-        #     object_created = datetime.datetime.fromtimestamp(comment.created_utc),
-        #     object_type = ThingType.COMMENT.value,
-        #     id = comment.id,
-        #     metadata_json = json.dumps({"group":"treatment", "arm":"arm_"+str(treatment_arm),
-        #                                 "condition":condition,
-        #                                 "randomization": metadata['randomization'],
-        #                                 "submission_id":submission.id})
-        # )
-
     def get_condition(self):
         if("main" not in self.experiment_settings['conditions'].keys()):
             self.log.error("Condition 'main' missing from configuration file.")
@@ -253,17 +237,21 @@ class NewcomerMessagingExperimentController(MessagingExperimentController):
                         "query_index": "Intervention TBD",
                         "metadata_json": json.dumps(et_metadata)
                     })
+
         if(newcomers_without_randomization > 0 ):
             self.log.error("NewcomerMessagingExperimentController Experiment {0} has run out of randomizations from '{1}' to assign.".format(self.experiment_name, condition))
-        self.db_session.insert_retryable(ExperimentThing, newcomer_ets)
 
-        self.experiment.experiment_settings = json.dumps(self.experiment_settings)
-        self.db_session.commit()
+        if(len(newcomer_ets)>0):
+            self.db_session.insert_retryable(ExperimentThing, newcomer_ets)
+
+            self.experiment.experiment_settings = json.dumps(self.experiment_settings)
+            self.db_session.commit()
+        self.db_session.execute("UNLOCK TABLES")
+
         self.log.info("Assigned randomizations to {0} commenters: [{1}]".format(
             len(newcomer_ets),
             ",".join([x['thing_id'] for x in newcomer_ets])
         ))
-        self.db_session.execute("UNLOCK TABLES")
         
 
     """
