@@ -11,8 +11,8 @@ from utils.common import *
 from app.models import Base, SubredditPage, Subreddit, Post, ModAction, PrawKey, Comment
 from app.models import Experiment, ExperimentThing, ExperimentAction, ExperimentThingSnapshot
 from app.models import EventHook
-from sqlalchemy import and_, or_
-from app.controllers.subreddit_controller import SubredditPageController
+from sqlalchemy import and_, or_, asc, desc
+from app.controllers.messaging_controller import MessagingController
 from app.controllers.experiment_controller import *
 from collections import defaultdict
 
@@ -133,8 +133,144 @@ class NewcomerMessagingExperimentController(MessagingExperimentController):
                     self.experiment_settings['newcomer_supplemental_json_file']
                 ))
 
+    ## RUN REGULARLY: UPDATE_EXPERIMENT:
+    # 1) identify accounts that need actions to be taken
+    # 2) take action on accounts
+    # 3) log that messages were sent
+    # 4) where necessary, send a followup survey
+    
     def update_experiment(self):
-        pass
+        ## Identify messages to be sent
+        accounts_needing_messages = self.get_accounts_needing_interventions()
+        self.send_messages(accounts_needing_messages)
+
+    ## format a message for sending, using information contained
+    ## in an experiment_thing
+    def format_message(self, experiment_thing):
+        metadata_json = json.loads(experiment_thing.metadata_json)
+        account_info = {"username": experiment_thing.thing_id}
+        arm = metadata_json['arm']
+        cond = self.experiment_settings['conditions'][self.get_condition()]
+        if(arm not in cond['arms'].keys()):
+            raise ExperimentConfigurationError(
+                "In the experiment '{0}', the '{1}' condition fails to include information about the '{2}' arm, despite having randomizations assigned to it".format(
+                    self.experiment_name,
+                    self.get_condition(), 
+                    arm
+                )) 
+        if(cond['arms'][arm] is None):
+            return None
+        message_body = cond['arms'][arm]['pm_text'].format(**account_info)
+        message_subject = cond['arms'][arm]['pm_subject'].format(**account_info)
+        return {"message": message_body, "subject": message_subject}
+
+        
+    ## Send intervention messages to a set of eligible experiment_things
+    ## 1) Add ExperimentAction records where actions were taken
+    ## 2) Update ExperimentThing object query_index and metadata 
+    ##    with further information about the action taken
+    ##    ExperimentThing objectscan have their query_index
+    ##    updated to either "Intervention Complete" or 
+    #     "Intervention Impossible"
+
+    def send_messages(self, experiment_things):
+        self.db_session.execute("Lock Tables experiment_actions WRITE, experiment_things WRITE, message_logs WRITE")
+        message_results = []
+        try:
+            mc = MessagingController(self.db_session, self.r, self.log)
+            action = "SendMessage"
+            messages_to_send = []
+            for experiment_thing in experiment_things:
+                message = self.format_message(experiment_thing)                
+                ## if it's a control group, log inaction
+                ## and do nothing, otherwise add to messages_to_send
+                if message is None:
+                    metadata = json.loads(experiment_thing.metadata_json)
+                    metadata['message_status']  = "sent"
+                    ea = ExperimentAction(
+                        experiment_id = self.experiment.id,
+                        action = action,
+                        action_object_type = ThingType.USER.value,
+                        action_object_id = experiment_thing.id,
+                        metadata_json = json.dumps(metadata)
+                    )
+                    experiment_thing.query_index = "Intervention Complete"
+                    experiment_thing.metadata_json = json.dumps(metadata)
+                    self.db_session.add(ea)
+                else:
+                    message['account'] = experiment_thing.thing_id
+                    messages_to_send.append(message)
+
+            # send messages_to_send
+            message_results = mc.send_messages(messages_to_send,
+                "NewcomerMessagingExperiment({0})::send_messages".format(
+                    self.experiment_name))
+            
+            # iterate through message_result, linked with experiment_things
+            for experiment_thing in experiment_things:
+                if(experiment_thing.thing_id in message_results.keys()):
+                    message_result = message_results[experiment_thing.thing_id]
+
+                    metadata = json.loads(experiment_thing.metadata_json)
+                    update_records = False
+
+                    message_errors = 0
+                    if 'errors' in message_result:
+                        message_errors = len(message_result['errors'])
+
+                    ## TAKE ACTION WITH INVALID USERNAME
+                    ## (add an action and UPDATE THE EXPERIMENT_THING)
+                    ## TO INDICATE THAT THE ACCOUNT DOESN'T EXIST
+                    ## NOTE: THE MESSAGE ATTEMPT WILL BE LOGGED
+                    ## SO YOU DON'T HAVE TO LOG AN ExperimentAction
+                    ## Ignore other errors 
+                    ## (since you will want to retry in those cases)
+                    if(message_errors > 0):
+                        for error in message_result['errors']:
+                            invalid_username = False
+                            if error['error'] == 'invalid username':
+                                invalid_username = True
+
+                            if(invalid_username):
+                                metadata['message_status'] = "nonexistent"
+                                metadata['survey_status'] = "nonexistent"
+                                experiment_thing.query_index = "Intervention Impossible"
+                                update_records = True
+                    ## if there are no errors
+                    ## add an ExperimentAction and
+                    ## update the experiment_thing metadata
+                    else:
+                        metadata['message_status'] = "sent"
+                        experiment_thing.query_index = "Intervention Complete"
+                        update_records = True
+
+                    if(update_records):
+                        metadata_json = json.dumps(metadata)
+                        ea = ExperimentAction(
+                            experiment_id = self.experiment.id,
+                            action = action,
+                            action_object_type = ThingType.USER.value,
+                            action_object_id = experiment_thing.id,
+                            metadata_json = metadata_json
+                        )
+                        self.db_session.add(ea)
+                        experiment_thing.metadata_json = metadata_json
+            self.db_session.commit()
+        except(Exception) as e:
+           self.db_session.execute("UNLOCK TABLES")
+           self.log.error("Error in NewcomerMessagingExperimentController::send_messages", extra=sys.exc_info()[0])
+           return []
+        self.db_session.execute("UNLOCK TABLES")
+        
+        return message_results
+
+    ## return a list of experiment_things needing interventions
+    def get_accounts_needing_interventions(self):
+        return self.db_session.query(ExperimentThing).filter(and_(
+            ExperimentThing.object_type == ThingType.USER.value,
+            ExperimentThing.experiment_id == self.experiment.id,
+            ExperimentThing.query_index == "Intervention TBD"
+            )).order_by(ExperimentThing.created_at).all()
 
     ## Accepts a list of comments
     # and returns a list of comment authors who are newcomers
@@ -193,59 +329,63 @@ class NewcomerMessagingExperimentController(MessagingExperimentController):
         previously_enrolled = self.previously_enrolled(newcomer_authors)
         matched_newcomers = list(previously_enrolled.keys())
 
-        self.db_session.execute("Lock Tables experiments WRITE, experiment_things WRITE")
+        self.db_session.execute("Lock Tables experiments WRITE,                                         experiment_things WRITE")
+        try:
+            newcomer_ets = []
+            newcomers_without_randomization = 0
+            next_randomization = self.experiment_settings['conditions'][condition]['next_randomization']
+            for newcomer in newcomer_comments:
+                if newcomer['author'] not in matched_newcomers:
+                    et_metadata = {}
+                    
+                    # NOW ASSIGN THE RANDOMIZATION
+                    next_randomization = self.experiment_settings['conditions'][condition]['next_randomization']
+                    
+                    ## if there are no remaining randomizations, log the error,
+                    ## break from the loop, and continue
+                    if(next_randomization is not None and 
+                        next_randomization >= len(self.experiment_settings['conditions'][condition]['randomizations'])):
+                        next_randomization = None
+                        newcomers_without_randomization += 1
+                    
+                    if(next_randomization is not None):
+                        randomization = self.experiment_settings['conditions'][condition]['randomizations'][next_randomization]
+                        self.experiment_settings['conditions'][condition]['next_randomization'] += 1
 
-        newcomer_ets = []
-        newcomers_without_randomization = 0
-        next_randomization = self.experiment_settings['conditions'][condition]['next_randomization']
-        for newcomer in newcomer_comments:
-            if newcomer['author'] not in matched_newcomers:
-                et_metadata = {}
-                
-                # NOW ASSIGN THE RANDOMIZATION
-                next_randomization = self.experiment_settings['conditions'][condition]['next_randomization']
-                
-                ## if there are no remaining randomizations, log the error,
-                ## break from the loop, and continue
-                if(next_randomization is not None and 
-                    next_randomization >= len(self.experiment_settings['conditions'][condition]['randomizations'])):
-                    next_randomization = None
-                    newcomers_without_randomization += 1
-                
-                if(next_randomization is not None):
-                    randomization = self.experiment_settings['conditions'][condition]['randomizations'][next_randomization]
-                    self.experiment_settings['conditions'][condition]['next_randomization'] += 1
+                        et_metadata = {
+                            "condition": condition,
+                            "randomization": randomization,
+                            "submission_id": newcomer['comment']['link_id'],
+                            "comment_id":newcomer['comment']['id'],
+                            "arm": "arm_" + str(randomization['treatment']),
+                            "message_status": "TBD",
+                            "survey_status": "TBD"
+                        }
+                        # NOW SAVE AN EXPERIMENT THING
+                        newcomer_ets.append({
+                            "id": uuid.uuid4().hex,
+                            "thing_id": newcomer['author'],
+                            "experiment_id": self.experiment.id,
+                            "object_type": ThingType.USER.value,
+                            # we don't have account creation info
+                            # at this stage, and it would take more queries to get
+                            "object_created": None, 
+                            "query_index": "Intervention TBD",
+                            "metadata_json": json.dumps(et_metadata)
+                        })
 
-                    et_metadata = {
-                        "condition": condition,
-                        "randomization": randomization,
-                        "submission_id": newcomer['comment']['link_id'],
-                        "comment_id":newcomer['comment']['id'],
-                        "arm": "arm_" + str(randomization['treatment']),
-                        "message_status": "TBD",
-                        "survey_status": "TBD"
-                    }
-                    # NOW SAVE AN EXPERIMENT THING
-                    newcomer_ets.append({
-                        "id": uuid.uuid4().hex,
-                        "thing_id": newcomer['author'],
-                        "experiment_id": self.experiment.id,
-                        "object_type": ThingType.USER.value,
-                        # we don't have account creation info
-                        # at this stage, and it would take more queries to get
-                        "object_created": None, 
-                        "query_index": "Intervention TBD",
-                        "metadata_json": json.dumps(et_metadata)
-                    })
+            if(newcomers_without_randomization > 0 ):
+                self.log.error("NewcomerMessagingExperimentController Experiment {0} has run out of randomizations from '{1}' to assign.".format(self.experiment_name, condition))
 
-        if(newcomers_without_randomization > 0 ):
-            self.log.error("NewcomerMessagingExperimentController Experiment {0} has run out of randomizations from '{1}' to assign.".format(self.experiment_name, condition))
+            if(len(newcomer_ets)>0):
+                self.db_session.insert_retryable(ExperimentThing, newcomer_ets)
 
-        if(len(newcomer_ets)>0):
-            self.db_session.insert_retryable(ExperimentThing, newcomer_ets)
-
-            self.experiment.experiment_settings = json.dumps(self.experiment_settings)
-            self.db_session.commit()
+                self.experiment.experiment_settings = json.dumps(self.experiment_settings)
+                self.db_session.commit()
+        except:
+            ## make sure to unlock tables even if you get an exception
+            self.db_session.execute("UNLOCK TABLES")
+        
         self.db_session.execute("UNLOCK TABLES")
 
         self.log.info("Assigned randomizations to {0} commenters: [{1}]".format(

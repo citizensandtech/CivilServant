@@ -111,12 +111,8 @@ def test_initialize_experiment(mock_reddit):
     assert last_log_line.find("MessagingExperimentController::enroll_new_participants") > -1
 
 
+#### TEST MessagingExperimentController::identify_newcomers
 #### TEST MessagingExperimentController::previously_enrolled
-@patch('praw.Reddit', autospec=True)
-def test_previously_enrolled(mock_reddit):
-    assert True
-
-
 @patch('praw.Reddit', autospec=True)
 def test_newcomer_messaging_eligibility(mock_reddit):
     random.seed(26062490)
@@ -254,5 +250,122 @@ def test_newcomer_messaging_eligibility(mock_reddit):
     assert mec.experiment_settings['conditions']['main']['randomizations'] == randomization_number
 
     et_newcomers = db_session.query(ExperimentThing).all()
-
     assert len(et_newcomers) == len(identified_newcomers)
+
+
+#### TEST MessagingExperimentController::get_accounts_needing_interventions
+@patch('praw.Reddit', autospec=True)
+def test_interventions(mock_reddit):
+    r = mock_reddit.return_value
+
+    ## SET UP FIXTURES AND INITIALIZE DATABASE
+
+    accounts_to_test = 4
+
+    account_comments = defaultdict(list)
+    comment_fixtures = []
+    newcomer_comments = []
+    for filename in sorted(glob.glob("{script_dir}/fixture_data/comments*".format(script_dir=TEST_DIR))):
+        f = open(filename, "r")
+        comment_fixtures += json.loads(f.read())
+        f.close()
+    
+    ## IN THIS CASE, WE ARE GENERATING AUTHOR IDs
+    ## LEST A BUG ACCIDENTALLY SEND PEOPLE COMMENTS
+    ## WHILE WE ARE UNIT TESTING. reddit has a 20 character limit
+    ## so any uuid4 will be an invalid username on reddit
+    for comment in comment_fixtures:
+        author = uuid.uuid4().hex
+        comment['author']  = author
+        account_comments[author].append(comment)
+    for author, comments in account_comments.items():
+        comments = sorted(comments, key = lambda x : x['created_utc'])
+        newcomer_comments.append({"author": author, "comment":comments[0]})
+
+
+    mec = NewcomerMessagingExperimentController("newcomer_messaging_experiment_test", db_session, r, log)
+    mec.assign_randomized_conditions(newcomer_comments[0:accounts_to_test])
+
+    ## TEST the result from get accounts needing intervention
+    accounts_needing_intervention = mec.get_accounts_needing_interventions()
+    assert len(accounts_needing_intervention) == len(newcomer_comments[0:accounts_to_test])
+    newcomer_authors = [x['author'] for x in newcomer_comments]
+    for account in accounts_needing_intervention:
+        assert account.thing_id in newcomer_authors
+
+    ## TEST the formatting of messages
+    # first case: where the arm is arm_1 as specified in the randomizations csv
+    arm_1_experiment_thing = [x for x in accounts_needing_intervention if json.loads(x.metadata_json)['arm']=="arm_1"][0]
+
+    message_output = mec.format_message(arm_1_experiment_thing)
+    assert message_output['message'].find("Hi {0}!".format(arm_1_experiment_thing.thing_id)) > -1
+    # second case: where the arm is null because it's the control group
+    # in that case, the message output should be None
+
+    arm_0_experiment_thing = [x for x in accounts_needing_intervention if json.loads(x.metadata_json)['arm']=="arm_0"][0]
+    message_output = mec.format_message(arm_0_experiment_thing) 
+    assert message_output is None
+
+    ## TEST the result from sending messages
+    m = Mock()
+    message_return_vals = []
+
+    ## SET UP accounts_to_test return values from message sending
+    ## the final account in the set will be an invalid username error
+    #for i in range(accounts_to_test-1):
+    #    message_return_vals.append({"errors":[]})
+    message_return_vals.append({"errors":[]})
+    message_return_vals.append({"errors":[{"username":newcomer_authors[accounts_to_test -2],
+                                "error": "nondescript error"}]})    
+    message_return_vals.append(
+        {"errors":[{"username":newcomer_authors[accounts_to_test-1], 
+        "error":"invalid username"}]})
+
+    m.side_effect = message_return_vals
+    r.send_message = m
+    patch('praw.')
+
+    experiment_things = accounts_needing_intervention[0:accounts_to_test]
+    
+    message_results = mec.send_messages(experiment_things)
+    
+    ## assertions for ExperimentAction objects
+    experiment_actions = db_session.query(ExperimentAction).all()
+    assert len(experiment_actions) == 3
+    ea = json.loads(experiment_actions[0].metadata_json)
+    assert(ea['survey_status']=="TBD")
+    assert(ea['message_status']=="sent")
+    ea = json.loads(experiment_actions[1].metadata_json)
+    assert(ea['survey_status']=="TBD")
+    assert(ea['message_status']=="sent")
+    ea = json.loads(experiment_actions[2].metadata_json)
+    assert(ea['survey_status']=="nonexistent")
+    assert(ea['message_status']=="nonexistent")
+
+    ## assertions for ExperimentThing objects
+    outcome_bundles = [{"query_index": "Intervention Complete",
+                    "message_status": "sent",
+                    "survey_status": "TBD",
+                    "observed_count":0},
+                    {"query_index":"Intervention TBD",
+                     "message_status":"TBD",
+                     "survey_status":"TBD",
+                     "observed_count":0},
+                    {"query_index":"Intervention Impossible",
+                     "message_status":"nonexistent",
+                     "survey_status":"nonexistent",
+                     "observed_count":0}
+                     ]
+
+    for experiment_thing in experiment_things:
+        mj = json.loads(experiment_thing.metadata_json)
+        for outcome in outcome_bundles:
+            if(experiment_thing.query_index == outcome['query_index'] and 
+                mj['message_status'] == outcome['message_status'] and
+                mj['survey_status'] == outcome['survey_status']
+              ):
+              outcome['observed_count'] += 1
+
+    assert outcome_bundles[0]['observed_count'] == 2
+    assert outcome_bundles[1]['observed_count'] == 1
+    assert outcome_bundles[2]['observed_count'] == 1
