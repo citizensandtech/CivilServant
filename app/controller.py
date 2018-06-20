@@ -7,6 +7,7 @@ import app.controllers.comment_controller
 import app.controllers.moderator_controller
 import app.controllers.stylesheet_experiment_controller
 import app.controllers.sticky_comment_experiment_controller
+import app.controllers.messaging_experiment_controller
 from utils.common import PageType, DbEngine
 from utils.perftest import profilable
 import app.cs_logger
@@ -151,6 +152,15 @@ def update_stylesheet_experiment(experiment_name):
     )
     sce.update_experiment()
 
+def update_newcomer_messaging_experiment(experiment_name):
+    r = conn.connect(controller=app.controllers.stylesheet_experiment_controller.StylesheetExperimentController)
+    mec = app.controllers.messaging_experiment_controller.NewcomerMessagingExperimentController(
+        experiment_name = experiment_name,
+        db_session = db_session,
+        r = r,
+        log = log
+    )
+    mec.update_experiment()
   
 if __name__ == "__main__":
     fnc = sys.argv[1]

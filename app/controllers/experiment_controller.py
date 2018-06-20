@@ -33,6 +33,7 @@ class ExperimentController():
         self.r = r
         self.required_keys = required_keys
         self.load_experiment_config(required_keys, experiment_name)
+        self.log.info("Initializing experiment {0}".format(experiment_name))
 
     def get_experiment_config(self, required_keys, experiment_name): 
         experiment_file_path = os.path.join(BASE_DIR, "config", "experiments", experiment_name) + ".yml"

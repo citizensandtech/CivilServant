@@ -104,7 +104,7 @@ class CommentController:
                 if(comment_result is None or comments_returned == 0 ):
                     limit_found = True
 
-                self.last_queried_comments += comment_result
+                self.last_queried_comments += comments
 
                 db_comments = []
                 db_comment_ids = []

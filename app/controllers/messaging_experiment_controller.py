@@ -84,7 +84,8 @@ class MessagingExperimentController(ExperimentController):
     #       and the id field as a generated unique ID for the specific record. 
     #       This is different from how other experiments currently use the id field.
     # TODO: Refactor other experiments to use the thing_id field, and conduct a
-    #       data migration to set thing_id across the CivilServant database    def accounts_not_already_in_experiment(self, accounts):
+    #       data migration to set thing_id across the CivilServant database    
+   # def accounts_not_already_in_experiment(self, accounts):
 
     def previously_enrolled(self, account_usernames):
 
@@ -413,23 +414,6 @@ class NewcomerMessagingExperimentController(MessagingExperimentController):
     def enroll_new_participants(self, instance):
         if(instance.last_subreddit_id != self.experiment_settings['subreddit_id']):
             return
-
-        self.log.info("Successfully Ran Event Hook to MessagingExperimentController::enroll_new_participants. Caller: {0}".format(str(instance)))
-
         newcomers = self.identify_newcomers(instance.last_queried_comments)
+        self.log.info("Callback called for experiment {0}. Last subreddit id: {1}. Experiment subreddit id:{2}. Caller: {3}, {4} comments, {5} newcomers.".format(self.experiment.name, instance.last_subreddit_id, self.experiment_settings['subreddit_id'], str(instance), len(instance.last_queried_comments), len(newcomers)))
         self.assign_randomized_conditions(newcomers)
-
-
-
-
-
-
-
-
-
-
-        
-
-
-
-
