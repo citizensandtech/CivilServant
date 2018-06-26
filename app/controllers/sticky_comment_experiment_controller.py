@@ -246,8 +246,22 @@ class StickyCommentExperimentController:
 
         comment_text  = self.experiment_settings['conditions'][condition]['arms']["arm_" + str(treatment_arm)]
 
+        ## THIS METHOD IS FOR USE WHEN INTENDING TO TEST AN EXPERIMENT WITHOUT
+        ## MAKING ANY ACTUAL COMMENTS ON REDDIT
+        #def _TEST_add_comment():
+        #    import collections, random, string
+        #    return collections.namedtuple("Comment", ["id", "created_utc"])(
+        #        "_" + "".join(random.choice(string.ascii_lowercase) for i in range(6)),
+        #        datetime.datetime.utcnow().timestamp())
+
+        ## TO USE THIS DRY RUN TEST CODE, UNCOMMENT THE FOLLOWING TWO LINES
+        ## AND COMMENT OUT THE TWO LINES AFTER IT
+        #comment = _TEST_add_comment() #submission.add_comment(comment_text)
+        ## distinguish_results = "DUMMY DISTINGUISH: Assume successful" 
+
         comment = submission.add_comment(comment_text)
         distinguish_results = comment.distinguish(sticky=True)
+
         self.log.info("{0}: Experiment {1} applied arm {2} to post {3} (condition = {4}). Result: {5}".format(
             self.__class__.__name__,            
             self.experiment_name,
@@ -584,6 +598,9 @@ class SubsetStickyCommentExperimentController(StickyCommentExperimentController)
         return self.make_sticky_post(experiment_thing, submission)
     
 
+
+### THIS SUBCLASS OF THE EXPERIMENT DOES NOT TAKE A SCHEDULED JOB
+### INSTEAD IT UPDATES AS PART OF A CALLBACK PROCESS
 class FrontPageStickyCommentExperimentController(StickyCommentExperimentController):
     def __init__(self, experiment_name, db_session, r, log):
         required_keys = ['subreddit', 'subreddit_id', 'username', 
@@ -618,13 +635,14 @@ class FrontPageStickyCommentExperimentController(StickyCommentExperimentControll
       subreddit_id_fullname = "t5_"+ self.subreddit_id
       objects_in_subreddit = [obj for obj in object_list if obj.subreddit_id==subreddit_id_fullname]
       return super(FrontPageStickyCommentExperimentController, self).get_eligible_objects(objects_in_subreddit)
-    ## main scheduled job
+
+    ## main callback job
     # differs from parent class's update_experiment with:
     #   - different method signature. "instance" variable used 
     #       because update_experiment is a callback
     #       (instance is an instance of the caller object)
     #   - calls different set_eligible_objects, which takes in "instance" variable
-    def update_experiment(self, instance):  ####
+    def callback_update_experiment(self, instance):  ####
         eligible_submissions = {}
         objs = self.set_eligible_objects(instance)  ####
         
@@ -633,6 +651,11 @@ class FrontPageStickyCommentExperimentController(StickyCommentExperimentControll
 
         self.archive_eligible_submissions(eligible_submissions) ####
         return self.run_interventions(eligible_submissions)
+
+    #override this method so it doesn't do anything
+    def update_experiment(self):
+      return
+
 
     def identify_frontpage_post(self, submission):
         # they are all frontpage posts  ???

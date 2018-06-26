@@ -102,13 +102,23 @@ def test_initialize_experiment(mock_reddit):
     
     ## NOW CHECK WHETHER THE EVENT HOOK WAS CALLED
     ## BY EXAMINING THE LOG
-    log_filename = log.handlers[0].baseFilename
-    last_log_line = None
-    with open(log_filename, "r") as f:
-        for line in f:
-            last_log_line = line
+    file_handler = None
+    for handler in log.handlers:
+        if type(handler).__name__ == "ConcurrentRotatingFileHandler":
+            file_handler = handler
+            break
 
-    assert last_log_line.find("MessagingExperimentController::enroll_new_participants") > -1
+    if(file_handler):
+        log_filename = handler.baseFilename
+        last_log_line = None
+        with open(log_filename, "r") as f:
+            for line in f:
+                last_log_line = line
+        assert last_log_line.find("MessagingExperimentController::enroll_new_participants") > -1
+    else:
+        ## IF THERE'S NO CONCURRENT ROTATING FILE HANDLER
+        ## RETURN FALSE
+        assert False
 
 
 #### TEST MessagingExperimentController::identify_newcomers

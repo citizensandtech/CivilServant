@@ -74,6 +74,7 @@ class CommentController:
         subreddit = self.db_session.query(Subreddit).filter(Subreddit.name == subreddit_name).first()
         subreddit_id = subreddit.id
         self.last_subreddit_id = subreddit_id
+        self.last_queried_comments = []
         #subreddit_name = subreddit.name
 
         # fetch the last thousand comment IDs
@@ -103,8 +104,6 @@ class CommentController:
                     after_id = "t1_" + comment['id']
                 if(comment_result is None or comments_returned == 0 ):
                     limit_found = True
-
-                self.last_queried_comments += comments
 
                 db_comments = []
                 db_comment_ids = []
@@ -152,4 +151,5 @@ class CommentController:
         except praw.errors.APIException:
             self.log.error("Error querying latest {subreddit_name} comments from reddit API. Immediate attention needed.".format(subreddit_name=subreddit_name))
             sys.exit(1)
+        self.last_queried_comments += comments
             

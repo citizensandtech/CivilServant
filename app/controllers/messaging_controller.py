@@ -60,10 +60,10 @@ class MessagingController:
             self.log.info("Sending a message to user %s with data %s" % (username, str(body)))
             # NOTE: THIS CODE WAS ADJUSTED TO PREVENT ACTUAL MESSAGE SENDING
             # NOTE: FOR THE PURPOSE OF TESTING THE r/feminism experiment
-            # WARNING: DO NOT COMMIT THESE TWO LINES
-            # response = self.r.send_message(username, subject, body, raise_captcha_exception=True)
-            response = {"errors":[]}
+            # WARNING: DO NOT COMMIT THIS LINE UNCOMMENTED
+            # response = {"errors":[]}
             # NOTE: END ALTERED CODE COMPONENT
+            response = self.r.send_message(username, subject, body, raise_captcha_exception=True)
  
             if response["errors"] and len(response['errors'])>0:
                 self.log.error("Error in response when sending a message to reddit account %s: %s" % (username, str(response)))

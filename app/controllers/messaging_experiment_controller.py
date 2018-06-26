@@ -416,4 +416,5 @@ class NewcomerMessagingExperimentController(MessagingExperimentController):
             return
         newcomers = self.identify_newcomers(instance.last_queried_comments)
         self.log.info("Callback called for experiment {0}. Last subreddit id: {1}. Experiment subreddit id:{2}. Caller: {3}, {4} comments, {5} newcomers.".format(self.experiment.name, instance.last_subreddit_id, self.experiment_settings['subreddit_id'], str(instance), len(instance.last_queried_comments), len(newcomers)))
+
         self.assign_randomized_conditions(newcomers)
