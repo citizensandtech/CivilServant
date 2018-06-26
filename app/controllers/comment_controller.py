@@ -8,6 +8,7 @@ import reddit.queries
 from utils.common import PageType
 from utils.retry import retryable
 from app.models import Base, SubredditPage, Subreddit, Post, Comment
+import app.event_handler
 from sqlalchemy import and_
 from sqlalchemy import text
 import sqlalchemy
@@ -18,6 +19,8 @@ class CommentController:
         self.db_session = db_session
         self.log = log
         self.r = r 
+        self.last_subreddit_id = None
+        self.last_queried_comments = []
 
     def archive_missing_post_comments(self, post_id):
         post = self.db_session.query(Post).filter(Post.id == post_id).first()
@@ -65,10 +68,13 @@ class CommentController:
         for post in posts_without_comments:
             self.archive_missing_post_comments(post.id)
 
+    @app.event_handler.event_handler
     def archive_last_thousand_comments(self, subreddit_name):
         # fetch the subreddit ID
         subreddit = self.db_session.query(Subreddit).filter(Subreddit.name == subreddit_name).first()
         subreddit_id = subreddit.id
+        self.last_subreddit_id = subreddit_id
+        self.last_queried_comments = []
         #subreddit_name = subreddit.name
 
         # fetch the last thousand comment IDs
@@ -136,7 +142,7 @@ class CommentController:
                 ## BREAK THE LOOP AFTER 15 iterations
                 iterations += 1
                 if(iterations==15):
-                    log.info(" Reached 15 iterations while trying to fetch comments from {0}. Fetched {1}".format(subreddit_name, total_comments_added))
+                    self.log.info(" Reached 15 iterations while trying to fetch comments from {0}. Fetched {1}".format(subreddit_name, total_comments_added))
                     limit_found = True
 
 #                    self.log.info("Exception saving {0} comments to database. Successfully saved after rollback: {1}".format(len(db_comments),str(e)))
@@ -145,4 +151,5 @@ class CommentController:
         except praw.errors.APIException:
             self.log.error("Error querying latest {subreddit_name} comments from reddit API. Immediate attention needed.".format(subreddit_name=subreddit_name))
             sys.exit(1)
+        self.last_queried_comments += comments
             

@@ -370,7 +370,7 @@ def test_update_experiment(intervene_ama_arm_1, intervene_ama_arm_0,
         intervene_frontpage_post_arm_1.return_value = comment_thing
 
         if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
-            experiment_return = controller_instance.update_experiment(instance)
+            experiment_return = controller_instance.callback_update_experiment(instance)
         elif controller_instance.__class__ is AMAStickyCommentExperimentController:
             experiment_return = controller_instance.update_experiment()
 

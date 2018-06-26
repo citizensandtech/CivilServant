@@ -18,7 +18,7 @@ def main():
                         help="The experiment")
 
     parser.add_argument("job",
-                         choices=["intervene", "tidy", "archive_submissions"],
+                         choices=["sticky_comment_intervene", "tidy", "archive_submissions", "send_newcomer_messages"],
                          help="The job associated with the experiment")
 
     parser.add_argument("interval",
@@ -54,7 +54,7 @@ def main():
         sys.exit(1)
 
 
-    if(args.job == "intervene"):
+    if(args.job == "sticky_comment_intervene"):
         scheduler.schedule(
                 scheduled_time=datetime.utcnow(),
                 func=app.controller.conduct_sticky_comment_experiment,
@@ -78,6 +78,15 @@ def main():
         scheduler.schedule(
                 scheduled_time=datetime.utcnow(),
                 func=app.controller.archive_experiment_submission_metadata,
+                args=[args.experiment],
+                kwargs={'_profile': args.profile},
+                interval=int(args.interval),
+                repeat=None,
+                timeout = timeout_seconds)
+    elif(args.job == "send_newcomer_messages"):
+        scheduler.schedule(
+                scheduled_time=datetime.utcnow(),
+                func=app.controller.update_newcomer_messaging_experiment,
                 args=[args.experiment],
                 kwargs={'_profile': args.profile},
                 interval=int(args.interval),

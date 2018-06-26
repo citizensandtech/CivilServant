@@ -4,6 +4,8 @@
 config/*.pickle
 config/*.json
 config/*.sh
+data/*.json
+data/*.csv
 praw.ini
 *.swp
 alembic.ini
