@@ -10,7 +10,7 @@ mysqlclient
 sqlalchemy
 alembic
 ConcurrentLogHandler
-airbrake
+airbrake==1.3.3
 pyyaml
 pytz
 numpy
