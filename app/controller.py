@@ -35,7 +35,7 @@ log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
 conn = app.connections.reddit_connect.RedditConnect()
 lumen_conn = app.connections.lumen_connect.LumenConnect(log)
-twitter_conn = app.connections.twitter_connect.TwitterConnect(log)
+twitter_conn = app.connections.twitter_connect.TwitterConnect(log, db_session)
 
 def fetch_reddit_front(page_type=PageType.TOP):
     r = conn.connect(controller="FetchRedditFront")
@@ -115,18 +115,18 @@ def conduct_sticky_comment_experiment(experiment_name):
 
 # not to be run as a job, just to store and get a sce object
 def initialize_sticky_comment_experiment(experiment_name):
-    c = get_experiment_class(experiment_name) 
-    r = conn.connect(controller=experiment_name)    
-    sce = c(        
+    c = get_experiment_class(experiment_name)
+    r = conn.connect(controller=experiment_name)
+    sce = c(
         experiment_name = experiment_name,
         db_session = db_session,
         r = r,
         log = log
     )
-    return sce    
+    return sce
 
 def remove_experiment_replies(experiment_name):
-    r = conn.connect(controller=experiment_name)    
+    r = conn.connect(controller=experiment_name)
     sce = app.controllers.sticky_comment_experiment_controller.StickyCommentExperimentController(
         experiment_name = experiment_name,
         db_session = db_session,
@@ -171,24 +171,24 @@ def fetch_lumen_notices(num_days=2):
 For all LumenNotices with CS_parsed_usernames=False, parse for twitter accounts
 """
 def parse_lumen_notices_for_twitter_accounts():
-    log.info("Calling parse_lumen_notices_for_twitter_accounts.")    
+    log.info("Calling parse_lumen_notices_for_twitter_accounts.")
     l = app.controllers.lumen_controller.LumenController(db_session, lumen_conn, log)
     l.query_and_parse_notices_archive_users()
 
 """
-For all LumenNoticeToTwitterUser with CS_account_queried=False, 
-archive Twitter accounts in TwitterUser objects,  and create 1st TwitterUserSnapshot 
+For all LumenNoticeToTwitterUser with CS_account_queried=False,
+archive Twitter accounts in TwitterUser objects,  and create 1st TwitterUserSnapshot
 """
 def fetch_twitter_users():
-    log.info("Calling fetch_twitter_users.")    
+    log.info("Calling fetch_twitter_users.")
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
     t.query_and_archive_new_users()
 
 """
-For all TwitterUserSnapshot.created_at older than x min, fetch another snapshot 
+For all TwitterUserSnapshot.created_at older than x min, fetch another snapshot
 """
 def fetch_twitter_snapshot_and_tweets(max_time_delta_min=60):
-    log.info("Calling fetch_twitter_snapshot_and_tweets, max_time_delta_min={0}".format(max_time_delta_min))    
+    log.info("Calling fetch_twitter_snapshot_and_tweets, max_time_delta_min={0}".format(max_time_delta_min))
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
     now = datetime.datetime.utcnow()
     date = now - datetime.timedelta(minutes=int(float(max_time_delta_min))) # now-1hour
@@ -198,7 +198,7 @@ def fetch_twitter_snapshot_and_tweets(max_time_delta_min=60):
 For all TwitterUsers with CS_most_tweets_queried=False, fetch tweets
 """
 def fetch_twitter_tweets(backfill=False):
-    log.info("Calling fetch_twitter_tweets, backfill={0}.".format(backfill))        
+    log.info("Calling fetch_twitter_tweets, backfill={0}.".format(backfill))
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
     t.query_and_archive_tweets(backfill)
 
@@ -212,7 +212,7 @@ def twitter_observational_analysis_basic_profiling():
 # python app/controller.py twitter_observational_analysis 2017-05-31 2017-06-02 7 /home/mmou/Dropbox/Documents/Chronos/MIT/CM/CivilServant
 def twitter_observational_analysis(start_date, end_date, min_observed_days, output_dir):
     start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
-    end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")    
+    end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
     min_observed_days = int(min_observed_days)
 
     to = app.controllers.twitter_observational_analysis_controller.TwitterObservationalAnalysisController(

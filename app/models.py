@@ -45,12 +45,12 @@ class Post(Base):
     created             = Column(DateTime) # "created"
     post_data           = Column(MEDIUMTEXT)	# "json_dict"
     comment_data        = Column(LONGTEXT)
-    comments_queried_at = Column(DateTime, default=None)  
+    comments_queried_at = Column(DateTime, default=None)
 
 class ModAction(Base):
     __tablename__ = "mod_actions"
     id                  = Column(String(256), primary_key = True, unique=True, autoincrement=False)
-    created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)  
+    created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     created_utc         = Column(DateTime)
     subreddit_id        = Column(String(32), index=True)
     mod                 = Column(String(64))
@@ -92,7 +92,7 @@ class Comment(Base):
                 data = comment_data,
                 link_id = comment_data['link_id'],
                 toplevel = toplevel)
-            all_comments[comment.id] = comment_node 
+            all_comments[comment.id] = comment_node
             if(toplevel):
                 all_toplevel[comment.id] = comment_node
 
@@ -107,7 +107,7 @@ class Comment(Base):
                 parent.add_child(comment)
             except:
                 continue
-        return {"all_comments": all_comments, "all_toplevel":all_toplevel}    
+        return {"all_comments": all_comments, "all_toplevel":all_toplevel}
 
 Index("ix_comments_subreddit_id_created_at", Comment.subreddit_id, Comment.created_at)
 
@@ -125,7 +125,7 @@ class PrawKey(Base):
     # IDs will be a string based on the assumption
     # that each device will only have one process
     # at a time handling a particular controller
-    # in the format:  
+    # in the format:
     #   HOST:ENV:CONTROLLER
     # For example:
     #   hannahmore:development:FrontPageController
@@ -160,7 +160,7 @@ class ExperimentThing(Base):
     experiment_id       = Column(Integer, index = True)
     object_created      = Column(DateTime, index = True)
     #column for experiment-specific custom query index
-    query_index         = Column(String(256), index = True) 
+    query_index         = Column(String(256), index = True)
     metadata_json       = Column(MEDIUMTEXT)
 
 class ExperimentThingSnapshot(Base):
@@ -189,14 +189,14 @@ class ExperimentAction(Base):
 class EventHook(Base):
     __tablename__ = "event_hooks"
     id                  = Column(Integer, primary_key=True)
-    name                = Column(String(256), index=True) 
+    name                = Column(String(256), index=True)
     created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     experiment_id       = Column(Integer, index=True)
     is_active           = Column(Boolean, default=False)
-    call_when           = Column(Integer) # see utils/common.py EventWhen Enum 
+    call_when           = Column(Integer) # see utils/common.py EventWhen Enum
     caller_controller   = Column(String(256), nullable=False)
-    caller_method       = Column(String(256), nullable=False)   
-    callee_module       = Column(String(256), nullable=False) # module, e.g. "app.controllers.sticky_comment_experiment_controller"    
+    caller_method       = Column(String(256), nullable=False)
+    callee_module       = Column(String(256), nullable=False) # module, e.g. "app.controllers.sticky_comment_experiment_controller"
     callee_controller   = Column(String(256), nullable=False) # class, e.g. "ChangingStickyCommentExperimentController"
     callee_method       = Column(String(256), nullable=False) # method, e.g. "change_sticky_comment_text"
 
@@ -226,7 +226,7 @@ class LumenNoticeExpandedURL(Base):
 # use twitter_use_id to join with TwitterUser, TwitterUserSnapshot, TwistterStatus
 class LumenNoticeToTwitterUser(Base):
     __tablename__ = 'lumen_notice_to_twitter_user'
-    id                  = Column(Integer, primary_key = True)    
+    id                  = Column(Integer, primary_key = True)
     record_created_at   = Column(DateTime, default=datetime.datetime.utcnow)
     notice_id           = Column(BigInteger, index=True)
     twitter_username    = Column(String(256), index = True) # if not found, NOT_FOUND_TWITTER_USER_STR
@@ -237,8 +237,8 @@ class LumenNoticeToTwitterUser(Base):
 class TwitterUser(Base):
     __tablename__ = 'twitter_users'
     id                  = Column(String(64), primary_key = True) # should be lowercase; if not found, # if not found, NOT_FOUND_TWITTER_USER_STR_[date]
-    not_found_id        = Column(String(64), index = True, default=None)    # if a user ever goes between e.g. FOUND and NOT_FOUND (either direction), 
-                                                                            # we want to be able to map between the actual id and the <NOT_FOUND>... id 
+    not_found_id        = Column(String(64), index = True, default=None)    # if a user ever goes between e.g. FOUND and NOT_FOUND (either direction),
+                                                                            # we want to be able to map between the actual id and the <NOT_FOUND>... id
     screen_name         = Column(String(256), index = True) # if not found, # if not found, NOT_FOUND_TWITTER_USER_STR
     created_at          = Column(DateTime)
     record_created_at   = Column(DateTime, default=datetime.datetime.utcnow)
@@ -250,16 +250,39 @@ class TwitterUserSnapshot(Base):
     __tablename__ = 'twitter_user_snapshots'
     id                  = Column(Integer, primary_key = True)
     twitter_user_id     = Column(String(64), index = True)
-    twitter_not_found_id= Column(String(64), index = True, default=None)    # if a user ever goes between e.g. FOUND and NOT_FOUND (either direction), 
-                                                                                    # we want to be able to map between the actual id and the <NOT_FOUND>... id 
+    twitter_not_found_id= Column(String(64), index = True, default=None)    # if a user ever goes between e.g. FOUND and NOT_FOUND (either direction),
+                                                                                    # we want to be able to map between the actual id and the <NOT_FOUND>... id
     record_created_at   = Column(DateTime, default=datetime.datetime.utcnow)
     user_state          = Column(Integer) # utils/common.py
     user_json           = Column(MEDIUMTEXT)
 
 class TwitterStatus(Base):
-    __tablename__ = 'twitter_statuses'    
+    __tablename__ = 'twitter_statuses'
     id                  = Column(BigInteger, primary_key = True)
     user_id             = Column(String(64), index = True)
     created_at          = Column(DateTime)
     record_created_at   = Column(DateTime, default=datetime.datetime.utcnow)
     status_data         = Column(MEDIUMTEXT)
+
+class TwitterRateState(Base):
+    # this tables keeps track of the RateLimit of each of our donated tokens
+    __tablename__ = 'twitter_ratestate'
+    id                       = Column(BigInteger, primary_key = True)
+    user_id                  = Column(String(64), index = True)
+    endpoint                 = Column(String(64), index = True)
+    is_exhausted             = Column(Boolean(), default = False)
+    checkin_due              = Column(DateTime)
+    reset_time               = Column(DateTime)
+    limit                    = Column(Integer)
+    remaining                = Column(Integer)
+    resources                = Column(MEDIUMTEXT)
+    is_valid                 = Column(Boolean(), default = True)
+    __table_args__           = (Index('user_endpoint', "user_id", "endpoint"),)
+
+class TwitterToken(Base):
+    # this table stores each of our donated tokens.
+    __tablename__ = 'twitter_tokens'
+    username            = Column(String(64)) #twitters limit is 15, futureproofing
+    user_id             = Column(BigInteger, primary_key = True)
+    oauth_token         = Column(String(64)) #these are only 50 long
+    oauth_token_secret  = Column(String(64)) #these are only 45 long
