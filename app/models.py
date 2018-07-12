@@ -267,17 +267,17 @@ class TwitterStatus(Base):
 class TwitterRateState(Base):
     # this tables keeps track of the RateLimit of each of our donated tokens
     __tablename__ = 'twitter_ratestate'
-    id                       = Column(BigInteger, primary_key = True)
+    id                       = Column(BigInteger, primary_key = True, autoincrement = True)
     user_id                  = Column(String(64), index = True)
     endpoint                 = Column(String(64), index = True)
-    is_exhausted             = Column(Boolean(), default = False)
+    is_exhausted             = Column(Boolean(), index = True, default = False)
     checkin_due              = Column(DateTime)
     reset_time               = Column(DateTime)
     limit                    = Column(Integer)
     remaining                = Column(Integer)
     resources                = Column(MEDIUMTEXT)
     is_valid                 = Column(Boolean(), default = True)
-    __table_args__           = (Index('user_endpoint', "user_id", "endpoint"),)
+    __table_args__           = (Index("endpoint", "is_exhausted"),)
 
 class TwitterToken(Base):
     # this table stores each of our donated tokens.
