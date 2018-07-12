@@ -147,6 +147,11 @@ class StickyCommentExperimentController:
             randomization = json.loads(experiment_thing.metadata_json)['randomization']
             arm_label = "arm_"+str(randomization['treatment'])
             intervene = getattr(self, "intervene_" + condition + "_" + arm_label)
+            self.log.info("{0}: Experiment {1} post {2} intervention_method: {3}".format(
+                self.__class__.__name__,
+                self.experiment_name,
+                experiment_thing.id,
+                "intervene_" + condition + "_" + arm_label))
             rval = intervene(experiment_thing, eligible_submissions[experiment_thing.id])
  
             if(rval is not None):
@@ -189,28 +194,13 @@ class StickyCommentExperimentController:
                     comment.id))
                 return False
 
-        ## Avoid Acting if the submission is not recent enough
-        curtime = time.time()
-#        if((curtime - submission.created_utc) > 10800):
-        if((curtime - submission.created_utc) > self.max_eligibility_age):
-            self.log.info("{0}: Submission created_utc {1} is {2} seconds greater than current time {3}, exceeding the max eligibility age of {4}. Declining to Add to the Experiment".format(
-                self.__class__.__name__,
-                submission.created_utc,
-                curtime - submission.created_utc,
-                curtime,
-                self.max_eligibility_age))
-            experiment_action = ExperimentAction(
-                experiment_id = self.experiment.id,
-                praw_key_id = PrawKey.get_praw_id(ENV, self.experiment_name),
-                action = "NonIntervention:MaxAgeExceeded",
-                action_object_type = ThingType.SUBMISSION.value,
-                action_object_id = submission.id
-            )
-            return False
         return True
 
     def make_control_nonaction(self, experiment_thing, submission, group="control"):
         if(self.submission_acceptable(submission) == False):
+            self.log.info("{0}: Submission {1} is unacceptable. Declining to make nonaction".format(
+                self.__class__.__name__,
+                submission.id))
             return None
 
         metadata      = json.loads(experiment_thing.metadata_json)
@@ -238,6 +228,9 @@ class StickyCommentExperimentController:
 
     def make_sticky_post(self, experiment_thing, submission):
         if(self.submission_acceptable(submission) == False):
+            self.log.info("{0}: Submission {1} is unacceptable. Declining to make sticky post".format(
+                self.__class__.__name__,
+                submission.id))
             return None
 
         metadata = json.loads(experiment_thing.metadata_json)
@@ -339,12 +332,25 @@ class StickyCommentExperimentController:
                     self.min_eligibility_age))
                 continue
 
-            ### TODO: rule out eligibility based on age at this stage
-            ### For now, we rule it out at the point of intervention
-            ### Since it's easier to mock single objects in the tests
-            ### Rather than a whole page of posts
-            # if(self.submission_acceptable(submission) == False):
-            #     continue
+            ## THE FOLLOWING IF STATEMENT IS NOT TESTED IN THE UNIT TESTS
+            #if(submission.created_utc < self.experiment.start_time):
+            #    self.log.info("{0}: Submission created_utc {1} is earlier than experiment start time {2}. Declining to Add to the Experiment".format(
+            #        self.__class__.__name__,
+            #        submission.created_utc,
+            #        self.experiment.start_time))
+            #    continue
+
+            ## THE FOLLOWING IF STATEMENT IS NOT TESTED IN THE UNIT TESTS
+            #if((curtime - submission.created_utc) > self.max_eligibility_age):
+            #    self.log.info("{0}: Submission created_utc {1} is {2} seconds greater than current time {3}, exceeding the max eligibility age of {4}. Declining to Add to the Experiment".format(
+            #        self.__class__.__name__,
+            #        submission.created_utc,
+            #        curtime - submission.created_utc,
+            #        curtime,
+            #        self.max_eligibility_age))
+            #    continue
+
+
             eligible_submissions.append(submission)
             eligible_submission_ids.append(id)
 
@@ -663,9 +669,17 @@ class FrontPageStickyCommentExperimentController(StickyCommentExperimentControll
 
     ## CONTROL GROUP
     def intervene_frontpage_post_arm_0(self, experiment_thing, submission):
+        self.log.info("{0}: Experiment {1} post {2} intervene_frontpage_post_arm_0".format(
+            self.__class__.__name__,
+            self.experiment_name,
+            submission.id))
         return self.make_control_nonaction(experiment_thing, submission, group="control")
         
     ## TREATMENT GROUP
     def intervene_frontpage_post_arm_1(self, experiment_thing, submission):
+        self.log.info("{0}: Experiment {1} post {2} intervene_frontpage_post_arm_1".format(
+            self.__class__.__name__,
+            self.experiment_name,
+            submission.id))
         #return self.make_control_nonaction(experiment_thing, submission, group="stub-treat")
         return self.make_sticky_post(experiment_thing, submission)
