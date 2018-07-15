@@ -259,7 +259,7 @@ class TwitterUserSnapshot(Base):
 class TwitterStatus(Base):
     __tablename__ = 'twitter_statuses'
     id                  = Column(BigInteger, primary_key = True)
-    user_id             = Column(String(64), index = True)
+    user_id             = Column(BigInteger, index = True)
     created_at          = Column(DateTime)
     record_created_at   = Column(DateTime, default=datetime.datetime.utcnow)
     status_data         = Column(MEDIUMTEXT)
@@ -268,7 +268,7 @@ class TwitterRateState(Base):
     # this tables keeps track of the RateLimit of each of our donated tokens
     __tablename__ = 'twitter_ratestate'
     id                       = Column(BigInteger, primary_key = True, autoincrement = True)
-    user_id                  = Column(String(64), index = True)
+    user_id                  = Column(BigInteger, index = True)
     endpoint                 = Column(String(64), index = True)
     is_exhausted             = Column(Boolean(), index = True, default = False)
     checkin_due              = Column(DateTime)
