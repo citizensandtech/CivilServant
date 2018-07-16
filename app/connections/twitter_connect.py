@@ -254,6 +254,7 @@ class TwitterConnect():
                     if prebook:
                         wait_before_return = (prebook.reset_time - query_time).total_seconds()
                         self.log.info(f'This is a prebook situation, not available until seconds: {wait_before_return}')
+                        self.log.info(f'Prebook user_id is {prebook.user_id}')
                     if not prebook:
                     # else we need to b) keep on waiting until we can checksomething out
                         next_checkout = self.db_session.query(TwitterRateState) \
@@ -266,15 +267,17 @@ class TwitterConnect():
                         continue
                 # 4. update checkout_due in database for select token-endpoint
                 assert endpoint_select or prebook
+                #either a token, or the prebook
                 token_endpoint = endpoint_select if endpoint_select else prebook
                 token_endpoint.checkin_due = query_time + timedelta(minutes=60*24) # 1 day loan
-                self.db_session.add(endpoint_select)
+                self.db_session.add(token_endpoint)
                 self.db_session.commit()
                 self.log.debug("I think I commited the checkin_due update")
-                token = self.db_session.query(TwitterToken).filter(TwitterToken.user_id==endpoint_select.user_id).one()
+                token = self.db_session.query(TwitterToken).filter(TwitterToken.user_id==token_endpoint.user_id).one()
                 self.db_session.commit()
                 self.endpoint_tokens[endpoint] = token
                 self.curr_endpoint = endpoint
+                self.log.debug(f'wiating for {wait_before_return}')
                 sleep(wait_before_return)
                 self.apply_token(endpoint)
                 return True
@@ -299,6 +302,8 @@ class TwitterConnect():
         # so this should be unique
         ratestate = self.db_session.query(TwitterRateState).filter(TwitterRateState.user_id==user_id) \
         .filter(TwitterRateState.endpoint==endpoint).with_for_update().one()
+        self.log.debug(f'Marking exhausted user_id:{user_id}, endpoint:{endpoint}, reset_time{reset_time}.')
+        self.log.debug(f'ratestate object had user_id:{ratestate.user_id}')
         # put in the reset time
         ratestate.reset_time = datetime.datetime.fromtimestamp(reset_time)
         # and also mark this ratestate as checked-in

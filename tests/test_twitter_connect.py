@@ -25,7 +25,8 @@ def setup_function(function):
     truncate_twitter_tables()
 
 def teardown_function(function):
-    truncate_twitter_tables()
+    # truncate_twitter_tables()
+    pass
 
 @patch('twitter.Api', autospec=True)
 @patch('twitter.ratelimit.RateLimit', autospec=True)
@@ -75,7 +76,7 @@ def test_twitter_connect_friends(mock_twitter):
 def test_exception_retry(mock_rate_limit, mock_twitter):
     #TODO: In the unlikelihood that a VERY slow machine is running these tests
     # you can increase the timedelta here and below to microseconds=500
-    reset_time = (datetime.datetime.now() + datetime.timedelta(seconds=1))
+    reset_time = (datetime.datetime.now() + datetime.timedelta(seconds=3    ))
     mock_rate_limit.resources = {"getfriends":{"/friends/list":{
         "reset":time.mktime(reset_time.timetuple()),
         "remaining":0,
@@ -117,30 +118,28 @@ def test_exception_retry(mock_rate_limit, mock_twitter):
     assert conn.endpoint_tokens[conn.curr_endpoint].user_id == 2
     # OK, so at this point in the code we assume that the second token is active
 
-    #
-    # ## now make it wait to go back to the previous key
-    # # by setting the second token's reset time to be later - aka further into the future - than the fetch_twitter_snapshot_and_tweets
-    # # and also by setting remaining to be zero
-    # # because the circumstances we're mocking are that every key is exhausted
-    # # so the token that has the shortest time-to-reset is used
-    # t.GetFriends.side_effect = [twitter.error.TwitterError([{'code': 88, 'message': 'Rate limit exceeded'}]), friend_accounts]
-    # mock_rate_limit.resources = {"getfriends":{"/friends/list":{
-    #     "reset":time.mktime((datetime.datetime.now() + datetime.timedelta(seconds=1)).timetuple()),
-    #     "remaining":0,
-    #     "limit":15}}}
-    # t.rate_limit = mock_rate_limit
-    #
-    # # assert we're still on key 2
-    # assert conn.endpoint_tokens[conn.curr_endpoint].user_id == 2
+    # now make it wait to go back to the previous key
+    # by setting the second token's reset time to be later - aka further into the future - than the user_id_1
+    # and also by setting remaining to be zero
+    # because the circumstances we're mocking are that every key is exhausted
+    # so the token that has the shortest time-to-reset is used
+    t.GetFriends.side_effect = [twitter.error.TwitterError([{'code': 88, 'message': 'Rate limit exceeded'}]), friend_accounts]
+    mock_rate_limit.resources = {"getfriends":{"/friends/list":{
+        "reset":time.mktime((datetime.datetime.now() + datetime.timedelta(seconds=6)).timetuple()),
+        "remaining":0,
+        "limit":15}}}
+    t.rate_limit = mock_rate_limit
+
+    # assert we're still on key 2
+    assert conn.endpoint_tokens[conn.curr_endpoint].user_id == 2
     # # assert (reset_time - datetime.datetime.now()).total_seconds() > 0
     # # make GetFriends run twice again, the first time erroring -- triggering a retry
-    # friends = conn.query(conn.api.GetFriends)
-    # # assert the right result came back
-    # assert len(friends)  == len(friend_accounts)
-    # # assert that we correctly went back to token 1
-    # # the token with the shortest reset time
-    # assert conn.endpoint_tokens[conn.curr_endpoint].user_id == 1
-    # #assert (reset_time - datetime.datetime.now()).total_seconds() < 0
-    #
-    # #TODO test not-only that in the all-exhausted case that rotation happens
-    # # but also that query waits until the reset time of the next available token
+    friends = conn.query(conn.api.GetFriends)
+    # assert the right result came back
+    assert len(friends)  == len(friend_accounts)
+    # assert that we correctly went back to token 1
+    # the token with the shortest reset time
+    assert conn.endpoint_tokens[conn.curr_endpoint].user_id == 1
+    #assert that the reset time is in the past which means we waited long enough
+    #why not check less than 0, not 1. I find that because of the timestamp resolution it's not quite right.
+    assert (reset_time - datetime.datetime.now()).total_seconds() < 1.0
