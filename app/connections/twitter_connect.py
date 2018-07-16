@@ -94,11 +94,11 @@ class TwitterConnect():
             self.config = json.loads(config.read())
 
         if(self.config['key_path'][0] == "/"):
-            self.log.info("TwitterConnect is loading from an absolute configuration path specified in {0}".format(config_path))
             self.token_path = self.config['key_path']
+            self.log.info("TwitterConnect is loading from an absolute configuration path specified in {0}".format(config_path))
         else:
-            self.log.info("TwitterConnect is loading from a relative configuration path specified in {0}. Loading tokens from {1}".format(config_path, token_path))
             self.token_path = os.path.join(BASE_DIR, self.config['key_path'])
+            self.log.info("TwitterConnect is loading from a relative configuration path specified in {0}. Loading tokens from {1}".format(config_path, self.token_path))
 
         self.update_db_tokens_from_files()
 
@@ -144,8 +144,8 @@ class TwitterConnect():
         # add all tokens not already in db
         tokens_to_add = []
         ratestates_to_add = []
-        creation_time = datetime.datetime.now()
-        self.log.info(f'Creation time is {creation_time}')
+        creation_time_epsilon = datetime.datetime.now() - timedelta(seconds=1) # a little in the past
+        self.log.info(f'Creation time is {creation_time_epsilon}')
         for token_username in in_dir_not_db:
             with open(os.path.join(self.token_path, f'{token_username}.json'), 'r') as f:
                 token_data = json.load(f)
@@ -162,8 +162,8 @@ class TwitterConnect():
                     ratestate = TwitterRateState()
                     ratestate.user_id = token_data['user_id']
                     ratestate.endpoint = endpoint #special value
-                    ratestate.checkin_due = creation_time #it will immediatley be available
-                    ratestate.reset_time = creation_time  #likewise immediately out of date
+                    ratestate.checkin_due = creation_time_epsilon #it will immediatley be available
+                    ratestate.reset_time = creation_time_epsilon  #likewise immediately out of date
                     ratestate.limit = -1 #special creation value
                     ratestate.remaining = -1 #special creation value
                     ratestate.resources = '{}'
@@ -210,10 +210,10 @@ class TwitterConnect():
     ## becomes available, based on information from the Twitter API
     ## then return that token
     def select_available_token(self, endpoint, strategy='random'):
-        query_time = datetime.datetime.now()
         wait_before_return = 0
         succeeded = False
         while not succeeded:
+            query_time = datetime.datetime.now()
             try:
                 # 2. findall token-endpoints where
                 # endpoint matches

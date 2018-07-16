@@ -5,30 +5,48 @@ import datetime, time
 from mock import Mock, patch
 import simplejson as json
 from utils.common import json2obj, DbEngine
-from app.models import TwitterTokens
+from app.models import TwitterToken, TwitterRateState
+import app.cs_logger
+import app.connections.twitter_connect
 
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 BASE_DIR  = os.path.join(TEST_DIR, "../")
 ENV = os.environ['CS_ENV'] = "test"
 
 db_session = DbEngine(os.path.join(TEST_DIR, "../", "config") + "/{env}.json".format(env=ENV)).new_session()
+log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
-
-import app.connections.twitter_connect
+def truncate_twitter_tables():
+    for table in (TwitterRateState, TwitterToken):
+        db_session.query(table).delete()
+        db_session.commit()
 
 def setup_function(function):
-    pass
+    truncate_twitter_tables()
 
 def teardown_function(function):
+    # truncate_twitter_tables()
     pass
+
 
 @patch('twitter.Api', autospec=True)
 @patch('twitter.ratelimit.RateLimit', autospec=True)
 def test_load_tokens(mock_rate_limit, mock_twitter):
+
+    config_path = os.path.join(BASE_DIR, "config", "twitter_configuration_" + ENV + ".json")
+    token_path = json.load(open(config_path,'r'))['key_path']
+    log.info(f'token_path is: {token_path}')
+    print(token_path)
+    token_file_names = os.listdir(token_path)
+
     db_session.rollback()
-    db_session.query(TwitterTokens).delete()
-    from IPython import embed; embed()
+    twitter_conn = app.connections.twitter_connect.TwitterConnect(log, db_session)
+    tokens_in_db = db_session.query(TwitterToken).all()
     db_session.commit()
+    len_files, len_db = len(token_file_names), len(tokens_in_db)
+    print(f'there are {len_files} tokens in files')
+    print(f'there are {len_db} tokens in db')
+    assert len_files == len_db
 
 @patch('twitter.Api', autospec=True)
 def test_twitter_connect(mock_twitter):
