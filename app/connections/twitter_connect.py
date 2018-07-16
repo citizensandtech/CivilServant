@@ -14,6 +14,12 @@ from sqlalchemy.sql.expression import func as sqlfunc
 
 from app.models import TwitterToken, TwitterRateState
 
+FUNC_ENDPOINTS = {'GetUserTimeline':'/statuses/user_timeline',
+                'UsersLookup':'/users/lookup',
+                'GetUser':'/users/show/:id',
+                'VerifyCredentials':'/account/verify_credentials',
+                'GetFriends': '/friends/list',}
+
 ENV =  os.environ['CS_ENV']
 
 ## HOW MANY TIMES TO RETRY?
@@ -157,8 +163,7 @@ class TwitterConnect():
                 token_obj.oauth_token_secret = token_data['oauth_token_secret']
                 tokens_to_add.append(token_obj)
 
-                for endpoint in ['/account/verify_credentials', '/users/lookup',
-                                 '/users/show/:id', '/statuses/user_timeline']:
+                for endpoint in FUNC_ENDPOINTS.values():
                     ratestate = TwitterRateState()
                     ratestate.user_id = token_data['user_id']
                     ratestate.endpoint = endpoint #special value
@@ -209,9 +214,13 @@ class TwitterConnect():
     ## or if no tokens are available, wait until the next token
     ## becomes available, based on information from the Twitter API
     ## then return that token
-    def select_available_token(self, endpoint, strategy='random'):
+    def select_available_token(self, endpoint, strategy='sequential'):
         wait_before_return = 0
         succeeded = False
+        strategy_order = {'random': sqlfunc.rand(),
+                          'sequential':TwitterRateState.user_id}
+        order_by = strategy_order[strategy]
+        self.log.info(f'order strategy is {strategy}: giving: {order_by}')
         while not succeeded:
             query_time = datetime.datetime.now()
             try:
@@ -225,7 +234,7 @@ class TwitterConnect():
                         .filter(TwitterRateState.endpoint == endpoint) \
                         .filter(TwitterRateState.checkin_due < query_time) \
                         .filter(TwitterRateState.reset_time < query_time) \
-                        .order_by(sqlfunc.rand()) \
+                        .order_by(order_by) \
                         .with_for_update().first()
                 self.log.info(f'''Trying to get token matching \
                                   endpoint: {endpoint} \
@@ -279,7 +288,7 @@ class TwitterConnect():
            until we find the endpoint and return its reset time'''
         for groupname, groupdict in self.api.rate_limit.resources.items():
             if endpoint in groupdict.keys():
-                return groupdict['/users/lookup']['reset']
+                return groupdict[endpoint]['reset']
 
     def mark_reset_time(self, endpoint):
         # find the reset time of this endpoint
@@ -304,11 +313,7 @@ class TwitterConnect():
     def query(self, method, *args, **kwargs):
         method_name = method.__name__
         #find the endpoint that will be used
-        method_endpoint = {'GetUserTimeline':'/statuses/user_timeline',
-                           'UsersLookup':'/users/lookup',
-                           'GetUser':'/users/show/:id',
-                           'VerifyCredentials':'/account/verify_credentials'}
-        endpoint = method_endpoint[method_name]
+        endpoint = FUNC_ENDPOINTS[method_name]
         #switch to that token or select_available_token
         if endpoint in self.endpoint_tokens.keys():
             if endpoint == self.curr_endpoint:
