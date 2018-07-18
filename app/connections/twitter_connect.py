@@ -14,6 +14,7 @@ from sqlalchemy.sql.expression import func as sqlfunc
 
 from app.models import TwitterToken, TwitterRateState
 
+# TODO include which version of python-twitter this relates to
 FUNC_ENDPOINTS = {'GetUserTimeline':'/statuses/user_timeline',
                 'UsersLookup':'/users/lookup',
                 'GetUser':'/users/show/:id',
@@ -218,18 +219,18 @@ class TwitterConnect():
         wait_before_return = 0
         succeeded = False
         strategy_order = {'random': sqlfunc.rand(),
-                          'sequential':TwitterRateState.user_id}
+                          'sequential':TwitterRateState.user_id,
+                          # another strategy might be fetch the most remaining in the future
+                          }
         order_by = strategy_order[strategy]
         self.log.info(f'order strategy is {strategy}: giving: {order_by}')
         while not succeeded:
             query_time = datetime.datetime.now()
             try:
-                # 2. findall token-endpoints where
+                # 2. find first token-endpoint where
                 # endpoint matches
                 # token-endpoint not checked out
-                # token-endpoint not reset_time
-                # random order
-                # just need one
+                # token-endpoint after reset_time
                 endpoint_select = self.db_session.query(TwitterRateState) \
                         .filter(TwitterRateState.endpoint == endpoint) \
                         .filter(TwitterRateState.checkin_due < query_time) \
@@ -275,6 +276,7 @@ class TwitterConnect():
                 self.log.debug("I think I commited the checkin_due update")
                 token = self.db_session.query(TwitterToken).filter(TwitterToken.user_id==token_endpoint.user_id).one()
                 self.db_session.commit()
+                # class dictionary update
                 self.endpoint_tokens[endpoint] = token
                 self.curr_endpoint = endpoint
                 self.log.debug(f'wiating for {wait_before_return}')
@@ -289,6 +291,7 @@ class TwitterConnect():
     def reset_time_of_endpoint(self, endpoint):
         '''Utility to walk through the rate_limit dict
            until we find the endpoint and return its reset time'''
+        #NOTE Future-me, not 100% sure that this dict is always in sync with reality
         for groupname, groupdict in self.api.rate_limit.resources.items():
             if endpoint in groupdict.keys():
                 return groupdict[endpoint]['reset']
@@ -311,10 +314,10 @@ class TwitterConnect():
         ratestate.checkin_due = checkin_time
         self.db_session.add(ratestate)
         self.db_session.commit()
-        #delet form local records
+        #delete form local records
         del self.endpoint_tokens[endpoint]
 
-    @rate_limit_retry
+    # @rate_limit_retry
     def query(self, method, *args, **kwargs):
         method_name = method.__name__
         #find the endpoint that will be used
