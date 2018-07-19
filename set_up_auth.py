@@ -15,7 +15,7 @@ env =  os.environ['CS_ENV']
 
 r = praw.Reddit(user_agent="Test version of CivilServant by u/natematias")
 
-url = r.get_authorize_url('uniqueKey', 'identity read modlog modposts submit modconfig flair', True)
+url = r.get_authorize_url('uniqueKey', 'identity read modlog modposts submit modconfig flair privatemessages', True)
 print(url)
 print("After you accept permission, please enter the code from the redirect_url")
 code = input("Enter the text after 'code='\n")

@@ -31,6 +31,7 @@ class MessagingController:
     ##    "message": "message text"}]
     ## This method will return a dict of results. 
     ## This method will raise a MessageError error if duplicate accounts are submitted
+    ## TODO: TEST THAT THE SUBJECT IS PROPERLY ASSIGNED
     def send_messages(self, account_messages, message_task_id, log_metadata = None):
         recipient_accounts = dict(Counter([x['account'] for x in account_messages]))
         duplicate_accounts = {k:v for (k,v) in recipient_accounts.items() if v>1}
@@ -42,8 +43,8 @@ class MessagingController:
         for account_message in account_messages:
             log_results[account_message['account']] = self.send_message(
                 account_message['account'], 
-                account_message['subject'],
                 account_message['message'], 
+                account_message['subject'],
                 message_task_id,
                 log_metadata)
         return log_results
@@ -57,7 +58,7 @@ class MessagingController:
         message_sent = None
         response = {"errors": []}
         try:
-            self.log.info("Sending a message to user %s with data %s" % (username, str(body)))
+            self.log.info("Sending a message to user %s with subject %s" % (username, str(subject)))
             # NOTE: THIS CODE WAS ADJUSTED TO PREVENT ACTUAL MESSAGE SENDING
             # NOTE: FOR THE PURPOSE OF TESTING THE r/feminism experiment
             # WARNING: DO NOT COMMIT THIS LINE UNCOMMENTED

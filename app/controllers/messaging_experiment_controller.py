@@ -143,6 +143,7 @@ class NewcomerMessagingExperimentController(MessagingExperimentController):
     def update_experiment(self):
         ## Identify messages to be sent
         accounts_needing_messages = self.get_accounts_needing_interventions()
+        self.log.info("Experiment {0}: identified {1} accounts needing interventions. Sending messages now...".format(self.experiment.name, len(accounts_needing_messages)))
         self.send_messages(accounts_needing_messages)
 
     ## format a message for sending, using information contained
@@ -412,6 +413,7 @@ class NewcomerMessagingExperimentController(MessagingExperimentController):
     ## THEN HAND THINGS OFF TO BE PICKED UP BY update_experiment()
 
     def enroll_new_participants(self, instance):
+        self.log.info("Experiment {0}: checking to see if subreddit {1} is subreddit {2}".format(self.experiment.name,instance.last_subreddit_id, self.experiment_settings['subreddit_id']))
         if(instance.last_subreddit_id != self.experiment_settings['subreddit_id']):
             return
         newcomers = self.identify_newcomers(instance.last_queried_comments)

@@ -108,6 +108,7 @@ def conduct_sticky_comment_experiment(experiment_name):
     sce.update_experiment()
 
 # not to be run as a job, just to store and get a sce object
+@profilable
 def initialize_sticky_comment_experiment(experiment_name):
     c = get_experiment_class(experiment_name) 
     r = conn.connect(controller=experiment_name)    
@@ -142,6 +143,7 @@ def archive_experiment_submission_metadata(experiment_name):
     )
     sce.archive_experiment_submission_metadata()
 
+@profilable
 def update_stylesheet_experiment(experiment_name):
     r = conn.connect(controller=app.controllers.stylesheet_experiment_controller.StylesheetExperimentController)
     sce = app.controllers.stylesheet_experiment_controller.StylesheetExperimentController(
@@ -152,8 +154,9 @@ def update_stylesheet_experiment(experiment_name):
     )
     sce.update_experiment()
 
+@profilable
 def update_newcomer_messaging_experiment(experiment_name):
-    r = conn.connect(controller=app.controllers.stylesheet_experiment_controller.StylesheetExperimentController)
+    r = conn.connect(controller=app.controllers.messaging_experiment_controller.NewcomerMessagingExperimentController)
     mec = app.controllers.messaging_experiment_controller.NewcomerMessagingExperimentController(
         experiment_name = experiment_name,
         db_session = db_session,

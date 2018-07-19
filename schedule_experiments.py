@@ -82,7 +82,8 @@ def main():
                 kwargs={'_profile': args.profile},
                 interval=int(args.interval),
                 repeat=None,
-                timeout = timeout_seconds)
+                timeout = timeout_seconds,
+                result_ttl = ttl)
     elif(args.job == "send_newcomer_messages"):
         scheduler.schedule(
                 scheduled_time=datetime.utcnow(),
@@ -91,7 +92,8 @@ def main():
                 kwargs={'_profile': args.profile},
                 interval=int(args.interval),
                 repeat=None,
-                timeout = timeout_seconds)
+                timeout = timeout_seconds,
+                result_ttl = ttl)
 
 if __name__ == '__main__':
     main()
