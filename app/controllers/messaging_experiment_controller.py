@@ -382,11 +382,13 @@ class NewcomerMessagingExperimentController(MessagingExperimentController):
             if(len(newcomer_ets)>0):
                 self.db_session.insert_retryable(ExperimentThing, newcomer_ets)
 
-                self.experiment.experiment_settings = json.dumps(self.experiment_settings)
+                self.experiment.settings_json = json.dumps(self.experiment_settings)
                 self.db_session.commit()
-        except:
+        except(Exception) as e:
             ## make sure to unlock tables even if you get an exception
             self.db_session.execute("UNLOCK TABLES")
+            self.log.error("Error in NewcomerMessagingExperimentController::assign_randomized_conditions", extra=sys.exc_info()[0])
+
         
         self.db_session.execute("UNLOCK TABLES")
 
