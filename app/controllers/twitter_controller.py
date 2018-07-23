@@ -253,7 +253,7 @@ class TwitterController():
 
         # at end, for left_users (users not found), commit to db
         left_existing_users = self.db_session.query(TwitterUser).filter(TwitterUser.screen_name.in_(list(left_users))).all()
-        
+
         # first, update lumen notices that are already associated with a twitter user
         for twitter_user in left_existing_users:
             screen_name = twitter_user.screen_name
@@ -586,7 +586,7 @@ class TwitterController():
     def get_statuses_user_state(self, user_id, count=200, max_id=None, user_state=TwitterUserState.NOT_FOUND, job_state=CS_JobState.FAILED):
         (statuses, user_state, job_state) = ([], user_state, job_state)
         try:
-            statuses = self.t.api.GetUserTimeline(user_id=user_id, count=count, max_id=max_id)
+            statuses = self.t.query(self.t.api.GetUserTimeline, user_id=user_id, count=count, max_id=max_id)
         except twitter.error.TwitterError as e:
             self.t.try_counter = 0 ## this line prevents the retry code from looping
             self.log.info(e)
