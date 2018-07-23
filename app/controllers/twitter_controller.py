@@ -7,7 +7,7 @@ import sqlalchemy
 from sqlalchemy import and_, or_, func
 import utils.common
 from utils.common import TwitterUserState, NOT_FOUND_TWITTER_USER_STR, CS_JobState
-import sys
+import sys, warnings, os
 from collections import defaultdict
 
 TWITTER_DATETIME_STR_FORMAT = "%a %b %d %H:%M:%S %z %Y"
@@ -343,7 +343,8 @@ class TwitterController():
         doesn't need to update any CS_JobState fields.
     """
     def query_and_archive_user_snapshots_and_tweets(self, min_time, is_test=False):
-        need_snapshot_users = self.db_session.query(TwitterUser).all()
+        need_snapshot_users = self.db_session.query(TwitterUser).filter(
+            or_(TwitterUser.lang.in_(["en","en-gb"]), TwitterUser.lang is None) ).all()
 
         # querying TwitterUserSnapshot is very expensive
         #need_snapshot_user_snapshots = self.db_session.query(
@@ -520,14 +521,18 @@ class TwitterController():
     ################### ARCHIVE TWEET CODE
     #########################################################
 
-    def query_and_archive_tweets(self, backfill=False, is_test=False):
+    def query_and_archive_tweets(self, backfill=False, is_test=False, order="ASC"):
         if backfill:
             # archive tweets for all users who haven't had oldest tweets PROCESSED
-            unarchived_users = self.db_session.query(TwitterUser).filter(
-                    TwitterUser.CS_oldest_tweets_archived != CS_JobState.PROCESSED.value).all()
+            unarchived_users = self.db_session.query(TwitterUser).filter(and_(
+                TwitterUser.CS_oldest_tweets_archived != CS_JobState.PROCESSED.value,
+                or_(TwitterUser.lang.in_(["en","en-gb"]), TwitterUser.lang is None))
+            ).order_by("record_created_at {0}".format(order)).all()
         else:
-            unarchived_users = self.db_session.query(TwitterUser).filter(
-                    TwitterUser.CS_oldest_tweets_archived == CS_JobState.PROCESSED.value).all()
+            unarchived_users = self.db_session.query(TwitterUser).filter(and_(
+                TwitterUser.CS_oldest_tweets_archived == CS_JobState.PROCESSED.value,
+                or_(TwitterUser.lang.in_(["en","en-gb"]), TwitterUser.lang is None))
+            ).order_by("record_created_at {0}".format(order)).all()
 
         self.log.info("About to query and archive tweets {0} users; backfill={1}".format(len(unarchived_users), backfill))
 
@@ -548,7 +553,7 @@ class TwitterController():
                     utils.common.reset_CS_JobState_In_Progress(this_users, "CS_oldest_tweets_archived", self.db_session, self.log) # if still marked IN_PROGRESS (e.g. because of unchecked exception), reset it to NOT_PROCESSED
                 prev_limit = limit
 
-            self.log.info("Queried and archived tweets for {0} out of {1} users; backfill={2}".format(prev_limit, len(unarchived_users), backfill))
+            self.log.info("PID {3} queried and archived tweets for {0} out of {1} users; backfill={2}".format(prev_limit, len(unarchived_users), backfill, str(os.getpid())))
 
     """
         user_records: list of TwitterUser records
@@ -583,8 +588,8 @@ class TwitterController():
         try:
             statuses = self.t.api.GetUserTimeline(user_id=user_id, count=count, max_id=max_id)
         except twitter.error.TwitterError as e:
-            self.log.info(e)
             self.t.try_counter = 0 ## this line prevents the retry code from looping
+            self.log.info(e)
             # TODO: un-jankify this error handling/parsing code. might not get much better though
             if e.message == "Not authorized.":
                 # Account is either protected or suspended
@@ -621,14 +626,15 @@ class TwitterController():
             query_seen_statuses = self.db_session.query(
                 TwitterStatus.id).filter(
                 TwitterStatus.user_id == user_id).all()
+            seen_statuses = set([s[0] for s in query_seen_statuses if s is not None]) # set of ids already in db; s = (872295416376823808,)
         else:
             # believe that we have all statuses older than func.max(TwitterStatus.id),
             # so we only need to get func.max(TwitterStatus.id)
             query_seen_statuses = self.db_session.query(
                 func.max(TwitterStatus.id)).filter(
                 TwitterStatus.user_id == user_id).first()
+            seen_statuses = set([query_seen_statuses])
 
-        seen_statuses = set([s[0] for s in query_seen_statuses if s is not None]) # set of ids already in db; s = (872295416376823808,)
         new_seen_statuses = set([]) # set of ids added this time
 
         oldest_id_queried = None    # if query_oldest_id is None else query_oldest_id[0]
@@ -645,7 +651,7 @@ class TwitterController():
                 self.log.error("Unexpected error while calling api.GetUserTimeline on user_id {0}: nothing returned".format(user_id))
                 return job_state
 
-            self.log.info("Queried total of {0} tweets for account {1}".format(len(statuses), user_id))
+            self.log.info("PID {3} queried total of {0} tweets for account {1}. Backfill={2}".format(len(statuses), user_id, str(backfill), str(os.getpid())))
 
             if user_state is not TwitterUserState.FOUND:
                 if not is_test:
@@ -666,31 +672,45 @@ class TwitterController():
             sorted_statuses_jsons = sorted(statuses_jsons, key=lambda s: datetime.datetime.strptime(s["created_at"], TWITTER_DATETIME_STR_FORMAT))
             prev_new_seen_statuses_length = len(new_seen_statuses)
             this_oldest_id = min([status_json["id"] for status_json in sorted_statuses_jsons])
+
+            status_records = []
+
             for i, status_json in enumerate(sorted_statuses_jsons): # go through statuses from oldest to newest
                 status_id = status_json["id"]
                 created_at = datetime.datetime.strptime(status_json["created_at"], TWITTER_DATETIME_STR_FORMAT)
                 # if status hasn't been stored before, store
                 if status_id not in seen_statuses and status_id not in new_seen_statuses:
                     try:
-                        status_record = TwitterStatus(
-                            id = status_id,
-                            user_id = str(status_json["user"]["id"]),
+                        status_record = dict( 
+                            id =                status_id,
+                            user_id =           str(status_json["user"]["id"]),
                             record_created_at = datetime.datetime.utcnow(),
-                            created_at = created_at, #"Sun Apr 16 17:11:30 +0000 2017"
-                            status_data = json.dumps(status_json))
-                        self.db_session.add(status_record)
+                            created_at =        created_at, #"Sun Apr 16 17:11:30 +0000 2017"
+                            status_data =       json.dumps(status_json)
+                       )
+                       # status_record = TwitterStatus(
+                       #     id = status_id,
+                       #     user_id = str(status_json["user"]["id"]),
+                       #     record_created_at = datetime.datetime.utcnow(),
+                       #     created_at = created_at, #"Sun Apr 16 17:11:30 +0000 2017"
+                       #     status_data = json.dumps(status_json))
+                        #self.db_session.add(status_record)
+                        status_records.append(status_record)
                         new_seen_statuses.add(status_id)
                     except:
                         self.log.error("Error while creating TwitterStatus object for user {0}, status id {1}".format(status_json["user"]["id"]["screen_name"], status_id), extra=sys.exc_info()[0])
                         return job_state
             try:
-                self.db_session.commit()
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", r"\(1062, \"Duplicate entry")
+                    self.db_session.execute(TwitterStatus.__table__.insert().prefix_with("IGNORE"), status_records)
+                    self.db_session.commit()
             except:
                 self.log.error("Error while saving DB Session for {0} statuses for user {1}.".format(
                     len(new_seen_statuses) - prev_new_seen_statuses_length, user_id), extra=sys.exc_info()[0])
                 return job_state
             else:
-                self.log.info("Saved {0} statuses for user {1}.".format(len(new_seen_statuses) - prev_new_seen_statuses_length, user_id))
+                self.log.info("PID {2} Saved {0} statuses for user {1}.".format(len(new_seen_statuses) - prev_new_seen_statuses_length, user_id, str(os.getpid())))
 
             if not backfill and this_oldest_id in seen_statuses:
                 # if not backfill, we don't try to go back in time beyond the newest status we've already stored

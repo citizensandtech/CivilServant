@@ -281,6 +281,7 @@ def generate_twitter_users(today=datetime.datetime.utcnow(), days=7, html=True, 
     query_str = """
         SELECT 'lumen', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
         FROM twitter_users WHERE record_created_at <= :to_date and record_created_at >= :from_date
+        AND LANG IN("en", "en-gb", NULL)
         GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);"""
     result = run_query_for_days(query_str, today, days=days)
     if not html:

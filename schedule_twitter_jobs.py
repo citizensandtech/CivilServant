@@ -61,17 +61,26 @@ def main():
                         required = False,
                         help="Run within a specific environment. Otherwise run under the environment defined in the environment variable CS_ENV")
 
+    parser.add_argument("-q", '--queue',
+                        choices=['development', 'test', 'production', 'production2'],
+                        required = False,
+                        help="Run within a specific queue. Otherwise run under the environment defined in the environment variable CS_ENV")
+
     args = parser.parse_args()
 
     # if the user specified the environment, set it here
     if args.env!=None:
         os.environ['CS_ENV'] = args.env
-    
-    queue_name = os.environ['CS_ENV']
-    scheduler = Scheduler(queue_name = os.environ['CS_ENV'], connection=Redis())
+
+    if args.queue!=None:
+        queue_name = args.queue
+    else:
+        queue_name = os.environ['CS_ENV']
+
+    scheduler = Scheduler(queue_name = queue_name, connection=Redis())
 
     ttl = max(172800, int(args.interval) + 3600) # max of (2days in seconds, args.interval + 1 hr)
-    timeout = max(60*60*3, int(args.interval) + 300) # max of (3hrs in seconds, args.interval + 50min)
+    timeout = max(60*60*24, int(args.interval) + 300) # max of (3hrs in seconds, args.interval + 50min)
 
 
     if args.function =="fetch_lumen_notices":
