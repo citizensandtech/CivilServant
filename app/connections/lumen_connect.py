@@ -18,7 +18,7 @@ class LumenConnect():
             "Content-type": "application/json",
             "Accept": "application/json",
             "X-Authentication-Token": LUMENCONFIG["X-Authentication-Token"],
-            "User-Agent": "MerryMouCSBot/1.0"
+            "User-Agent": "CivilServant/1.0"
         } 
         self.log = log
 
@@ -40,16 +40,18 @@ class LumenConnect():
         return self.get("https://lumendatabase.org/notices/search", payload)
 
     def get_notices_to_twitter(self, topics, count, page, from_date, to_date):
+        date_facet = str(utils.common.time_since_epoch_ms(from_date)) + ".." + str(utils.common.time_since_epoch_ms(to_date))
         payload = {
             "topics": topics,
             "per_page": count,
             "page": page,
             "sort_by": "date_received desc",
             "recipient_name": "Twitter",
-            "date_received_facet": {
-                "from": utils.common.time_since_epoch_ms(from_date),
-                "to": utils.common.time_since_epoch_ms(to_date)
-            }
+            "date_received_facet": date_facet
+#            "date_received_facet": {
+#                "from": utils.common.time_since_epoch_ms(from_date),
+#                "to": utils.common.time_since_epoch_ms(to_date)
+#            }
         }
 
         return self.get_search(payload)
