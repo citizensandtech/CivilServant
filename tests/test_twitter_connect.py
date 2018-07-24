@@ -16,16 +16,16 @@ ENV = os.environ['CS_ENV'] = "test"
 db_session = DbEngine(os.path.join(TEST_DIR, "../", "config") + "/{env}.json".format(env=ENV)).new_session()
 log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
-def truncate_twitter_tables():
+def clear_twitter_tables():
     for table in (TwitterRateState, TwitterToken):
         db_session.query(table).delete()
         db_session.commit()
 
 def setup_function(function):
-    truncate_twitter_tables()
+    clear_twitter_tables()
 
 def teardown_function(function):
-    # truncate_twitter_tables()
+    # clear_twitter_tables()
     pass
 
 @patch('twitter.Api', autospec=True)
@@ -34,7 +34,7 @@ def test_load_tokens(mock_rate_limit, mock_twitter):
 
     config_path = os.path.join(BASE_DIR, "config", "twitter_configuration_" + ENV + ".json")
     token_path = json.load(open(config_path,'r'))['key_path']
-    log.info(f'token_path is: {token_path}')
+    log.info('token_path is: {0}'.format(token_path))
     print(token_path)
     token_file_names = os.listdir(token_path)
 
@@ -43,8 +43,8 @@ def test_load_tokens(mock_rate_limit, mock_twitter):
     tokens_in_db = db_session.query(TwitterToken).all()
     db_session.commit()
     len_files, len_db = len(token_file_names), len(tokens_in_db)
-    print(f'there are {len_files} tokens in files')
-    print(f'there are {len_db} tokens in db')
+    print('there are {0} tokens in files'.format(len_files))
+    print('there are {0} tokens in db'.format(len_db))
     assert len_files == len_db
 
 @patch('twitter.Api', autospec=True)

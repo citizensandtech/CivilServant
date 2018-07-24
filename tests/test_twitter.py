@@ -1,6 +1,6 @@
 import pytest
 import app.connections.twitter_connect
-import app.controller
+#import app.controller
 import app.controllers.twitter_controller
 import os
 import simplejson as json
@@ -19,10 +19,17 @@ ENV = os.environ['CS_ENV'] = "test"
 db_session = DbEngine(os.path.join(TEST_DIR, "../", "config") + "/{env}.json".format(env=ENV)).new_session()
 log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
+
+def clear_twitter_tables():
+    for table in (TwitterRateState, TwitterToken):
+        db_session.query(table).delete()
+        db_session.commit()
+
 def setup_function(function):
-    pass
+    clear_twitter_tables()
 
 def teardown_function(function):
+    clear_twitter_tables()
     db_session.query(LumenNotice).delete()
     db_session.query(LumenNoticeExpandedURL).delete()
     db_session.query(LumenNoticeToTwitterUser).delete()
@@ -52,13 +59,13 @@ def populate_notice_users():
 
 @patch('twitter.Api', autospec=True)
 def test_archive_twitter_new_users(mock_twitter, populate_notice_users):
+    log.info("STARTING test_archive_twitter_new_users")
     t = mock_twitter.return_value
-
     with open("{script_dir}/fixture_data/anon_users_lookup_0.json".format(script_dir=TEST_DIR)) as f:
         fixture = json.loads(f.read())
         t.UsersLookup.return_value = fixture
 
-    conn = app.connections.twitter_connect.TwitterConnect()
+    conn = app.connections.twitter_connect.TwitterConnect(log=log,db_session=db_session)
     t_ctrl = app.controllers.twitter_controller.TwitterController(db_session, conn, log)
 
     try:
@@ -71,9 +78,8 @@ def test_archive_twitter_new_users(mock_twitter, populate_notice_users):
         assert False # expected query_and_archive_new_users to throw test_exception
 
 @patch('twitter.Api', autospec=True)
-@patch('app.connections.twitter_connect.TwitterConnect', autospec=True)
-def test_with_user_records_archive_tweets(mock_TwitterConnect, mock_twitter_api):
-    tc = mock_TwitterConnect.return_value
+def test_with_user_records_archive_tweets(mock_twitter_api):
+    tc = app.connections.twitter_connect.TwitterConnect(log=log, db_session=db_session)
     api = mock_twitter_api.return_value
 
     def mocked_GetUserTimeline(user_id, count=None, max_id=None):
@@ -91,13 +97,11 @@ def test_with_user_records_archive_tweets(mock_TwitterConnect, mock_twitter_api)
     m = Mock()
     m.side_effect = mocked_GetUserTimeline
     api.GetUserTimeline = m
+    api.GetUserTimeline.__name__ = "GetUserTimeline"
     tc.api = api
     patch('twitter.')
-    patch('app.connections.twitter_connect.')
 
     assert len(db_session.query(TwitterStatus).all()) == 0
-
-
 
     t_controller = app.controllers.twitter_controller.TwitterController(db_session, tc, log)
 

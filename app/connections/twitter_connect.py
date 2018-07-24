@@ -4,7 +4,7 @@ from datetime import timedelta
 from collections import defaultdict
 import twitter
 import app.cs_logger
-from retrying import retry
+#from retrying import retry
 from time import sleep
 from random import random
 
@@ -27,24 +27,24 @@ ENV =  os.environ['CS_ENV']
 ## WE SHOULD RETRY FOR AS MANY TIMES AS THERE ARE KEYS
 ## NOTE: this was the only thing relying on the token_path being outside of the
 ## twitter_connect class, so I'm going to remove the dependency for now.
-RETRY_LIMIT = 100 #len(glob.glob(os.path.join(token_path, "*.json")))
+#RETRY_LIMIT = 100 #len(glob.glob(os.path.join(token_path, "*.json")))
 
-def rate_limit_retry(func):
+#def rate_limit_retry(func):
 
-    def retry_if_api_limit_error(exception):
+#    def retry_if_api_limit_error(exception):
         #print("rate_limit_retry: {0}".format(str(exception)))
         #print(exception)
-        if(len(exception.args)>0 and len(exception.args[0])>0 and "code" in exception.args[0][0] and exception.args[0][0]['code'] == 88):
-            return True
+#        if(len(exception.args)>0 and len(exception.args[0])>0 and "code" in exception.args[0][0] and exception.args[0][0]['code'] == 88):
+#            return True
         #print("rate_limit_retry: Raising Exception")
-        raise exception
+#        raise exception
 
     # this code wraps the function in a retry block
-    @retry(retry_on_exception=retry_if_api_limit_error, stop_max_attempt_number=RETRY_LIMIT)
-    def func_wrapper(self,*args, **kwargs):
+#    @retry(retry_on_exception=retry_if_api_limit_error, stop_max_attempt_number=RETRY_LIMIT)
+#    def func_wrapper(self,*args, **kwargs):
         #print("Before (Class {0}, Method {1})".format(self.__class__.__name__,  sys._getframe().f_code.co_name))
-        self.try_counter += 1
-        result = None
+#        self.try_counter += 1
+#        result = None
         #try a new key only if it's the second attempt or later
         # if(self.try_counter >= 2):
         #     self.log.info("Twitter: rate limit calling TwitterConnect.api.{0} on ID {1}.".format(set(args).pop().__name__, self.curr_token.user_id))
@@ -70,14 +70,14 @@ def rate_limit_retry(func):
         #     if(self.apply_token(token)):
         #         self.log.info("Twitter API connection verified under ID {0}. Previously {1}.".format(self.token['user_id'], previous_token_user))
 
-        result = func(self,*args, **kwargs)
+#        result = func(self,*args, **kwargs)
         ## if the above line fails, the counter will iterate
         ## without being reset, since the line below would never run
         ## if the above line succeeds, reset the counter and continue
-        self.try_counter = 0
-        return result
+#        self.try_counter = 0
+#        return result
 
-    return func_wrapper
+#    return func_wrapper
 
 
 class TwitterConnect():
@@ -136,25 +136,25 @@ class TwitterConnect():
         token_path_names = os.listdir(self.token_path)
         dir_tokens = set([fname.split('.json')[0] for fname in token_path_names \
                         if fname.endswith('.json')])
-        self.log.info(f'Found {len(dir_tokens)} tokens in f{self.token_path}')
+        self.log.info('Found {0} tokens in {1}'.format(len(dir_tokens), self.token_path))
         # get the tokens currently in the database #just the usernames
         db_tokens_res = self.db_session.query(TwitterToken).options(load_only('username')).all()
         db_tokens = set([r.username for r in db_tokens_res])
-        self.log.info(f'Found {len(db_tokens)} tokens in twitter_tokens table')
+        self.log.info('Found {0} tokens in twitter_tokens table'.format(len(db_tokens)))
 
         #do some set subtraction in both directions
         in_dir_not_db = dir_tokens - db_tokens
         in_db_not_dir = db_tokens - dir_tokens
-        self.log.info(f'Found {len(in_dir_not_db)} tokens in directory not db')
-        self.log.info(f'Found {len(in_db_not_dir)} tokens in db not directory')
+        self.log.info('Found {0} tokens in directory not db'.format(len(in_dir_not_db)))
+        self.log.info('Found {0} tokens in db not directory'.format(len(in_db_not_dir)))
 
         # add all tokens not already in db
         tokens_to_add = []
         ratestates_to_add = []
         creation_time_epsilon = datetime.datetime.now() - timedelta(seconds=1) # a little in the past
-        self.log.info(f'Creation time is {creation_time_epsilon}')
+        self.log.info('Creation time is {0}'.format(creation_time_epsilon))
         for token_username in in_dir_not_db:
-            with open(os.path.join(self.token_path, f'{token_username}.json'), 'r') as f:
+            with open(os.path.join(self.token_path, '{0}.json'.format(token_username)), 'r') as f:
                 token_data = json.load(f)
 
                 token_obj = TwitterToken()
@@ -178,17 +178,17 @@ class TwitterConnect():
         # Twitter Tokens table
         self.db_session.add_all(tokens_to_add)
         self.db_session.commit()
-        self.log.info(f'Added {len(tokens_to_add)} tokens to twitter_tokens table')
+        self.log.info('Added {0} tokens to twitter_tokens table'.format(len(tokens_to_add)))
 
         # Twitter RateState tables
         self.db_session.add_all(ratestates_to_add)
         self.db_session.commit()
-        self.log.info(f'Added {len(ratestates_to_add)} tokens to twitter_ratestate table')
+        self.log.info('Added {0} tokens to twitter_ratestate table'.format(len(ratestates_to_add)))
 
         # at least log what's in but not in dir
         for token_username in in_db_not_dir:
-            self.log.info(f"I think {token_username} has revoked permission and\
-            we should set their token to inactive.")
+            self.log.info("I think {0} has revoked permission and\
+            we should set their token to inactive.".format(token_username))
 
     ## This method takes a token and tries to adjust the API to query using the token
     def apply_token(self, endpoint):
@@ -204,7 +204,7 @@ class TwitterConnect():
             verification = self.api.VerifyCredentials()
             self.api.InitializeRateLimit() #dangerous for us.
         except twitter.error.TwitterError as e:
-            self.log.error("Twitter: Failed to connect to API with User ID {0}. Remove from token set. Error: {1}.".format(token['user_id'], str(e)))
+            self.log.error("Twitter: Failed to connect to API with endpoint {0}. Remove from token set. Error: {1}.".format(endpoint, str(e)))
             self.curr_endpoint['valid'] = False
             self.token = None
             return False
@@ -223,7 +223,7 @@ class TwitterConnect():
                           # another strategy might be fetch the most remaining in the future
                           }
         order_by = strategy_order[strategy]
-        self.log.info(f'order strategy is {strategy}: giving: {order_by}')
+        self.log.info('order strategy is {0}: giving: {1}'.format(strategy, order_by))
         while not succeeded:
             query_time = datetime.datetime.now()
             try:
@@ -237,10 +237,10 @@ class TwitterConnect():
                         .filter(TwitterRateState.reset_time < query_time) \
                         .order_by(order_by) \
                         .with_for_update().first()
-                self.log.info(f'''Trying to get token matching \
-                                  endpoint: {endpoint} \
-                                  query_time: {query_time}''')
-                self.log.info(f'Number Token-endpoint query results: {1 if endpoint_select else 0}')
+                self.log.info('''Trying to get token matching \
+                                  endpoint: {0} \
+                                  query_time: {1}'''.format(endpoint, query_time))
+                self.log.info('Number Token-endpoint query results: {0}'.format(1 if endpoint_select else 0))
 
                 # 3 check if the endpoint_select is empty
                 if not endpoint_select:
@@ -254,8 +254,8 @@ class TwitterConnect():
                               .order_by(TwitterRateState.reset_time).first()
                     if prebook:
                         wait_before_return = (prebook.reset_time - query_time).total_seconds()
-                        self.log.info(f'This is a prebook situation, not available until seconds: {wait_before_return}')
-                        self.log.info(f'Prebook user_id is {prebook.user_id}')
+                        self.log.info('This is a prebook situation, not available until seconds: {0}'.format(wait_before_return))
+                        self.log.info('Prebook user_id is {0}'.format(prebook.user_id))
                     if not prebook:
                     # else we need to b) keep on waiting until we can checksomething out
                         next_checkout = self.db_session.query(TwitterRateState) \
@@ -263,7 +263,7 @@ class TwitterConnect():
                                   .order_by(TwitterRateState.checkin_due).first()
                         #add a bit of noise for loop until
                         time_until_next_try = next_checkout.checkin_due - query_time + timedelta(seconds=random())
-                        self.log.info(f'Oh dear all the endpoints are checked out for at least seconds: {time_until_next_try}')
+                        self.log.info('Oh dear all the endpoints are checked out for at least seconds: {0}'.format(time_until_next_try))
                         sleep(time_until_next_try.total_seconds())
                         continue
                 # 4. update checkout_due in database for select token-endpoint
@@ -279,12 +279,12 @@ class TwitterConnect():
                 # class dictionary update
                 self.endpoint_tokens[endpoint] = token
                 self.curr_endpoint = endpoint
-                self.log.debug(f'wiating for {wait_before_return}')
+                self.log.debug('wiating for {0}'.format(wait_before_return))
                 sleep(wait_before_return)
                 self.apply_token(endpoint)
                 return True
             except:
-                self.log.exception(f'exception in getting from DB for tokens')
+                self.log.exception('exception in getting from DB for tokens')
                 self.db_session.rollback()
                 raise
 
@@ -305,8 +305,8 @@ class TwitterConnect():
         # so this should be unique
         ratestate = self.db_session.query(TwitterRateState).filter(TwitterRateState.user_id==user_id) \
         .filter(TwitterRateState.endpoint==endpoint).with_for_update().one()
-        self.log.debug(f'Marking exhausted user_id:{user_id}, endpoint:{endpoint}, reset_time{reset_time}.')
-        self.log.debug(f'ratestate object had user_id:{ratestate.user_id}')
+        self.log.debug('Marking exhausted user_id:{0}, endpoint:{1}, reset_time{2}.'.format(user_id, endpoint, reset_time))
+        self.log.debug('ratestate object had user_id:{0}'.format(ratestate.user_id))
         # put in the reset time
         ratestate.reset_time = datetime.datetime.fromtimestamp(reset_time)
         # and also mark this ratestate as checked-in
@@ -339,12 +339,13 @@ class TwitterConnect():
         #if we get a an error from twitter
         except twitter.TwitterError as twiterr:
             # if it's rate exceeded we know how to deal with that
-            if twiterr.message[0]['message']=='Rate limit exceeded':
-                self.log.info(f'Rate limit encountered on endpoint:{endpoint}')
+            if type(twiterr.message).__name__ == "list" and twiterr.message[0]['message']=='Rate limit exceeded':
+                self.log.info('Rate limit encountered on endpoint:{0}'.format(endpoint))
                 self.mark_reset_time(endpoint)
                 # recurse!
-                self.log.info(f'Recursing for method:')
+                self.log.info('Recursing for method:')
                 return self.query(method, *args, **kwargs)
             else:
-                self.log.info(f'Encountered twitter error, not the exceeded one: {twiterr}')
+                self.log.info('Twitter Query encountered twitter error other than Rate Limit Exceeded: {0}'.format(twiterr))
+                raise twiterr
         return result

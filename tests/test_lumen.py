@@ -1,5 +1,4 @@
 import app.connections.lumen_connect
-import app.controller
 import app.controllers.lumen_controller
 import os
 import simplejson as json
