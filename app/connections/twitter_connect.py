@@ -263,7 +263,7 @@ class TwitterConnect():
                                   .order_by(TwitterRateState.checkin_due).first()
                         #add a bit of noise for loop until
                         time_until_next_try = next_checkout.checkin_due - query_time + timedelta(seconds=random())
-                        self.log.info('PID {1}: Oh dear all the endpoints are checked out for at least seconds: {0}'.format(time_until_next_try), str(os.getpid()))
+                        self.log.info('PID {1}: Oh dear all the endpoints are checked out for at least seconds: {0}'.format(time_until_next_try, str(os.getpid())))
                         sleep(time_until_next_try.total_seconds())
                         continue
                 # 4. update checkout_due in database for select token-endpoint
