@@ -25,13 +25,11 @@ def setup_function(function):
     clear_twitter_tables()
 
 def teardown_function(function):
-    # clear_twitter_tables()
-    pass
+    clear_twitter_tables()
 
 @patch('twitter.Api', autospec=True)
 @patch('twitter.ratelimit.RateLimit', autospec=True)
 def test_load_tokens(mock_rate_limit, mock_twitter):
-
     config_path = os.path.join(BASE_DIR, "config", "twitter_configuration_" + ENV + ".json")
     token_path = json.load(open(config_path,'r'))['key_path']
     log.info('token_path is: {0}'.format(token_path))
@@ -46,6 +44,7 @@ def test_load_tokens(mock_rate_limit, mock_twitter):
     print('there are {0} tokens in files'.format(len_files))
     print('there are {0} tokens in db'.format(len_db))
     assert len_files == len_db
+
 
 @patch('twitter.Api', autospec=True)
 def test_twitter_connect_friends(mock_twitter):
@@ -106,8 +105,11 @@ def test_exception_retry(mock_rate_limit, mock_twitter):
     # and then secondly to assume we roll-over to a good key and then return the right results
     t.GetFriends.side_effect = [twitter.error.TwitterError([{'code': 88, 'message': 'Rate limit exceeded'}]), friend_accounts]
     # assert we are using the first token
-    assert conn.endpoint_tokens[conn.curr_endpoint].user_id == 1
-    # now try and get friends
+
+    # assert conn.endpoint_tokens[conn.curr_endpoint].user_id == 1 #this assertion used to work,
+    # but now verify credentials checks itself back in immediately.
+    # so after that happens this weird state is expected:
+    assert conn.curr_endpoint == '/account/verify_credentials' and conn.curr_endpoint not in conn.endpoint_tokens
     # NOTE! this should call GetFriends twice, because connect should catch an error and then retry
 
 
@@ -143,3 +145,20 @@ def test_exception_retry(mock_rate_limit, mock_twitter):
     #assert that the reset time is in the past which means we waited long enough
     #why not check less than 0, not 1. I find that because of the timestamp resolution it's not quite right.
     assert (reset_time - datetime.datetime.now()).total_seconds() < 1.0
+
+
+@patch('twitter.Api', autospec=True)
+@patch('twitter.ratelimit.RateLimit', autospec=True)
+def test_release_verify_credential_endpoint(mock_rate_limit, mock_twitter):
+    """The `verify_credentials` endpoint shouldn't ever be checked_out
+    apart from a very small time"""
+    before_creation = datetime.datetime.now()
+    time.sleep(1)
+    conn = app.connections.twitter_connect.TwitterConnect(log, db_session)
+    ratestates = db_session.query(TwitterRateState).filter(TwitterRateState.endpoint == '/account/verify_credentials')
+    time.sleep(1)
+    expiration = datetime.datetime.now()
+
+    for ratestate in ratestates:
+        assert ratestate.checkin_due > before_creation
+        assert ratestate.checkin_due < expiration
