@@ -210,7 +210,7 @@ class TwitterConnect():
             self.log.error(
                 "Twitter: Failed to connect to API with endpoint {0}. Remove from token set. Error: {1}.".format(
                     endpoint, str(e)))
-            if e[0]['code']==89: # or 'message': 'Invalid or expired token.':
+            if e[0]['code'] == 89:  # or 'message': 'Invalid or expired token.':
                 raise NotImplementedError('mark as invalid')
             return False
         self.curr_endpoint = endpoint
@@ -316,20 +316,24 @@ class TwitterConnect():
 
     def checkin_endpoint(self, endpoint=None):
         if endpoint is None:
+            assert self.curr_endpoint, 'There was no curr_endpoint to use as default'
             endpoint = self.curr_endpoint
         ratestate = self.get_ratestate_of_endpoint(endpoint)
         checkin_time = datetime.datetime.now()
         ratestate.checkin_due = checkin_time
         self.db_session.add(ratestate)
         self.db_session.commit()
+
         # delete form local records
         del self.endpoint_tokens[endpoint]
+        self.curr_endpoint = None
 
     def mark_reset_time(self, endpoint):
         reset_time = self.get_reset_time_of_endpoint(endpoint)
         ratestate = self.get_ratestate_of_endpoint(endpoint)
         self.log.debug(
-            'Marking exhausted user_id:{0}, endpoint:{1}, reset_time{2}.'.format(ratestate.user_id, endpoint, reset_time))
+            'Marking exhausted user_id:{0}, endpoint:{1}, reset_time{2}.'.format(ratestate.user_id, endpoint,
+                                                                                 reset_time))
         # put in the reset time
         ratestate.reset_time = datetime.datetime.fromtimestamp(reset_time)
         self.db_session.add(ratestate)

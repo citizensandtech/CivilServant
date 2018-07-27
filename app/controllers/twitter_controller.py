@@ -106,32 +106,33 @@ class TwitterController():
             # reset progress for any remaining in-progress items whether or not exception is raised
             notice_users_to_reset = [notice_user for notice_user in unprocessed_unarchived_notice_users if notice_user.CS_account_archived == CS_JobState.IN_PROGRESS.value]
             utils.common.reset_CS_JobState_In_Progress(notice_users_to_reset, "CS_account_archived", self.db_session, self.log) # if still marked IN_PROGRESS (e.g. because of unchecked exception), reset it to NOT_PROCESSED
+            self.t.checkin_endpoint()
 
 
-    """
-        unarchived_notice_users: list of LumenNoticeToTwitterUser
-
-        archive_new_users makes sure that new users get a TwitterUser and TwitterUserSnapshot stored for them
-        currently, it is NOT responsible for updating existing TwitterUser objects
-        (archive_old_users is responsible for that, e.g. in the case that a user goes from found to not found)
-        however, it should make sure that it doesn't add duplicate entries for the same user
-
-
-        for username in unarchived_notice_users:
-            if user id found:
-                if user id not already stored:
-                    store new TwitterUser, TwitterUserSnapshot
-                else:
-                    do nothing
-            elif no user id (or user info) found:
-                if username not already stored (gives approx correct behavior):
-                    store new TwitterUser, TwitterUserSnapshot
-                else:
-                    do nothing
-
-
-    """
     def archive_new_users(self, unarchived_notice_users, test_exception=False):
+        """
+            unarchived_notice_users: list of LumenNoticeToTwitterUser
+
+            archive_new_users makes sure that new users get a TwitterUser and TwitterUserSnapshot stored for them
+            currently, it is NOT responsible for updating existing TwitterUser objects
+            (archive_old_users is responsible for that, e.g. in the case that a user goes from found to not found)
+            however, it should make sure that it doesn't add duplicate entries for the same user
+
+
+            for username in unarchived_notice_users:
+                if user id found:
+                    if user id not already stored:
+                        store new TwitterUser, TwitterUserSnapshot
+                    else:
+                        do nothing
+                elif no user id (or user info) found:
+                    if username not already stored (gives approx correct behavior):
+                        store new TwitterUser, TwitterUserSnapshot
+                    else:
+                        do nothing
+
+
+        """
         if len(unarchived_notice_users) == 0:
             return (None, None)
 
@@ -331,18 +332,19 @@ class TwitterController():
     ################### ARCHIVE SNAPSHOTS AND NEW TWEETS CODE
     #########################################################
 
-    """
-        precondition: a TwitterUser and TwitterUserSnapshot must exist for
-                        the user, for archive_old_user to run
-
-        for each user in twitterusersnapshot with too old most recent snapshot:
-            user_state twitterusersnapshot record
-            update twitteruser?
-            store tweets?
-
-        doesn't need to update any CS_JobState fields.
-    """
     def query_and_archive_user_snapshots_and_tweets(self, min_time, is_test=False):
+        """
+            precondition: a TwitterUser and TwitterUserSnapshot must exist for
+                            the user, for archive_old_user to run
+
+            for each user in twitterusersnapshot with too old most recent snapshot:
+                user_state twitterusersnapshot record
+                update twitteruser?
+                store tweets?
+
+            doesn't need to update any CS_JobState fields.
+        """
+
         need_snapshot_users = self.db_session.query(TwitterUser).filter(
             or_(TwitterUser.lang.in_(["en","en-gb"]), TwitterUser.lang is None) ).all()
 
@@ -372,14 +374,17 @@ class TwitterController():
         self.log.info("Need to get new tweets for {0} users".format(len(need_new_tweets_users)))
         self.with_user_records_archive_tweets(need_new_tweets_users, is_test)  # TwitterUsers
 
-    """
+        self.t.checkin_endpoint()
 
-        key_to_users = {user id (if has_ids is True) OR username (if has_ids is False): TwitterUser}
-        we send {id: TwitterUser} if the user has an actual twitter id (the user is FOUND or PROTECTED)
-
-        doesn't return anything
-    """
     def archive_old_users(self, key_to_users, has_ids=True):
+        """
+
+            key_to_users = {user id (if has_ids is True) OR username (if has_ids is False): TwitterUser}
+            we send {id: TwitterUser} if the user has an actual twitter id (the user is FOUND or PROTECTED)
+
+            doesn't return anything
+        """
+
         if len(key_to_users) <= 0:
             return None
         is_test = type(key_to_users) is not dict
@@ -555,12 +560,15 @@ class TwitterController():
 
             self.log.info("PID {3} queried and archived tweets for {0} out of {1} users; backfill={2}".format(prev_limit, len(unarchived_users), backfill, str(os.getpid())))
 
-    """
-        user_records: list of TwitterUser records
+        self.t.checkin_endpoint()
 
-        returns user_to_state
-    """
     def with_user_records_archive_tweets(self, user_records, backfill=False, is_test=False, test_exception=False):
+        """
+            user_records: list of TwitterUser records
+
+            returns user_to_state
+        """
+
         if len(user_records) == 0:
             return
 
@@ -578,12 +586,12 @@ class TwitterController():
                 if counter >= len(user_records) / 2:
                     raise Exception("Throwing an exception for test purposes")
 
-    """
-        returns (statuses, user_state, job_state)
-
-        possible user_state: SUSPENDED, NOT_FOUND
-    """
     def get_statuses_user_state(self, user_id, count=200, max_id=None, user_state=TwitterUserState.NOT_FOUND, job_state=CS_JobState.FAILED):
+        """
+            returns (statuses, user_state, job_state)
+
+            possible user_state: SUSPENDED, NOT_FOUND
+        """
         (statuses, user_state, job_state) = ([], user_state, job_state)
         try:
             statuses = self.t.query(self.t.api.GetUserTimeline, user_id=user_id, count=count, max_id=max_id)
@@ -607,11 +615,12 @@ class TwitterController():
         return (statuses, user_state, job_state)
 
 
-    """
-        given TwitterUser user, archive user tweets.
-        also updates TwitterUser record if unexpected user state, by calling self.archive_old_users
-    """
     def archive_user_tweets(self, user, backfill=False, is_test=False):
+        """
+            given TwitterUser user, archive user tweets.
+            also updates TwitterUser record if unexpected user state, by calling self.archive_old_users
+        """
+
         user_id = user.id
 
         if utils.common.NOT_FOUND_TWITTER_USER_STR in user_id or user.user_state is TwitterUserState.PROTECTED:

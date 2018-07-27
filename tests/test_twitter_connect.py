@@ -10,28 +10,32 @@ import app.cs_logger
 import app.connections.twitter_connect
 
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
-BASE_DIR  = os.path.join(TEST_DIR, "../")
+BASE_DIR = os.path.join(TEST_DIR, "../")
 ENV = os.environ['CS_ENV'] = "test"
 
 db_session = DbEngine(os.path.join(TEST_DIR, "../", "config") + "/{env}.json".format(env=ENV)).new_session()
 log = app.cs_logger.get_logger(ENV, BASE_DIR)
+
 
 def clear_twitter_tables():
     for table in (TwitterRateState, TwitterToken):
         db_session.query(table).delete()
         db_session.commit()
 
+
 def setup_function(function):
     clear_twitter_tables()
 
+
 def teardown_function(function):
     clear_twitter_tables()
+
 
 @patch('twitter.Api', autospec=True)
 @patch('twitter.ratelimit.RateLimit', autospec=True)
 def test_load_tokens(mock_rate_limit, mock_twitter):
     config_path = os.path.join(BASE_DIR, "config", "twitter_configuration_" + ENV + ".json")
-    token_path = json.load(open(config_path,'r'))['key_path']
+    token_path = json.load(open(config_path, 'r'))['key_path']
     log.info('token_path is: {0}'.format(token_path))
     print(token_path)
     token_file_names = os.listdir(token_path)
@@ -51,9 +55,9 @@ def test_twitter_connect_friends(mock_twitter):
     t = mock_twitter.return_value
     conn = app.connections.twitter_connect.TwitterConnect(log, db_session)
 
-    #assert len(conn.rate_limit_resources.values()), 3
+    # assert len(conn.rate_limit_resources.values()), 3
 
-    friend_accounts = []# NOTE: # NOTE:
+    friend_accounts = []  # NOTE: # NOTE:
     with open("{script_dir}/fixture_data/twitter_get_friends.json".format(script_dir=TEST_DIR)) as f:
         fixture = json.loads(f.read())
         for account in fixture:
@@ -68,18 +72,19 @@ def test_twitter_connect_friends(mock_twitter):
     getfriends.__name__ = 'GetFriends'
 
     friends = conn.query(conn.api.GetFriends)
-    assert len(friends)  == len(friend_accounts)
+    assert len(friends) == len(friend_accounts)
+
 
 @patch('twitter.Api', autospec=True)
 @patch('twitter.ratelimit.RateLimit', autospec=True)
 def test_exception_retry(mock_rate_limit, mock_twitter):
-    #TODO: In the unlikelihood that a VERY slow machine is running these tests
+    # TODO: In the unlikelihood that a VERY slow machine is running these tests
     # you can increase the timedelta here and below to microseconds=500
-    reset_time = (datetime.datetime.now() + datetime.timedelta(seconds=3    ))
-    mock_rate_limit.resources = {"getfriends":{"/friends/list":{
-        "reset":time.mktime(reset_time.timetuple()),
-        "remaining":0,
-        "limit":15}}} #num queries per period
+    reset_time = (datetime.datetime.now() + datetime.timedelta(seconds=3))
+    mock_rate_limit.resources = {"getfriends": {"/friends/list": {
+        "reset": time.mktime(reset_time.timetuple()),
+        "remaining": 0,
+        "limit": 15}}}  # num queries per period
 
     t = mock_twitter.return_value
     t.rate_limit = mock_rate_limit
@@ -103,19 +108,19 @@ def test_exception_retry(mock_rate_limit, mock_twitter):
     # set the side-effect of get friends to first throw an error, then later return the right result_ttl
     # the reason it does this is that we except GetFriends should be called twice, first to experience the Error
     # and then secondly to assume we roll-over to a good key and then return the right results
-    t.GetFriends.side_effect = [twitter.error.TwitterError([{'code': 88, 'message': 'Rate limit exceeded'}]), friend_accounts]
+    t.GetFriends.side_effect = [twitter.error.TwitterError([{'code': 88, 'message': 'Rate limit exceeded'}]),
+                                friend_accounts]
     # assert we are using the first token
 
     # assert conn.endpoint_tokens[conn.curr_endpoint].user_id == 1 #this assertion used to work,
     # but now verify credentials checks itself back in immediately.
     # so after that happens this weird state is expected:
-    assert conn.curr_endpoint == '/account/verify_credentials' and conn.curr_endpoint not in conn.endpoint_tokens
+    assert conn.curr_endpoint is None and not conn.endpoint_tokens
     # NOTE! this should call GetFriends twice, because connect should catch an error and then retry
-
 
     friends = conn.query(conn.api.GetFriends)
     # assert right results still came throught
-    assert len(friends)  == len(friend_accounts)
+    assert len(friends) == len(friend_accounts)
     # assert that we did roll-over onto the second token
     assert conn.endpoint_tokens[conn.curr_endpoint].user_id == 2
     # OK, so at this point in the code we assume that the second token is active
@@ -125,11 +130,12 @@ def test_exception_retry(mock_rate_limit, mock_twitter):
     # and also by setting remaining to be zero
     # because the circumstances we're mocking are that every key is exhausted
     # so the token that has the shortest time-to-reset is used
-    t.GetFriends.side_effect = [twitter.error.TwitterError([{'code': 88, 'message': 'Rate limit exceeded'}]), friend_accounts]
-    mock_rate_limit.resources = {"getfriends":{"/friends/list":{
-        "reset":time.mktime((datetime.datetime.now() + datetime.timedelta(seconds=6)).timetuple()),
-        "remaining":0,
-        "limit":15}}}
+    t.GetFriends.side_effect = [twitter.error.TwitterError([{'code': 88, 'message': 'Rate limit exceeded'}]),
+                                friend_accounts]
+    mock_rate_limit.resources = {"getfriends": {"/friends/list": {
+        "reset": time.mktime((datetime.datetime.now() + datetime.timedelta(seconds=6)).timetuple()),
+        "remaining": 0,
+        "limit": 15}}}
     t.rate_limit = mock_rate_limit
 
     # assert we're still on key 2
@@ -138,12 +144,12 @@ def test_exception_retry(mock_rate_limit, mock_twitter):
     # # make GetFriends run twice again, the first time erroring -- triggering a retry
     friends = conn.query(conn.api.GetFriends)
     # assert the right result came back
-    assert len(friends)  == len(friend_accounts)
+    assert len(friends) == len(friend_accounts)
     # assert that we correctly went back to token 1
     # the token with the shortest reset time
     assert conn.endpoint_tokens[conn.curr_endpoint].user_id == 1
-    #assert that the reset time is in the past which means we waited long enough
-    #why not check less than 0, not 1. I find that because of the timestamp resolution it's not quite right.
+    # assert that the reset time is in the past which means we waited long enough
+    # why not check less than 0, not 1. I find that because of the timestamp resolution it's not quite right.
     assert (reset_time - datetime.datetime.now()).total_seconds() < 1.0
 
 
@@ -153,10 +159,10 @@ def test_release_verify_credential_endpoint(mock_rate_limit, mock_twitter):
     """The `verify_credentials` endpoint shouldn't ever be checked_out
     apart from a very small time"""
     before_creation = datetime.datetime.now()
-    time.sleep(1)
+    time.sleep(1.5)
     conn = app.connections.twitter_connect.TwitterConnect(log, db_session)
     ratestates = db_session.query(TwitterRateState).filter(TwitterRateState.endpoint == '/account/verify_credentials')
-    time.sleep(1)
+    time.sleep(1.5)
     expiration = datetime.datetime.now()
 
     for ratestate in ratestates:

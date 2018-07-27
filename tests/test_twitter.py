@@ -1,3 +1,5 @@
+from time import sleep
+
 import pytest
 import app.connections.twitter_connect
 #import app.controller
@@ -19,7 +21,6 @@ ENV = os.environ['CS_ENV'] = "test"
 db_session = DbEngine(os.path.join(TEST_DIR, "../", "config") + "/{env}.json".format(env=ENV)).new_session()
 log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
-
 def clear_twitter_tables():
     for table in (TwitterRateState, TwitterToken):
         db_session.query(table).delete()
@@ -27,6 +28,7 @@ def clear_twitter_tables():
 
 def setup_function(function):
     clear_twitter_tables()
+
 
 def teardown_function(function):
     clear_twitter_tables()
@@ -61,11 +63,15 @@ def populate_notice_users():
 def test_archive_twitter_new_users(mock_twitter, populate_notice_users):
     log.info("STARTING test_archive_twitter_new_users")
     t = mock_twitter.return_value
+    before_creation = datetime.datetime.now()
+    sleep(1.5)
+
     with open("{script_dir}/fixture_data/anon_users_lookup_0.json".format(script_dir=TEST_DIR)) as f:
         fixture = json.loads(f.read())
+        t.UsersLookup.__name__ = 'UsersLookup'
         t.UsersLookup.return_value = fixture
 
-    conn = app.connections.twitter_connect.TwitterConnect(log=log,db_session=db_session)
+    conn = app.connections.twitter_connect.TwitterConnect(log=log, db_session=db_session)
     t_ctrl = app.controllers.twitter_controller.TwitterController(db_session, conn, log)
 
     try:
@@ -76,6 +82,14 @@ def test_archive_twitter_new_users(mock_twitter, populate_notice_users):
             assert noticeuser.CS_account_archived != CS_JobState.IN_PROGRESS.value
     else:
         assert False # expected query_and_archive_new_users to throw test_exception
+
+    sleep(1.5)
+    expiration = datetime.datetime.now()
+    ratestates = db_session.query(TwitterRateState).filter(TwitterRateState.endpoint == '/users/lookup')
+
+    for ratestate in ratestates:
+        assert ratestate.checkin_due > before_creation
+        assert ratestate.checkin_due < expiration
 
 @patch('twitter.Api', autospec=True)
 def test_with_user_records_archive_tweets(mock_twitter_api):
@@ -122,7 +136,6 @@ def test_with_user_records_archive_tweets(mock_twitter_api):
         db_session.add(user_record)
         db_session.commit()
         user_records.append(user_record)
-
 
     try:
         t_controller.with_user_records_archive_tweets(user_records, backfill=True, is_test=True)

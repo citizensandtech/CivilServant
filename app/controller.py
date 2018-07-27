@@ -156,10 +156,11 @@ def update_stylesheet_experiment(experiment_name):
     )
     sce.update_experiment()
 
-"""
-Archive lumen notices.
-"""
+
 def fetch_lumen_notices(num_days=2):
+    """
+    Archive lumen notices.
+    """
     log.info("Calling fetch_lumen_notices, num_days={0}".format(num_days))
     l = app.controllers.lumen_controller.LumenController(db_session, lumen_conn, log)
 
@@ -167,37 +168,41 @@ def fetch_lumen_notices(num_days=2):
     date = datetime.datetime.utcnow() - datetime.timedelta(days=int(float(num_days))) # now-2days
     l.archive_lumen_notices(topics, date)
 
-"""
-For all LumenNotices with CS_parsed_usernames=False, parse for twitter accounts
-"""
+
 def parse_lumen_notices_for_twitter_accounts():
+    """
+    For all LumenNotices with CS_parsed_usernames=False, parse for twitter accounts
+    """
     log.info("Calling parse_lumen_notices_for_twitter_accounts.")
     l = app.controllers.lumen_controller.LumenController(db_session, lumen_conn, log)
     l.query_and_parse_notices_archive_users()
 
-"""
-For all LumenNoticeToTwitterUser with CS_account_queried=False,
-archive Twitter accounts in TwitterUser objects,  and create 1st TwitterUserSnapshot
-"""
+
 def fetch_twitter_users():
+    """
+    For all LumenNoticeToTwitterUser with CS_account_queried=False,
+    archive Twitter accounts in TwitterUser objects,  and create 1st TwitterUserSnapshot
+    """
     log.info("Calling fetch_twitter_users.")
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
     t.query_and_archive_new_users()
 
-"""
-For all TwitterUserSnapshot.created_at older than x min, fetch another snapshot
-"""
+
 def fetch_twitter_snapshot_and_tweets(max_time_delta_min=60):
+    """
+    For all TwitterUserSnapshot.created_at older than x min, fetch another snapshot
+    """
     log.info("Calling fetch_twitter_snapshot_and_tweets, max_time_delta_min={0}".format(max_time_delta_min))
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
     now = datetime.datetime.utcnow()
     date = now - datetime.timedelta(minutes=int(float(max_time_delta_min))) # now-1hour
     t.query_and_archive_user_snapshots_and_tweets(date)
 
-"""
-For all TwitterUsers with CS_most_tweets_queried=False, fetch tweets
-"""
+
 def fetch_twitter_tweets(backfill=False):
+    """
+    For all TwitterUsers with CS_most_tweets_queried=False, fetch tweets
+    """
     log.info("Calling fetch_twitter_tweets, backfill={0}.".format(backfill))
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
     t.query_and_archive_tweets(backfill)
