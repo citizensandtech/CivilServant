@@ -186,6 +186,7 @@ def fetch_twitter_users():
     log.info("Calling fetch_twitter_users.")
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
     t.query_and_archive_new_users()
+    twitter_conn.checkin_endpoint()
 
 
 def fetch_twitter_snapshot_and_tweets(max_time_delta_min=60):
@@ -197,6 +198,7 @@ def fetch_twitter_snapshot_and_tweets(max_time_delta_min=60):
     now = datetime.datetime.utcnow()
     date = now - datetime.timedelta(minutes=int(float(max_time_delta_min))) # now-1hour
     t.query_and_archive_user_snapshots_and_tweets(date)
+    twitter_conn.checkin_endpoint()
 
 
 def fetch_twitter_tweets(backfill=False):
@@ -206,7 +208,7 @@ def fetch_twitter_tweets(backfill=False):
     log.info("Calling fetch_twitter_tweets, backfill={0}.".format(backfill))
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
     t.query_and_archive_tweets(backfill)
-
+    twitter_conn.checkin_endpoint()
 
 def twitter_observational_analysis_basic_profiling():
     tb = app.controllers.twitter_observational_analysis_controller.TwitterBasicProfilingController(
