@@ -14,18 +14,21 @@ class LumenConnect():
         with open(lumen_config_path, 'r') as config:
           LUMENCONFIG = json.loads(config.read())
 
+        self.lumen_search_url = "https://lumendatabase.org/notices/search"
+
         self.headers = {
             "Content-type": "application/json",
             "Accept": "application/json",
             "X-Authentication-Token": LUMENCONFIG["X-Authentication-Token"],
             "User-Agent": "CivilServant/1.0"
-        } 
+        }
+
         self.log = log
 
     def get(self, url, payload):
         retries = 3
         while retries > 0:
-            r = requests.get(url, 
+            r = requests.get(url,
                 params=payload,
                 headers=self.headers)
             if r.status_code == 200:
@@ -37,7 +40,10 @@ class LumenConnect():
         self.log.error("Failed to query lumen url: {0}. Status code {1}.".format(url, r.status_code))
 
     def get_search(self, payload):
-        return self.get("https://lumendatabase.org/notices/search", payload)
+        request_to_do = requests.Request(method='GET',url=self.lumen_search_url, params=payload)
+        prepared = request_to_do.prepare()
+        self.log.debug('Lumen search URL is: {}'.format(prepared.url))
+        return self.get(self.lumen_search_url, payload)
 
     def get_notices_to_twitter(self, topics, count, page, from_date, to_date):
         date_facet = str(utils.common.time_since_epoch_ms(from_date)) + ".." + str(utils.common.time_since_epoch_ms(to_date))
@@ -47,11 +53,13 @@ class LumenConnect():
             "page": page,
             "sort_by": "date_received desc",
             "recipient_name": "Twitter",
-            "date_received_facet": date_facet
-#            "date_received_facet": {
-#                "from": utils.common.time_since_epoch_ms(from_date),
-#                "to": utils.common.time_since_epoch_ms(to_date)
-#            }
+            "date_received_facet": date_facet,
         }
+
+        # Historical Params
+        #            "date_received_facet": {
+        #                "from": utils.common.time_since_epoch_ms(from_date),
+        #                "to": utils.common.time_since_epoch_ms(to_date)
+        #            }
 
         return self.get_search(payload)

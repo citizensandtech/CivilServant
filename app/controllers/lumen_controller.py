@@ -36,13 +36,19 @@ class LumenController():
                 if(next_page > 1):
                   time.sleep(2)
 
+
                 data = self.l.get_notices_to_twitter([topic], 50, next_page, date, nowish)
                 if not data:
                     # error is already logged by get_notices_to_twitter
                     return
 
                 notices_json = data["notices"]
-                next_page = data["meta"]["next_page"]
+                self.log.debug('next_page of pagination has value {}'.format(next_page))
+                self.log.debug('{} notices returned from Lumen Call'.format(len(notices_json)))
+                # self.log.debug('lumen meta response is: {}'.format(data['meta']))
+                # next_page = data["meta"]["next_page"]
+                ## Danger hack because Lumen is not returning next_page properly.
+                next_page = next_page + 1 if next_page <= data['meta']['total_pages'] else None
                 max_date_received = None
 
                 prev_add_notices_size = len(newly_added_notices_ids)
