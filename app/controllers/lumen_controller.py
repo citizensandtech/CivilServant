@@ -12,6 +12,7 @@ import sqlalchemy
 from sqlalchemy import or_
 import sys
 import time
+import warnings
 
 class LumenController():
     def __init__(self, db_session, l, log):
@@ -116,7 +117,17 @@ class LumenController():
                 job_state = None
                 for work in notice_json["works"]:
                     # infringing_urls is known to contain urls
-                    for url_obj in work["infringing_urls"]:
+
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings("ignore", ".*ResourceWarning.*")
+                        unshortened_urls = self.bulk_unshorten(notice.id, [x['url'] for x in work['infringing_urls']])
+                    infringing_urls = []
+                    for url_dict in unshortened_urls.values():
+                        if(url_dict['final_url'] is not None):
+                            infringing_urls.append({"url":url_dict['final_url'], 
+                                                    "url_original":url_dict['original_url']})
+
+                    for url_obj in infringing_urls:
                         url = url_obj["url"]
                         try:
                             username = helper_parse_url_for_username(url, self.log)
@@ -195,115 +206,126 @@ class LumenController():
 
                     key = notice if not is_test else json.dumps(notice)
 
-        def bulk_unshorten(self,notice_id,urls,workers=10):
+    def bulk_unshorten(self,notice_id,urls,workers=10):
 
-            # This function will unshorten an array of shortened URLS
-            # The second optional argument is the number of workers to run in parallel
+        # This function will unshorten an array of shortened URLS
+        # The second optional argument is the number of workers to run in parallel
 
-            # When initially called, an array of string objects will be passed to the function.
-            # The function will then create a dictionary to keep track of all urls, the number of hops and
-            # the final destination url.  If there is an error, a status code of 4xx is recorded within the dict.
-            # Otherwise, a status code of 200 should be returned.
+        # When initially called, an array of string objects will be passed to the function.
+        # The function will then create a dictionary to keep track of all urls, the number of hops and
+        # the final destination url.  If there is an error, a status code of 4xx is recorded within the dict.
+        # Otherwise, a status code of 200 should be returned.
 
-            # Global timeouts
-            # - REQUEST_TIMEOUT is the timeout when waiting for a reply from a remote server
-            # - HOPS_LIMIT is the maximum number of redirect hops allowed
+        # Global timeouts
+        # - REQUEST_TIMEOUT is the timeout when waiting for a reply from a remote server
+        # - HOPS_LIMIT is the maximum number of redirect hops allowed
 
-            REQUEST_TIMEOUT = 10
-            HOPS_LIMIT = 10
+        REQUEST_TIMEOUT = 10
+        HOPS_LIMIT = 10
 
-            # Allow passing in of one url as a string object
-            if (isinstance(urls,str)):
-                urls = [urls]
+        # Allow passing in of one url as a string object
+        if (isinstance(urls,str)):
+            urls = [urls]
 
-            # If method is being called initally, create a dictionary for the urls passed.  When the method calls
-            # itself, it will pass this object to itself as needed.
-            if (isinstance(urls,list)):
-                url_objects = urls[:]
-                urls = {}
-                for url in url_objects:
-                    req = requests.Request('HEAD',url)
-                    normalized_url = req.prepare().url
-                    urls[normalized_url] = {"notice_id":notice_id,"hops":0,"status_code":None,"success":None,"final_url":None,"error":None,"original_url":url}
+        # If method is being called initally, create a dictionary for the urls passed.  When the method calls
+        # itself, it will pass this object to itself as needed.
+        if (isinstance(urls,list)):
+            url_objects = urls[:]
+            urls = {}
+            for url in url_objects:
+                req = requests.Request('HEAD',url)
+                normalized_url = req.prepare().url
+                urls[normalized_url] = {"notice_id":notice_id,"hops":0,"status_code":None,"success":None,"final_url":None,"error":None,"original_url":url}
 
-            while True:
+        while True:
 
-                session = FuturesSession(max_workers=workers)
-                futures = []
+            session = FuturesSession(max_workers=workers)
+            futures = []
+
+            for key in urls:
+                if urls[key]['success'] is not None: continue
+                if urls[key]['hops'] >= HOPS_LIMIT: continue
+                futures.append(session.head(key,timeout=REQUEST_TIMEOUT))
+
+            if futures:
+                done, incomplete = wait(futures)
+                self.log.info("Making {0} simultaneous requests to unshorten urls for notice {1}.".format(len(futures),notice_id))
+                for obj in done:
+                    try:
+                        result = obj.result()
+                    except requests.exceptions.ConnectTimeout as e:
+                        url = e.request.url
+                        urls[url]['error'] = "ConnectTimeout"
+                        urls[url]['success'] = False
+                        continue
+                    except requests.exceptions.ReadTimeout as e:
+                        url = e.request.url
+                        urls[url]['error'] = "ReadTimeout"
+                        urls[url]['success'] = False
+                        continue
+                    except requests.exceptions.SSLError as e:
+                        url = e.request.url
+                        urls[url]['error'] = "SSLError"
+                        urls[url]['success'] = False
+                        continue
+                    except Exception as e:
+                        url = e.request.url
+                        urls[url]['error'] = "Error"
+                        urls[url]['success'] = False
+                        continue
+                        
+
+                    if result.status_code == 200:
+                        urls[result.url]['success'] = True
+                        urls[result.url]['final_url'] = result.url
+                        urls[result.url]['status_code'] = result.status_code
+                    elif result.status_code == 301 or result.status_code == 302:
+                        redirect_url = result.headers['location']
+
+                        # Handle a location header that returns a relative path instead of an absolute path.  This is now allowed
+                        # under RFC 7231.  If the returned location does not begin with http, then it is a relative path and should
+                        # be concatenated to the original url
+
+                        if not redirect_url.lower().startswith("http"):
+                            redirect_url = result.url + redirect_url
+
+                        # Normalize the url using the requests module
+                        req = requests.Request('HEAD',redirect_url)
+                        redirect_url = req.prepare().url
+
+                        urls[result.url]['hops'] += 1
+                        urls[result.url]['final_url'] = redirect_url
+                        urls[result.url]['status_code'] = result.status_code
+                        urls[redirect_url] = urls.pop(result.url)
+                    else:
+                        urls[result.url]['success'] = False
+                        urls[result.url]['status_code'] = result.status_code
+
+            else:
+
+                url_dict = {}
 
                 for key in urls:
-                    if urls[key]['success'] is not None: continue
-                    if urls[key]['hops'] >= HOPS_LIMIT: continue
-                    futures.append(session.head(key,timeout=REQUEST_TIMEOUT))
+                    if urls[key]['status_code'] == 200:
+                        now = datetime.datetime.utcnow()
+                        url_record = LumenNoticeExpandedURL (
+                            created_at = now,
+                            notice_id = urls[key]['notice_id'],
+                            original_url = urls[key]['original_url'],
+                            expanded_url = urls[key]['final_url'],
+                            number_of_hops = urls[key]['hops'])
+                        self.db_session.add(url_record)
+                    original_url = urls[key]['original_url']
+                    url_dict[original_url] = urls[key]
 
-                if futures:
-                    done, incomplete = wait(futures)
-                    self.log.info("Making {0} simultaneous requests to unshorten urls for notice {1}.".format(len(futures),notice_id))
-                    for obj in done:
-                        try:
-                            result = obj.result()
-                        except requests.exceptions.ConnectTimeout as e:
-                            url = e.request.url
-                            urls[url]['error'] = "ConnectTimeout"
-                            urls[url]['success'] = False
-                            continue
-                        except requests.exceptions.ReadTimeout as e:
-                            url = e.request.url
-                            urls[url]['error'] = "ReadTimeout"
-                            urls[url]['success'] = False
-                            continue
-
-                        if result.status_code == 200:
-                            urls[result.url]['success'] = True
-                            urls[result.url]['final_url'] = result.url
-                            urls[result.url]['status_code'] = result.status_code
-                        elif result.status_code == 301 or result.status_code == 302:
-                            redirect_url = result.headers['location']
-
-                            # Handle a location header that returns a relative path instead of an absolute path.  This is now allowed
-                            # under RFC 7231.  If the returned location does not begin with http, then it is a relative path and should
-                            # be concatenated to the original url
-
-                            if not redirect_url.lower().startswith("http"):
-                                redirect_url = result.url + redirect_url
-
-                            # Normalize the url using the requests module
-                            req = requests.Request('HEAD',redirect_url)
-                            redirect_url = req.prepare().url
-
-                            urls[result.url]['hops'] += 1
-                            urls[result.url]['final_url'] = redirect_url
-                            urls[result.url]['status_code'] = result.status_code
-                            urls[redirect_url] = urls.pop(result.url)
-                        else:
-                            urls[result.url]['success'] = False
-                            urls[result.url]['status_code'] = result.status_code
-
+                try:
+                    self.db_session.commit()
+                except:
+                    self.log.error("Error while committing expanded urls for notice {0}".format(notice_id), extra=sys.exc_info()[0])
                 else:
+                    self.log.info("Saved expanded urls for lumen notice {0}".format(notice_id))
 
-                    url_dict = {}
-
-                    for key in urls:
-                        if urls[key]['status_code'] == 200:
-                            now = datetime.datetime.utcnow()
-                            url_record = LumenNoticeExpandedURL (
-                                created_at = now,
-                                notice_id = urls[key]['notice_id'],
-                                original_url = urls[key]['original_url'],
-                                expanded_url = urls[key]['final_url'],
-                                number_of_hops = urls[key]['hops'])
-                            self.db_session.add(url_record)
-                        original_url = urls[key]['original_url']
-                        url_dict[original_url] = urls[key]
-
-                    try:
-                        self.db_session.commit()
-                    except:
-                        self.log.error("Error while committing expanded urls for notice {0}".format(notice_id), extra=sys.exc_info()[0])
-                    else:
-                        self.log.info("Saved expanded urls for lumen notice {0}".format(notice_id))
-
-                    return url_dict
+                return url_dict
 
 
 # assume url is of the form 'https://twitter.com/sooos243/status/852942353321140224'
