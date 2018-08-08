@@ -106,7 +106,7 @@ class TwitterController():
             # reset progress for any remaining in-progress items whether or not exception is raised
             notice_users_to_reset = [notice_user for notice_user in unprocessed_unarchived_notice_users if notice_user.CS_account_archived == CS_JobState.IN_PROGRESS.value]
             utils.common.reset_CS_JobState_In_Progress(notice_users_to_reset, "CS_account_archived", self.db_session, self.log) # if still marked IN_PROGRESS (e.g. because of unchecked exception), reset it to NOT_PROCESSED
-            self.t.checkin_endpoint()
+
 
 
     def archive_new_users(self, unarchived_notice_users, test_exception=False):
@@ -146,7 +146,7 @@ class TwitterController():
         for nu in unarchived_notice_users:
             if(utils.common.NOT_FOUND_TWITTER_USER_STR not in nu.twitter_username):
                 user_names_to_notice_user[nu.twitter_username].append(nu)
-#        user_names_to_notice_user = {nu.twitter_username: nu for nu in unarchived_notice_users if utils.common.NOT_FOUND_TWITTER_USER_STR not in nu.twitter_username}
+#       user_names_to_notice_user = {nu.twitter_username: nu for nu in unarchived_notice_users if utils.common.NOT_FOUND_TWITTER_USER_STR not in nu.twitter_username}
         unarchived_user_names = set(user_names_to_notice_user.keys())
         user_names = list(unarchived_user_names)
 
@@ -173,9 +173,9 @@ class TwitterController():
                 this_users = user_names[prev_limit:limit]
                 users_info = []
                 try:
-                    users_info = self.t.query(self.t.api.UsersLookup,screen_name=this_users)
+                    users_info = self.t.query(self.t.api.UsersLookup, screen_name=this_users)
                 except twitter.error.TwitterError as e:
-                    self.t.try_counter = 0 ## this line prevents the retry code from looping
+                    # self.t.try_counter = 0 ## this line prevents the retry code from looping
                     #for this_user in this_users:
                     #    commit_users_failed(this_user)
                     self.log.info("Failed to query for {0} Twitter users using api.UsersLookup: {1} {2}".format(limit-prev_limit, ",".join(this_users), str(e)))
@@ -374,7 +374,6 @@ class TwitterController():
         self.log.info("Need to get new tweets for {0} users".format(len(need_new_tweets_users)))
         self.with_user_records_archive_tweets(need_new_tweets_users, is_test)  # TwitterUsers
 
-        self.t.checkin_endpoint()
 
     def archive_old_users(self, key_to_users, has_ids=True):
         """
@@ -560,7 +559,6 @@ class TwitterController():
 
             self.log.info("PID {3} queried and archived tweets for {0} out of {1} users; backfill={2}".format(prev_limit, len(unarchived_users), backfill, str(os.getpid())))
 
-        self.t.checkin_endpoint()
 
     def with_user_records_archive_tweets(self, user_records, backfill=False, is_test=False, test_exception=False):
         """

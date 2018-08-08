@@ -316,8 +316,15 @@ class TwitterConnect():
 
     def checkin_endpoint(self, endpoint=None):
         if endpoint is None:
-            assert self.curr_endpoint, 'There was no curr_endpoint to use as default'
-            endpoint = self.curr_endpoint
+        # this is a way to signal to checkin the curr_endpoint without knowing its name
+            if self.curr_endpoint is None:
+                # however it may not have ever got checked-out so there'd be nothing to do
+                self.log.debug('Endpoint checkin was called but no endpoint is active')
+                return None
+            else:
+                # but otherwise we'll implicitly checkin the curr endpoint.
+                endpoint = self.curr_endpoint
+
         ratestate = self.get_ratestate_of_endpoint(endpoint)
         checkin_time = datetime.datetime.now()
         ratestate.checkin_due = checkin_time
@@ -374,5 +381,5 @@ class TwitterConnect():
             else:
                 self.log.info(
                     'Twitter Query encountered twitter error other than Rate Limit Exceeded: {0}'.format(twiterr))
-                raise twiterr
+                raise
         return result

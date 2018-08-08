@@ -37,13 +37,19 @@ class LumenController():
                 if(next_page > 1):
                   time.sleep(2)
 
+
                 data = self.l.get_notices_to_twitter([topic], 50, next_page, date, nowish)
                 if not data:
                     # error is already logged by get_notices_to_twitter
                     return
 
                 notices_json = data["notices"]
-                next_page = data["meta"]["next_page"]
+                self.log.debug('next_page of pagination has value {}'.format(next_page))
+                self.log.debug('{} notices returned from Lumen Call'.format(len(notices_json)))
+                # self.log.debug('lumen meta response is: {}'.format(data['meta']))
+                # next_page = data["meta"]["next_page"]
+                ## Danger hack because Lumen is not returning next_page properly.
+                next_page = next_page + 1 if next_page <= data['meta']['total_pages'] else None
                 max_date_received = None
 
                 prev_add_notices_size = len(newly_added_notices_ids)
@@ -85,17 +91,18 @@ class LumenController():
         self.log.info("fetch_lumen_notices saved {0} total new lumen notices.".format(len(newly_added_notices_ids)))
 
 
-    """
-    For all LumenNotices with CS_parsed_usernames=NOT_PROCESSED, parse for twitter accounts
-    """
+
     def query_and_parse_notices_archive_users(self, test_exception = False):
+        """
+        For all LumenNotices with CS_parsed_usernames=NOT_PROCESSED, parse for twitter accounts
+        """
         unparsed_notices = self.db_session.query(LumenNotice).filter(LumenNotice.CS_parsed_usernames == CS_JobState.NOT_PROCESSED.value).all()
         self.parse_notices_archive_users(unparsed_notices, test_exception)
 
-    """
-        unparsed_notices = list of LumenNotices
-    """
     def parse_notices_archive_users(self, unparsed_notices, test_exception = False):
+        """
+            unparsed_notices = list of LumenNotices
+        """
         if len(unparsed_notices) == 0:
             return {}
 
@@ -119,7 +126,7 @@ class LumenController():
                     # infringing_urls is known to contain urls
 
                     with warnings.catch_warnings():
-                        warnings.filterwarnings("ignore", ".*ResourceWarning.*")
+                        warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>") 
                         unshortened_urls = self.bulk_unshorten(notice.id, [x['url'] for x in work['infringing_urls']])
                     infringing_urls = []
                     for url_dict in unshortened_urls.values():
@@ -207,18 +214,17 @@ class LumenController():
                     key = notice if not is_test else json.dumps(notice)
 
     def bulk_unshorten(self,notice_id,urls,workers=10):
+        """This function will unshorten an array of shortened URLS
+        The second optional argument is the number of workers to run in parallel
 
-        # This function will unshorten an array of shortened URLS
-        # The second optional argument is the number of workers to run in parallel
+        When initially called, an array of string objects will be passed to the function.
+        The function will then create a dictionary to keep track of all urls, the number of hops and
+        the final destination url.  If there is an error, a status code of 4xx is recorded within the dict.
+        Otherwise, a status code of 200 should be returned.
 
-        # When initially called, an array of string objects will be passed to the function.
-        # The function will then create a dictionary to keep track of all urls, the number of hops and
-        # the final destination url.  If there is an error, a status code of 4xx is recorded within the dict.
-        # Otherwise, a status code of 200 should be returned.
-
-        # Global timeouts
-        # - REQUEST_TIMEOUT is the timeout when waiting for a reply from a remote server
-        # - HOPS_LIMIT is the maximum number of redirect hops allowed
+        Global timeouts
+        - REQUEST_TIMEOUT is the timeout when waiting for a reply from a remote server
+        - HOPS_LIMIT is the maximum number of redirect hops allowed"""
 
         REQUEST_TIMEOUT = 10
         HOPS_LIMIT = 10
@@ -268,6 +274,8 @@ class LumenController():
                         urls[url]['error'] = "SSLError"
                         urls[url]['success'] = False
                         continue
+                    except UnicodeDecodeError as e:
+                        continue
                     except Exception as e:
                         url = e.request.url
                         urls[url]['error'] = "Error"
@@ -300,6 +308,17 @@ class LumenController():
                     else:
                         urls[result.url]['success'] = False
                         urls[result.url]['status_code'] = result.status_code
+
+                 ## since unicodeErorrs don't have the original url
+                 ## and can consequently not set a status
+                 ## we iterate through urls with no status and set success to False
+                for url in urls.values():
+                    if url['success'] == None:
+                        url['error'] = "Error"
+                        url['success'] = False
+                        url['status_code'] = 400
+                        if(url['final_url'] is None):
+                            url['final_url'] = url['original_url']
 
             else:
 
