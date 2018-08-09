@@ -376,7 +376,14 @@ class TwitterConnect():
                 self.log.info('Rate limit encountered on endpoint:{0}'.format(endpoint))
                 self.mark_reset_time_and_checkin(endpoint)
                 # recurse!
-                self.log.info('Recursing for method:')
+                self.log.info('Recursing for method:', method)
+                return self.query(method, *args, **kwargs)
+            # if it's over capacity we know how to deal with that
+            if type(twiterr.message).__name__ == "list" and twiterr.message[0]['message'] == 'Over capacity':
+                too_hot_sleep_secs = 10 # ten seconds because i don't want to recurse too often and this error is rare.
+                self.log.info('Over capacity encountered on endpoint:{0}. Sleeping for {1} seconds'.format(endpoint, too_hot_sleep_secs))
+                time.sleep(too_hot_sleep_secs)
+                self.log.info('Recursing for method:', method)
                 return self.query(method, *args, **kwargs)
             else:
                 self.log.info(

@@ -168,3 +168,48 @@ def test_release_verify_credential_endpoint(mock_rate_limit, mock_twitter):
     for ratestate in ratestates:
         assert ratestate.checkin_due > before_creation
         assert ratestate.checkin_due < expiration
+
+
+@patch('twitter.Api', autospec=True)
+@patch('twitter.ratelimit.RateLimit', autospec=True)
+def test_too_hot_recovery(mock_rate_limit, mock_twitter):
+    reset_time = (datetime.datetime.now() + datetime.timedelta(seconds=3))
+    mock_rate_limit.resources = {"getfriends": {"/friends/list": {
+        "reset": time.mktime(reset_time.timetuple()),
+        "remaining": 0,
+        "limit": 15}}}  # num queries per period
+
+    t = mock_twitter.return_value
+    t.rate_limit = mock_rate_limit
+    t.VerifyCredentials.return_value = True
+    t.InitializeRateLimit.return_value = True
+
+    conn = app.connections.twitter_connect.TwitterConnect(log, db_session)
+
+    # some gynamstics because Mock overides __name__
+    getfriends = conn.api.GetFriends
+    getfriends.__name__ = 'GetFriends'
+
+    friend_accounts = []
+    with open("{script_dir}/fixture_data/twitter_get_friends.json".format(script_dir=TEST_DIR)) as f:
+        fixture = json.loads(f.read())
+        for account in fixture:
+            json_dump = json.dumps(account)
+            account_obj = json2obj(json_dump)
+            friend_accounts.append(account_obj)
+
+    # set the side-effect of get friends to throw 2 errors and then the right one
+    t.GetFriends.side_effect = [twitter.error.TwitterError([{'code': 130, 'message': 'Over capacity'}]),
+                                twitter.error.TwitterError([{'code': 130, 'message': 'Over capacity'}]),
+                                friend_accounts]
+    # assert we are using the first token
+
+    # assert conn.endpoint_tokens[conn.curr_endpoint].user_id == 1 #this assertion used to work,
+    # but now verify credentials checks itself back in immediately.
+    # so after that happens this weird state is expected:
+    assert conn.curr_endpoint is None and not conn.endpoint_tokens
+    # NOTE! this should call GetFriends twice, because connect should catch an error and then retry
+
+    friends = conn.query(conn.api.GetFriends)
+    # assert right results still came through after the too-hot error was handled.
+    assert len(friends) == len(friend_accounts)
