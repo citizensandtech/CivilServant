@@ -75,7 +75,7 @@ def fetch_mod_action_history(subreddit, after_id = None):
         after_id = mac.archive_mod_action_page(after_id)
         db_session.commit()
         num_actions_stored = db_session.query(ModAction).filter(ModAction.subreddit_id == subreddit_id).count() - pre_action_count
-   
+
     log.info("Finished Fetching Moderation Action History for {subreddit}. {stored} actions were stored, with a total of {total}.".format(
         subreddit = subreddit,
         stored = pre_action_count - first_action_count,
@@ -99,7 +99,7 @@ def get_experiment_class(experiment_name):
         log.error("Cannot find experiment settings for {0} in {1}".format(ENV, experiment_file_path))
         sys.exit(1)
     experiment_config = experiment_config_all[ENV]
-    
+
     ## this is a hack. needs to be improved
     if(experiment_config['controller'] == "StylesheetExperimentController"):
         c = getattr(app.controllers.stylesheet_experiment_controller, experiment_config['controller'])
@@ -167,6 +167,7 @@ def fetch_lumen_notices(num_days=2):
     topics = ["Copyright"]    # "Government Requests", #["Defamation","Protest, Parody and Criticism Sites","Law Enforcement Requests","International","Government Requests","DMCA Subpoenas","Court Orders"]
     date = datetime.datetime.utcnow() - datetime.timedelta(days=int(float(num_days))) # now-2days
     l.archive_lumen_notices(topics, date)
+    log.info("Finished fetch_lumen_notices, num_days={0}".format(num_days))
 
 
 def parse_lumen_notices_for_twitter_accounts():
@@ -176,6 +177,7 @@ def parse_lumen_notices_for_twitter_accounts():
     log.info("Calling parse_lumen_notices_for_twitter_accounts.")
     l = app.controllers.lumen_controller.LumenController(db_session, lumen_conn, log)
     l.query_and_parse_notices_archive_users()
+    log.info("Finished parse_lumen_notices_for_twitter_accounts")
 
 
 def fetch_twitter_users():
@@ -187,6 +189,7 @@ def fetch_twitter_users():
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
     t.query_and_archive_new_users()
     twitter_conn.checkin_endpoint()
+    log.info("Finished fetch_twitter_users.")
 
 
 def fetch_twitter_snapshot_and_tweets(max_time_delta_min=60):
@@ -199,6 +202,7 @@ def fetch_twitter_snapshot_and_tweets(max_time_delta_min=60):
     date = now - datetime.timedelta(minutes=int(float(max_time_delta_min))) # now-1hour
     t.query_and_archive_user_snapshots_and_tweets(date)
     twitter_conn.checkin_endpoint()
+    log.info("Finished fetch_twitter_snapshot_and_tweets, max_time_delta_min={0}".format(max_time_delta_min))
 
 
 def fetch_twitter_tweets(backfill=False):
@@ -209,6 +213,8 @@ def fetch_twitter_tweets(backfill=False):
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
     t.query_and_archive_tweets(backfill)
     twitter_conn.checkin_endpoint()
+    log.info("Finished fetch_twitter_tweets, backfill={0}.".format(backfill))
+
 
 def twitter_observational_analysis_basic_profiling():
     tb = app.controllers.twitter_observational_analysis_controller.TwitterBasicProfilingController(
