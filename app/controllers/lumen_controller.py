@@ -126,26 +126,29 @@ class LumenController():
                     # infringing_urls is known to contain urls
 
                     with warnings.catch_warnings():
-                        warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>") 
+                        warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>")
                         unshortened_urls = self.bulk_unshorten(notice.id, [x['url'] for x in work['infringing_urls']])
                     infringing_urls = []
                     for url_dict in unshortened_urls.values():
                         if(url_dict['final_url'] is not None):
-                            infringing_urls.append({"url":url_dict['final_url'], 
+                            infringing_urls.append({"url":url_dict['final_url'],
                                                     "url_original":url_dict['original_url']})
 
                     for url_obj in infringing_urls:
                         url = url_obj["url"]
-                        try:
-                            username = helper_parse_url_for_username(url, self.log)
-                        except utils.common.ParseUsernameSuspendedUserFound:
-                            suspended_user_count += 1
-                        except Exception as e:
-                            self.log.error("Unexpected error while calling helper_parse_url_for_username on url {0}: {1}".format(url, e))
+                        if url:
+                            try:
+                                username = helper_parse_url_for_username(url, self.log)
+                            except utils.common.ParseUsernameSuspendedUserFound:
+                                suspended_user_count += 1
+                            except Exception as e:
+                                self.log.error("Unexpected error while calling helper_parse_url_for_username on url {0}: {1}".format(url, e))
+                            else:
+                                if username:
+                                    # if no username, then no username found
+                                    notice_users.add(username)
                         else:
-                            if username:
-                                # if no username, then no username found
-                                notice_users.add(username)
+                            self.log.info('There was no url for url_obj: {0}'.format(url_obj))
 
                     if len(work["copyrighted_urls"]) > 0:  # I've only seen this empty
                         self.log.error("method helper_parse_notices_archive_users: maybe missed something in notice_json['works']['copyrighted_urls']; notice id = {0}".format(notice_json["id"]))
@@ -281,7 +284,7 @@ class LumenController():
                         urls[url]['error'] = "Error"
                         urls[url]['success'] = False
                         continue
-                        
+
 
                     if result.status_code == 200:
                         urls[result.url]['success'] = True
@@ -354,7 +357,11 @@ def helper_parse_url_for_username(url, log):
     twitter_domain = "twitter.com"
     tco_domain = "t.co"
     username = None
-    url_split = url.split("/")
+    if url:
+        url_split = url.split("/")
+    else:
+        # url was None so cannot split it,
+        return ''
     retries = 3
 
     # TODO: how to resolve t.co urls without hitting twitter.com without auth tokens (since we're getting rate limited?)

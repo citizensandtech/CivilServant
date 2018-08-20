@@ -17,10 +17,7 @@ ENV = os.environ['CS_ENV'] ="test"
 db_session = DbEngine(os.path.join(TEST_DIR, "../", "config") + "/{env}.json".format(env=ENV)).new_session()
 log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
-def setup_function(function):
-    pass
-
-def teardown_function(function):
+def clear_tables():
     db_session.query(LumenNotice).delete()
     db_session.query(LumenNoticeExpandedURL).delete()
     db_session.query(LumenNoticeToTwitterUser).delete()
@@ -28,6 +25,12 @@ def teardown_function(function):
     db_session.query(TwitterUserSnapshot).delete()
     db_session.query(TwitterStatus).delete()
     db_session.commit()
+
+def setup_function(function):
+    clear_tables()
+
+def teardown_function(function):
+    clear_tables()
 
 @patch('app.connections.lumen_connect.LumenConnect', autospec=True)
 def test_archive_lumen_notices(mock_LumenConnect):
