@@ -350,6 +350,14 @@ class TwitterConnect():
         self.mark_reset_time(endpoint)
         self.checkin_endpoint(endpoint)
 
+    def constant_wait_sleep_and_recurse(self, err_msg, method, *args, **kwargs):
+        constant_sleep_secs = 10  # ten seconds because i don't want to recurse too often and this error is rare.
+        self.log.info(
+            '{2} encountered on endpoint:{0}. Sleeping for {1} seconds'.format(self.curr_endpoint, constant_sleep_secs, err_msg))
+        time.sleep(constant_sleep_secs)
+        self.log.info('Recursing for method:', method)
+        return self.query(method, *args, **kwargs)
+
     # @rate_limit_retry
     def query(self, method, *args, **kwargs):
         method_name = method.__name__
@@ -369,24 +377,30 @@ class TwitterConnect():
         try:
             # try to actually execute
             result = method(*args, **kwargs)
+            return result
         # if we get a an error from twitter
         except twitter.TwitterError as twiterr:
-            # if it's rate exceeded we know how to deal with that
-            if type(twiterr.message).__name__ == "list" and twiterr.message[0]['message'] == 'Rate limit exceeded':
+            # check to see if we can get an error message out
+            err_msg = None
+            if type(twiterr.message).__name__ == "list":
+                err_msg = twiterr.message[0]['message']
+            else:
+                self.log.info('Twitter Query encountered a twitter error without a message list')
+                raise
+
+            # if we got an error message handle it via message text (could have been error code too)
+            if err_msg == 'Rate limit exceeded':
+                # special procedure for rate limit
                 self.log.info('Rate limit encountered on endpoint:{0}'.format(endpoint))
                 self.mark_reset_time_and_checkin(endpoint)
                 # recurse!
                 self.log.info('Recursing for method:', method)
                 return self.query(method, *args, **kwargs)
             # if it's over capacity we know how to deal with that
-            if type(twiterr.message).__name__ == "list" and twiterr.message[0]['message'] == 'Over capacity':
-                too_hot_sleep_secs = 10 # ten seconds because i don't want to recurse too often and this error is rare.
-                self.log.info('Over capacity encountered on endpoint:{0}. Sleeping for {1} seconds'.format(endpoint, too_hot_sleep_secs))
-                time.sleep(too_hot_sleep_secs)
-                self.log.info('Recursing for method:', method)
-                return self.query(method, *args, **kwargs)
+            elif err_msg == 'Over capacity':
+                return self.constant_wait_sleep_and_recurse(err_msg, method, *args, **kwargs)
+            elif err_msg == 'Internal error':
+                return self.constant_wait_sleep_and_recurse(err_msg, method, *args, **kwargs)
             else:
-                self.log.info(
-                    'Twitter Query encountered twitter error other than Rate Limit Exceeded: {0}'.format(twiterr))
-                raise
-        return result
+                self.log.error(
+                    'Twitter Query encountered twitter error with no handler yet: {0}'.format(twiterr))

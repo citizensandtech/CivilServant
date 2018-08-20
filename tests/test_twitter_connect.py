@@ -170,9 +170,8 @@ def test_release_verify_credential_endpoint(mock_rate_limit, mock_twitter):
         assert ratestate.checkin_due < expiration
 
 
-@patch('twitter.Api', autospec=True)
-@patch('twitter.ratelimit.RateLimit', autospec=True)
-def test_too_hot_recovery(mock_rate_limit, mock_twitter):
+def recovery_after_error(mock_rate_limit, mock_twitter, error_to_test):
+    '''Higher level funciton to return a function that tests an error code.'''
     reset_time = (datetime.datetime.now() + datetime.timedelta(seconds=3))
     mock_rate_limit.resources = {"getfriends": {"/friends/list": {
         "reset": time.mktime(reset_time.timetuple()),
@@ -199,8 +198,8 @@ def test_too_hot_recovery(mock_rate_limit, mock_twitter):
             friend_accounts.append(account_obj)
 
     # set the side-effect of get friends to throw 2 errors and then the right one
-    t.GetFriends.side_effect = [twitter.error.TwitterError([{'code': 130, 'message': 'Over capacity'}]),
-                                twitter.error.TwitterError([{'code': 130, 'message': 'Over capacity'}]),
+    t.GetFriends.side_effect = [error_to_test,
+                                error_to_test,
                                 friend_accounts]
     # assert we are using the first token
 
@@ -213,3 +212,15 @@ def test_too_hot_recovery(mock_rate_limit, mock_twitter):
     friends = conn.query(conn.api.GetFriends)
     # assert right results still came through after the too-hot error was handled.
     assert len(friends) == len(friend_accounts)
+
+@patch('twitter.Api', autospec=True)
+@patch('twitter.ratelimit.RateLimit', autospec=True)
+def test_recovery_after_over_capacity(mock_rate_limit, mock_twitter):
+    error_to_test = twitter.error.TwitterError([{'code': 130, 'message': 'Over capacity'}])
+    return recovery_after_error(mock_rate_limit, mock_twitter, error_to_test)
+
+@patch('twitter.Api', autospec=True)
+@patch('twitter.ratelimit.RateLimit', autospec=True)
+def test_recovery_after_internal_error(mock_rate_limit, mock_twitter):
+    error_to_test = twitter.error.TwitterError([{'message': 'Internal error', 'code': 131}])
+    return recovery_after_error(mock_rate_limit, mock_twitter, error_to_test)
