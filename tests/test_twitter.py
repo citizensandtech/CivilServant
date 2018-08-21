@@ -1,6 +1,8 @@
 from time import sleep
 
 import pytest
+import twitter
+
 import app.connections.twitter_connect
 # import app.controller
 import app.controllers.twitter_controller
@@ -135,17 +137,30 @@ def test_with_user_records_archive_tweets(mock_twitter_api):
         user_record = TwitterUser(
             id=user["id"],
             screen_name=user["screen_name"],
-            user_state=user["user_state"])
+            user_state=user["user_state"],
+            lang="en",
+            )
         db_session.add(user_record)
         db_session.commit()
         user_records.append(user_record)
 
+
     try:
-        t_controller.with_user_records_archive_tweets(user_records, backfill=True, is_test=True)
-    except:
+        t_controller.query_and_archive_tweets(backfill=True, is_test=True, test_exception=True)
+        # t_controller.with_user_records_archive_tweets(user_records, backfill=True, is_test=True)
+    except Exception as e:
+        log.info('Exception was {0}'.format(e))
         user_records = [x for x in db_session.query(TwitterUser).all()]
         for user_record in user_records:
+            # assert that nothing is in progress
             assert user_record.CS_oldest_tweets_archived != CS_JobState.IN_PROGRESS.value
+        # assert that at least one item has been processed
         assert len([x for x in user_records if x.CS_oldest_tweets_archived == CS_JobState.PROCESSED.value]) > 0
     else:
         assert False  # expected query_and_archive_new_users to throw test_exception
+
+    # now test that last_attempted_process exists and is in the past.
+    after_all_attempted_process = datetime.datetime.now()
+    for user_record in user_records:
+        assert user_record.last_attempted_process is not None
+        assert user_record.last_attempted_process < after_all_attempted_process

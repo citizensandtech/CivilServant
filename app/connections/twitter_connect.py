@@ -281,7 +281,7 @@ class TwitterConnect():
                 token_endpoint.checkin_due = query_time + timedelta(minutes=60 * 24)  # 1 day loan
                 self.db_session.add(token_endpoint)
                 self.db_session.commit()
-                self.log.debug("I think I commited the checkin_due update")
+                self.log.debug("I think I committed the checkin_due update")
                 token = self.db_session.query(TwitterToken).filter(TwitterToken.user_id == token_endpoint.user_id).one()
                 self.db_session.commit()
                 # class dictionary update

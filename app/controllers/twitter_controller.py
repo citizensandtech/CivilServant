@@ -525,31 +525,41 @@ class TwitterController():
     ################### ARCHIVE TWEET CODE
     #########################################################
 
-    def query_and_archive_tweets(self, backfill=False, is_test=False, order="ASC"):
+    def query_and_archive_tweets(self, backfill=False, is_test=False, order="ASC", test_exception=False):
+        # TODO: backfill or not, order, can be compiled into a single ORM phrase.
         if backfill:
             # archive tweets for all users who haven't had oldest tweets PROCESSED
             unarchived_users = self.db_session.query(TwitterUser).filter(and_(
                 TwitterUser.CS_oldest_tweets_archived != CS_JobState.PROCESSED.value,
                 or_(TwitterUser.lang.in_(["en","en-gb"]), TwitterUser.lang is None))
-            ).order_by("record_created_at {0}".format(order)).all()
+            ).with_for_update().order_by("record_created_at {0}".format(order)).all()
         else:
-            unarchived_users = self.db_session.query(TwitterUser).filter(and_(
+            unarchived_users = self.db_session.query(TwitterUser).filter(
+                and_(
                 TwitterUser.CS_oldest_tweets_archived == CS_JobState.PROCESSED.value,
-                or_(TwitterUser.lang.in_(["en","en-gb"]), TwitterUser.lang is None))
+                or_(
+                    TwitterUser.lang.in_(["en","en-gb"]),
+                    TwitterUser.lang is None))
             ).order_by("record_created_at {0}".format(order)).all()
 
+        # mark in the database that we're claiming these items
+        last_attempted_process = datetime.datetime.now()
+        for unarchived_user in unarchived_users:
+            unarchived_user.last_attempted_process = last_attempted_process
+            self.db_session.add(unarchived_user)
+            self.db_session.commit()
         self.log.info("About to query and archive tweets {0} users; backfill={1}".format(len(unarchived_users), backfill))
 
         batch_size = 100
         # query batch_size at a time in order to update job states more often
         prev_limit = 0
-        for i in range(1,int(len(unarchived_users)/batch_size)+2):
+        for i in range(1, int(len(unarchived_users)/batch_size)+2):
             limit = min(i*batch_size, len(unarchived_users))
             if limit > prev_limit:
                 this_users = unarchived_users[prev_limit:limit]
                 utils.common.update_CS_JobState(this_users, "CS_oldest_tweets_archived", CS_JobState.IN_PROGRESS, self.db_session, self.log)
                 try:
-                    self.with_user_records_archive_tweets(this_users, backfill=backfill, is_test=is_test) # backfill hacky
+                    self.with_user_records_archive_tweets(this_users, backfill=backfill, is_test=is_test, test_exception=test_exception) # backfill hacky
                 except:
                     raise # re-raise the exception
                 finally:
@@ -667,7 +677,10 @@ class TwitterController():
                     self.archive_old_users(key_to_users={user_id:user}, has_ids=True)
                 else:
                     # if test, just update the user object here (since i don't want to mock out archive_old_users stuff...)
+                    self.log.debug('In the test block with user: {0}'.format(user))
                     user.user_state = user_state.value
+                    user.CS_oldest_tweets_archived = CS_JobState.PROCESSED.value
+                    self.db_session.add(user)
                     self.db_session.commit()
                 break
 
@@ -688,7 +701,7 @@ class TwitterController():
                 # if status hasn't been stored before, store
                 if status_id not in seen_statuses and status_id not in new_seen_statuses:
                     try:
-                        status_record = dict( 
+                        status_record = dict(
                             id =                status_id,
                             user_id =           str(status_json["user"]["id"]),
                             record_created_at = datetime.datetime.utcnow(),
