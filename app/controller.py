@@ -211,7 +211,7 @@ def fetch_twitter_tweets(backfill=False):
     """
     log.info("Calling fetch_twitter_tweets, backfill={0}.".format(backfill))
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
-    query_and_archive_tweets(backfill)
+    t.query_and_archive_tweets(backfill)
     twitter_conn.checkin_endpoint()
     log.info("Finished fetch_twitter_tweets, backfill={0}.".format(backfill))
 

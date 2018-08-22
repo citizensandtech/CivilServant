@@ -1,3 +1,5 @@
+from operator import eq, not_
+
 import twitter
 import simplejson as json
 import datetime
@@ -527,6 +529,26 @@ class TwitterController():
 
     def query_and_archive_tweets(self, backfill=False, is_test=False, order="ASC", test_exception=False):
         # TODO: backfill or not, order, can be compiled into a single ORM phrase.
+
+        def neq(x,y):
+            return not_(eq(x,y))
+
+        neq_or_eq = neq if backfill else eq
+
+        order_strat_map = {'ASC':TwitterUser.record_created_at.asc(),
+                           'DESC':TwitterUser.record_created_at.desc(),
+                          }
+
+        order_strat = order_strat_map[order]
+        unarchived_users_q = self.db_session.query(TwitterUser).\
+            filter(and_(
+                        neq_or_eq(TwitterUser.CS_oldest_tweets_archived, CS_JobState.PROCESSED.value),
+                        or_(TwitterUser.lang.in_(["en","en-gb"]), TwitterUser.lang is None)
+                        )). \
+            order_by(order_strat). \
+            with_for_update(). \
+            all()
+
         if backfill:
             # archive tweets for all users who haven't had oldest tweets PROCESSED
             unarchived_users = self.db_session.query(TwitterUser).filter(and_(
@@ -542,6 +564,7 @@ class TwitterController():
                     TwitterUser.lang is None))
             ).order_by("record_created_at {0}".format(order)).all()
 
+        from IPython import embed; embed()
         # mark in the database that we're claiming these items
         last_attempted_process = datetime.datetime.now()
         for unarchived_user in unarchived_users:
