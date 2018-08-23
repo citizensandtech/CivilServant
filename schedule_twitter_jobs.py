@@ -66,6 +66,14 @@ def main():
                         required = False,
                         help="Run within a specific queue. Otherwise run under the environment defined in the environment variable CS_ENV")
 
+    parser.add_argument("--n_tasks",
+                        required = False,
+                        default= 1,
+                        help="Number of concurrent tasks. Currently only supports fetch_twitter_tweets.")
+
+
+
+
     args = parser.parse_args()
 
     # if the user specified the environment, set it here
@@ -120,10 +128,12 @@ def main():
                 result_ttl = ttl,
                 timeout = timeout)
     elif args.function =="fetch_twitter_tweets":
-        scheduler.schedule(
+        fill_start_time = datetime.utcnow()
+        for task in range(args.n_tasks):
+            scheduler.schedule(
                 scheduled_time=datetime.utcnow(),
                 func=app.controller.fetch_twitter_tweets,
-                args=[args.statuses_backfill, datetime.utcnow()],
+                args=[args.statuses_backfill, fill_start_time],
                 interval=int(args.interval),
                 repeat=None,
                 result_ttl = ttl,
