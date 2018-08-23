@@ -398,10 +398,11 @@ class TwitterController():
         # store new tweets for users with found id and CS_oldest_tweets_archived = PROCESSED
         # (if a user doesn't have a found id, then it is either deleted (NOT_FOUND) or suspended (SUSPENDED).
         # in both cases, we will not find tweets)
-        need_new_tweets_users = [u for u in need_snapshot_users if
-                                 u.CS_oldest_tweets_archived == CS_JobState.PROCESSED.value and utils.common.NOT_FOUND_TWITTER_USER_STR not in u.id]
-        self.log.info("Need to get new tweets for {0} users".format(len(need_new_tweets_users)))
-        self.with_user_records_archive_tweets(need_new_tweets_users, is_test)  # TwitterUsers
+        # Max: I believe this stop is not necessary any more because it will be done by query_and_archive_tweets(frontfill)
+        # need_new_tweets_users = [u for u in need_snapshot_users if
+        #                          u.CS_oldest_tweets_archived == CS_JobState.PROCESSED.value and utils.common.NOT_FOUND_TWITTER_USER_STR not in u.id]
+        # self.log.info("Need to get new tweets for {0} users".format(len(need_new_tweets_users)))
+        # self.with_user_records_archive_tweets(need_new_tweets_users, is_test)  # TwitterUsers
 
     def archive_old_users(self, key_to_users, has_ids=True):
         """
@@ -579,10 +580,9 @@ class TwitterController():
             unarchived_users = self.db_session.query(TwitterUser). \
                 filter(and_(
                         neq_or_eq(TwitterUser.CS_oldest_tweets_archived, CS_JobState.PROCESSED.value),
-                        or_(TwitterUser.lang.in_(["en", "en-gb"]), TwitterUser.lang is None)
-                        )). \
-                filter(or_(TwitterUser.last_attempted_process < fill_start_time,
-                           TwitterUser.last_attempted_process is None)). \
+                        or_(TwitterUser.lang.in_(["en", "en-gb"]), TwitterUser.lang is None),
+                        or_(TwitterUser.last_attempted_process < fill_start_time,
+                            TwitterUser.last_attempted_process is None))). \
                 order_by(order_strat). \
                 with_for_update(). \
                 limit(batch_size). \
