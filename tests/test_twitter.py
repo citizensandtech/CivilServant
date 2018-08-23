@@ -64,7 +64,7 @@ def populate_notice_users():
 def test_archive_twitter_new_users(mock_twitter, populate_notice_users):
     log.info("STARTING test_archive_twitter_new_users")
     t = mock_twitter.return_value
-    before_creation = datetime.datetime.now()
+    before_creation = datetime.datetime.utcnow()
     sleep(2)
 
     with open("{script_dir}/fixture_data/anon_users_lookup_0.json".format(script_dir=TEST_DIR)) as f:
@@ -85,7 +85,7 @@ def test_archive_twitter_new_users(mock_twitter, populate_notice_users):
         assert False  # expected query_and_archive_new_users to throw test_exception
 
     sleep(2)
-    expiration = datetime.datetime.now() + datetime.timedelta(minutes=60 * 24)  # one day lease
+    expiration = datetime.datetime.utcnow() + datetime.timedelta(minutes=60 * 24)  # one day lease
     ratestates = db_session.query(TwitterRateState).filter(TwitterRateState.endpoint == '/users/lookup').all()
 
     for ratestate in ratestates:
@@ -146,7 +146,8 @@ def test_with_user_records_archive_tweets(mock_twitter_api):
 
 
     try:
-        t_controller.query_and_archive_tweets(backfill=True, is_test=True, test_exception=True)
+        t_controller.query_and_archive_tweets(backfill=True, fill_start_time=datetime.datetime.utcnow(),
+                                              is_test=True, test_exception=True)
         # t_controller.with_user_records_archive_tweets(user_records, backfill=True, is_test=True)
     except Exception as e:
         log.info('Exception was {0}'.format(e))
@@ -160,7 +161,8 @@ def test_with_user_records_archive_tweets(mock_twitter_api):
         assert False  # expected query_and_archive_new_users to throw test_exception
 
     # now test that last_attempted_process exists and is in the past.
-    after_all_attempted_process = datetime.datetime.now()
+    sleep(2)
+    after_all_attempted_process = datetime.datetime.utcnow()
     for user_record in user_records:
         assert user_record.last_attempted_process is not None
         assert user_record.last_attempted_process < after_all_attempted_process

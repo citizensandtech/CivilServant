@@ -80,7 +80,7 @@ def test_twitter_connect_friends(mock_twitter):
 def test_exception_retry(mock_rate_limit, mock_twitter):
     # TODO: In the unlikelihood that a VERY slow machine is running these tests
     # you can increase the timedelta here and below to microseconds=500
-    reset_time = (datetime.datetime.now() + datetime.timedelta(seconds=3))
+    reset_time = (datetime.datetime.utcnow() + datetime.timedelta(seconds=3))
     mock_rate_limit.resources = {"getfriends": {"/friends/list": {
         "reset": time.mktime(reset_time.timetuple()),
         "remaining": 0,
@@ -133,14 +133,14 @@ def test_exception_retry(mock_rate_limit, mock_twitter):
     t.GetFriends.side_effect = [twitter.error.TwitterError([{'code': 88, 'message': 'Rate limit exceeded'}]),
                                 friend_accounts]
     mock_rate_limit.resources = {"getfriends": {"/friends/list": {
-        "reset": time.mktime((datetime.datetime.now() + datetime.timedelta(seconds=6)).timetuple()),
+        "reset": time.mktime((datetime.datetime.utcnow() + datetime.timedelta(seconds=6)).timetuple()),
         "remaining": 0,
         "limit": 15}}}
     t.rate_limit = mock_rate_limit
 
     # assert we're still on key 2
     assert conn.endpoint_tokens[conn.curr_endpoint].user_id == 2
-    # # assert (reset_time - datetime.datetime.now()).total_seconds() > 0
+    # # assert (reset_time - datetime.datetime.utcnow()).total_seconds() > 0
     # # make GetFriends run twice again, the first time erroring -- triggering a retry
     friends = conn.query(conn.api.GetFriends)
     # assert the right result came back
@@ -150,7 +150,7 @@ def test_exception_retry(mock_rate_limit, mock_twitter):
     assert conn.endpoint_tokens[conn.curr_endpoint].user_id == 1
     # assert that the reset time is in the past which means we waited long enough
     # why not check less than 0, not 1. I find that because of the timestamp resolution it's not quite right.
-    assert (reset_time - datetime.datetime.now()).total_seconds() < 1.0
+    assert (reset_time - datetime.datetime.utcnow()).total_seconds() < 1.0
 
 
 @patch('twitter.Api', autospec=True)
@@ -158,12 +158,12 @@ def test_exception_retry(mock_rate_limit, mock_twitter):
 def test_release_verify_credential_endpoint(mock_rate_limit, mock_twitter):
     """The `verify_credentials` endpoint shouldn't ever be checked_out
     apart from a very small time"""
-    before_creation = datetime.datetime.now()
+    before_creation = datetime.datetime.utcnow()
     time.sleep(1.5)
     conn = app.connections.twitter_connect.TwitterConnect(log, db_session)
     ratestates = db_session.query(TwitterRateState).filter(TwitterRateState.endpoint == '/account/verify_credentials')
     time.sleep(1.5)
-    expiration = datetime.datetime.now()
+    expiration = datetime.datetime.utcnow()
 
     for ratestate in ratestates:
         assert ratestate.checkin_due > before_creation
@@ -172,7 +172,7 @@ def test_release_verify_credential_endpoint(mock_rate_limit, mock_twitter):
 
 def recovery_after_error(mock_rate_limit, mock_twitter, error_to_test):
     '''Higher level funciton to return a function that tests an error code.'''
-    reset_time = (datetime.datetime.now() + datetime.timedelta(seconds=3))
+    reset_time = (datetime.datetime.utcnow() + datetime.timedelta(seconds=3))
     mock_rate_limit.resources = {"getfriends": {"/friends/list": {
         "reset": time.mktime(reset_time.timetuple()),
         "remaining": 0,

@@ -245,7 +245,7 @@ class TwitterUser(Base):
     lang                = Column(String(32))
     user_state          = Column(Integer) # utils/common.py
     CS_oldest_tweets_archived = Column(Integer, default=1) # see CS_JobState Enum
-    last_attempted_process = Column(DateTime)
+    last_attempted_process = Column(DateTime, default=datetime.datetime.utcnow)
 
 class TwitterUserSnapshot(Base):
     __tablename__ = 'twitter_user_snapshots'

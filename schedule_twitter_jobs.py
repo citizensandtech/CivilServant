@@ -119,11 +119,11 @@ def main():
                 repeat=None,
                 result_ttl = ttl,
                 timeout = timeout)
-    elif args.function =="fetch_twitter_tweets":                    
+    elif args.function =="fetch_twitter_tweets":
         scheduler.schedule(
                 scheduled_time=datetime.utcnow(),
                 func=app.controller.fetch_twitter_tweets,
-                args=[args.statuses_backfill],
+                args=[args.statuses_backfill, datetime.utcnow()],
                 interval=int(args.interval),
                 repeat=None,
                 result_ttl = ttl,

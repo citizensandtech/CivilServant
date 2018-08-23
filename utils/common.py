@@ -1,4 +1,6 @@
 from enum import Enum
+from operator import eq, not_
+
 import simplejson as json
 from collections import namedtuple
 import datetime
@@ -158,3 +160,13 @@ class CommentNode:
 def time_since_epoch_ms(dt):
     epoch = datetime.datetime.utcfromtimestamp(0)
     return int((dt - epoch).total_seconds() * 1000.0)
+
+
+def neq(x, y):
+    """
+    implementation of not equals for SQLalchemy ORM
+    :param sqlalchemy column:
+    :param sqlalchemy column:
+    :return not-equals x, y:
+    """
+    return not_(eq(x, y))

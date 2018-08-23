@@ -154,7 +154,7 @@ class TwitterConnect():
         # add all tokens not already in db
         tokens_to_add = []
         ratestates_to_add = []
-        creation_time_epsilon = datetime.datetime.now() - timedelta(seconds=1)  # a little in the past
+        creation_time_epsilon = datetime.datetime.utcnow() - timedelta(seconds=1)  # a little in the past
         self.log.info('Creation time is {0}'.format(creation_time_epsilon))
         for token_username in in_dir_not_db:
             with open(os.path.join(self.token_path, '{0}.json'.format(token_username)), 'r') as f:
@@ -230,7 +230,7 @@ class TwitterConnect():
         order_by = strategy_order[strategy]
         self.log.info('order strategy is {0}: giving: {1}'.format(strategy, order_by))
         while not succeeded:
-            query_time = datetime.datetime.now()
+            query_time = datetime.datetime.utcnow()
             try:
                 # 2. find first token-endpoint where
                 # endpoint matches
@@ -326,7 +326,7 @@ class TwitterConnect():
                 endpoint = self.curr_endpoint
 
         ratestate = self.get_ratestate_of_endpoint(endpoint)
-        checkin_time = datetime.datetime.now()
+        checkin_time = datetime.datetime.utcnow()
         ratestate.checkin_due = checkin_time
         self.db_session.add(ratestate)
         self.db_session.commit()
