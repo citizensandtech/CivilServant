@@ -387,7 +387,6 @@ class TwitterConnect():
             else:
                 self.log.info('Twitter Query encountered a twitter error without a message list')
                 raise
-
             # if we got an error message handle it via message text (could have been error code too)
             if err_msg == 'Rate limit exceeded':
                 # special procedure for rate limit
@@ -402,5 +401,7 @@ class TwitterConnect():
             elif err_msg == 'Internal error':
                 return self.constant_wait_sleep_and_recurse(err_msg, method, *args, **kwargs)
             else:
-                self.log.error(
-                    'Twitter Query encountered twitter error with no handler yet: {0}'.format(twiterr))
+                raise twiterr
+                # self.log.error(
+                #     'Twitter Query encountered twitter error with no handler yet: {0}'.format(twiterr))
+

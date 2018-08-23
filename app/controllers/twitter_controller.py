@@ -340,6 +340,7 @@ class TwitterController():
         user_state = TwitterUserState.NOT_FOUND
         try:
             user = self.t.query(self.t.api.GetUser, screen_name=username)
+            user_state = TwitterUserState.FOUND
         except twitter.error.TwitterError as e:
             self.t.try_counter = 0  ## this line prevents the retry code from looping
             if e.message[0]['code'] == 50 and e.message[0]['message'] == 'User not found.':
@@ -404,7 +405,6 @@ class TwitterController():
 
     def archive_old_users(self, key_to_users, has_ids=True):
         """
-
             key_to_users = {user id (if has_ids is True) OR username (if has_ids is False): TwitterUser}
             we send {id: TwitterUser} if the user has an actual twitter id (the user is FOUND or PROTECTED)
 
@@ -564,13 +564,12 @@ class TwitterController():
     ################### ARCHIVE TWEET CODE
     #########################################################
 
-    def query_and_archive_tweets(self, backfill=False, fill_start_time=None, order="ASC", test_exception=False,
-                                 is_test=False):
+    def query_and_archive_tweets(self, backfill=False, fill_start_time=None, batch_size=100,
+                                 order="ASC", test_exception=False, is_test=False):
         order_strat_map = {'ASC': TwitterUser.record_created_at.asc(),
                            'DESC': TwitterUser.record_created_at.desc()}
         order_strat = order_strat_map[order]
         neq_or_eq = neq if backfill else eq
-        batch_size = 100
         all_filled = False  # this flag gets set to True when we find no more users to fill
 
         # in a loop, until all_filled, get a batch and process the last_attempt_process state along with
@@ -582,7 +581,8 @@ class TwitterController():
                         neq_or_eq(TwitterUser.CS_oldest_tweets_archived, CS_JobState.PROCESSED.value),
                         or_(TwitterUser.lang.in_(["en", "en-gb"]), TwitterUser.lang is None)
                         )). \
-                filter(TwitterUser.last_attempted_process < fill_start_time). \
+                filter(or_(TwitterUser.last_attempted_process < fill_start_time,
+                           TwitterUser.last_attempted_process is None)). \
                 order_by(order_strat). \
                 with_for_update(). \
                 limit(batch_size). \

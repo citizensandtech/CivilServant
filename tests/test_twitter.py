@@ -131,8 +131,7 @@ def test_with_user_records_archive_tweets(mock_twitter_api):
          {"status_count": 0, "user_state": TwitterUserState.PROTECTED.value})
     ]
 
-    user_records = []
-    for i, (user, result) in enumerate(user_results):
+    for (user, result) in user_results:
         # need to create TwitterUser records first
         user_record = TwitterUser(
             id=user["id"],
@@ -142,12 +141,13 @@ def test_with_user_records_archive_tweets(mock_twitter_api):
             )
         db_session.add(user_record)
         db_session.commit()
-        user_records.append(user_record)
+
+    sleep(2)
 
 
     try:
         t_controller.query_and_archive_tweets(backfill=True, fill_start_time=datetime.datetime.utcnow(),
-                                              is_test=True, test_exception=True)
+                                              is_test=True, test_exception=True, batch_size=100)
         # t_controller.with_user_records_archive_tweets(user_records, backfill=True, is_test=True)
     except Exception as e:
         log.info('Exception was {0}'.format(e))
@@ -155,8 +155,9 @@ def test_with_user_records_archive_tweets(mock_twitter_api):
         for user_record in user_records:
             # assert that nothing is in progress
             assert user_record.CS_oldest_tweets_archived != CS_JobState.IN_PROGRESS.value
-        # assert that at least one item has been processed
-        assert len([x for x in user_records if x.CS_oldest_tweets_archived == CS_JobState.PROCESSED.value]) > 0
+            if user_record.id == "2":
+                assert user_record.CS_oldest_tweets_archived == CS_JobState.PROCESSED.value
+            log.info('Userid {0} has oldtweetarchived {1}'.format(user_record.id, user_record.CS_oldest_tweets_archived))
     else:
         assert False  # expected query_and_archive_new_users to throw test_exception
 
