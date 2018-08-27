@@ -46,8 +46,15 @@ killall rqscheduler
 
 if [ -z $CS_ENV ]
     then
-    echo "CS_ENV not defined, quitting."
-    exit 1
+    echo "trying to source environment variables."
+    source config/environment_variables.sh
+    if [ -z $CS_ENV ]
+        then
+        echo "couldn't get CS_ENV out of the script, exting"
+        exit 1
+        else
+        echo "Found CS_ENV from script"
+    fi
 fi
 
 echo "Running with CS_ENV=$CS_ENV"
