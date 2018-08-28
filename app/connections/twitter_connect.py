@@ -263,7 +263,7 @@ class TwitterConnect():
                             'This is a prebook situation, not available until seconds: {0}'.format(wait_before_return))
                         self.log.info('Prebook user_id is {0}'.format(prebook.user_id))
                     if not prebook:
-                        # else we need to b) keep on waiting until we can checksomething out
+                        # else we need to b) keep on waiting until we can check something out
                         next_checkout = self.db_session.query(TwitterRateState) \
                             .filter(TwitterRateState.endpoint == endpoint) \
                             .order_by(TwitterRateState.checkin_due).first()
@@ -278,7 +278,7 @@ class TwitterConnect():
                 assert endpoint_select or prebook
                 # either a token, or the prebook
                 token_endpoint = endpoint_select if endpoint_select else prebook
-                token_endpoint.checkin_due = query_time + timedelta(minutes=60 * 24)  # 1 day loan
+                token_endpoint.checkin_due = query_time + timedelta(minutes=10)  # 10 minutes.
                 self.db_session.add(token_endpoint)
                 self.db_session.commit()
                 self.log.debug("I think I committed the checkin_due update")
@@ -287,7 +287,7 @@ class TwitterConnect():
                 # class dictionary update
                 self.endpoint_tokens[endpoint] = token
                 self.curr_endpoint = endpoint
-                self.log.debug('wiating for {0}'.format(wait_before_return))
+                self.log.debug('waiting for {0}'.format(wait_before_return))
                 sleep(wait_before_return)
                 self.apply_token(endpoint)
                 return True
