@@ -161,23 +161,23 @@ def fetch_lumen_notices(num_days=2):
     """
     Archive lumen notices.
     """
-    log.info("Calling fetch_lumen_notices, num_days={0}".format(num_days))
+    log.info("Calling fetch_lumen_notices, num_days={0}, PID={1}".format(num_days, str(os.getpid())))
     l = app.controllers.lumen_controller.LumenController(db_session, lumen_conn, log)
 
     topics = ["Copyright"]    # "Government Requests", #["Defamation","Protest, Parody and Criticism Sites","Law Enforcement Requests","International","Government Requests","DMCA Subpoenas","Court Orders"]
     date = datetime.datetime.utcnow() - datetime.timedelta(days=int(float(num_days))) # now-2days
     l.archive_lumen_notices(topics, date)
-    log.info("Finished fetch_lumen_notices, num_days={0}".format(num_days))
+    log.info("Finished fetch_lumen_notices, num_days={0}, PID={1}".format(num_days, str(os.getpid())))
 
 
 def parse_lumen_notices_for_twitter_accounts():
     """
     For all LumenNotices with CS_parsed_usernames=False, parse for twitter accounts
     """
-    log.info("Calling parse_lumen_notices_for_twitter_accounts.")
+    log.info("Calling parse_lumen_notices_for_twitter_accounts. PID={0}".format(str(os.getpid())))
     l = app.controllers.lumen_controller.LumenController(db_session, lumen_conn, log)
     l.query_and_parse_notices_archive_users()
-    log.info("Finished parse_lumen_notices_for_twitter_accounts")
+    log.info("Finished parse_lumen_notices_for_twitter_accounts. PID={0}".format(str(os.getpid())))
 
 
 def fetch_twitter_users():
@@ -185,11 +185,11 @@ def fetch_twitter_users():
     For all LumenNoticeToTwitterUser with CS_account_queried=False,
     archive Twitter accounts in TwitterUser objects,  and create 1st TwitterUserSnapshot
     """
-    log.info("Calling fetch_twitter_users.")
+    log.info("Calling fetch_twitter_users. PID={0}".format(str(os.getpid())))
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
     t.query_and_archive_new_users()
     twitter_conn.checkin_endpoint()
-    log.info("Finished fetch_twitter_users.")
+    log.info("Finished fetch_twitter_users. PID={0}".format(str(os.getpid())))
 
 
 def fetch_twitter_snapshot_and_tweets(max_time_delta_min=60):
