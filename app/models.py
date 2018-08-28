@@ -262,7 +262,7 @@ class TwitterStatus(Base):
     id                  = Column(BigInteger, primary_key = True)
     user_id             = Column(BigInteger, index = True)
     created_at          = Column(DateTime)
-    record_created_at   = Column(DateTime, default=datetime.datetime.utcnow)
+    record_created_at   = Column(DateTime, default=datetime.datetime.utcnow, index=True) # need this index for fast counting
     status_data         = Column(MEDIUMTEXT)
 
 class TwitterRateState(Base):
