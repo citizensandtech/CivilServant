@@ -6,6 +6,7 @@ import pandas as pd
 from email_db_report import send_report, date_to_str
 
 pd.set_option('display.max_colwidth', -1)
+pd.set_option('mode.chained_assignment', None)
 import datetime
 
 if __name__ == "__main__" and len(sys.argv) > 1:
@@ -67,9 +68,10 @@ yesterday_errors = [error for error in errors if error[0] > yesterday]
 
 yesterday_errors_html = pd.DataFrame.from_records(yesterday_errors, columns=['timestamp', 'stacktrace']).to_html()
 
-first_and_last_html = logdf.iloc[[0, -1]].to_html()
-
-
+try:
+    first_and_last_html = logdf.iloc[[0, -1]].to_html()
+except IndexError:
+    print('seemingly no logs')
 # Timing
 def RepresentsInt(s):
     try:
@@ -152,16 +154,17 @@ def make_title(text, level):
 
 report_html = make_title('Report for date beginning {}'.format(yesterday), 1)
 
-html_tables = {"First and last log statements": first_and_last_html,
-               "Caught errors": caught_errors_html,
-               "Uncaught errors": yesterday_errors_html,
-               "Log level value counts": log_level_value_counts_html,
-               "Controller timings": pid_timing_html,
-               "Account backfill info": account_backfill_tweets_html,
-               "Backfill stats": backfill_stats_html,
-               "Frontfill stats": frontfill_stats_html}
-
-for table_title, html_table in html_tables.items():
+html_tables = (
+    ("First and last log statements", first_and_last_html),
+    ("Caught errors", caught_errors_html),
+    ("Uncaught errors", yesterday_errors_html),
+    ("Log level value counts", log_level_value_counts_html),
+    ("Controller timings", pid_timing_html),
+    ("Account backfill info", account_backfill_tweets_html),
+    ("Backfill stats", backfill_stats_html),
+    ("Frontfill stats", frontfill_stats_html),
+     )
+for table_title, html_table in html_tables:
     title = make_title(table_title, 3)
     report_html += title
     report_html += html_table
