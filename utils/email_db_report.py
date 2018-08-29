@@ -117,19 +117,18 @@ def generate_html_table_from_dict(type_to_date_to_val, today, title):
     return html
 
 
-def send_db_report(date, html):
+def send_report(subject, html):
     with open(os.path.join(BASE_DIR, "config") + "/email_db_report.json".format(env=ENV), "r") as f:
         email_config = json.loads(f.read())
-    subject = "CivilServant Database Report: {0}".format(date_to_str(date))
-    save_report_locally(date, html)
+    save_report_locally(subject, html)
     try:
         send_email(email_config["fromaddr"], email_config["toaddrs"], subject, html)
     except ConnectionRefusedError:
         print('It looks like you cant SMTP from this machine' )
 
 
-def save_report_locally(date, html):
-    with open(os.path.join(BASE_DIR, 'logs', 'DB report{}.html'.format(date)), 'w') as outf:
+def save_report_locally(subject, html):
+    with open(os.path.join(BASE_DIR, 'logs', subject), 'w') as outf:
         outf.write(html)
 
 
@@ -489,4 +488,5 @@ if __name__ == "__main__":
     today = end - datetime.timedelta(seconds=1)
 
     html = generate_report(today, days=7)
-    send_db_report(today, html)
+    subject = "CivilServant Database Report: {0}".format(date_to_str(today))
+    send_report(subject, html)

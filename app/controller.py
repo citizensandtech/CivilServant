@@ -174,10 +174,10 @@ def parse_lumen_notices_for_twitter_accounts():
     """
     For all LumenNotices with CS_parsed_usernames=False, parse for twitter accounts
     """
-    log.info("Calling parse_lumen_notices_for_twitter_accounts. PID={0}".format(str(os.getpid())))
+    log.info("Calling parse_lumen_notices_for_twitter_accounts, PID={0}".format(str(os.getpid())))
     l = app.controllers.lumen_controller.LumenController(db_session, lumen_conn, log)
     l.query_and_parse_notices_archive_users()
-    log.info("Finished parse_lumen_notices_for_twitter_accounts. PID={0}".format(str(os.getpid())))
+    log.info("Finished parse_lumen_notices_for_twitter_accounts, PID={0}".format(str(os.getpid())))
 
 
 def fetch_twitter_users():
@@ -185,35 +185,35 @@ def fetch_twitter_users():
     For all LumenNoticeToTwitterUser with CS_account_queried=False,
     archive Twitter accounts in TwitterUser objects,  and create 1st TwitterUserSnapshot
     """
-    log.info("Calling fetch_twitter_users. PID={0}".format(str(os.getpid())))
+    log.info("Calling fetch_twitter_users, PID={0}".format(str(os.getpid())))
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
     t.query_and_archive_new_users()
     twitter_conn.checkin_endpoint()
-    log.info("Finished fetch_twitter_users. PID={0}".format(str(os.getpid())))
+    log.info("Finished fetch_twitter_users, PID={0}".format(str(os.getpid())))
 
 
 def fetch_twitter_snapshot_and_tweets(max_time_delta_min=60):
     """
     For all TwitterUserSnapshot.created_at older than x min, fetch another snapshot
     """
-    log.info("Calling fetch_twitter_snapshot_and_tweets, max_time_delta_min={0}".format(max_time_delta_min))
+    log.info("Calling fetch_twitter_snapshot_and_tweets, max_time_delta_min={0} PID={1}".format(max_time_delta_min, str(os.getpid())))
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
     now = datetime.datetime.utcnow()
     date = now - datetime.timedelta(minutes=int(float(max_time_delta_min))) # now-1hour
     t.query_and_archive_user_snapshots_and_tweets(date)
     twitter_conn.checkin_endpoint()
-    log.info("Finished fetch_twitter_snapshot_and_tweets, max_time_delta_min={0}".format(max_time_delta_min))
+    log.info("Finished fetch_twitter_snapshot_and_tweets, max_time_delta_min={0} PID={1}".format(max_time_delta_min, str(os.getpid())))
 
 
 def fetch_twitter_tweets(backfill=False, fill_start_time=None):
     """
     For all TwitterUsers with CS_most_tweets_queried=False, fetch tweets
     """
-    log.info("Calling fetch_twitter_tweets, backfill={0}.".format(backfill))
+    log.info("Calling fetch_twitter_tweets, backfill={0}. PID={1}".format(backfill, str(os.getpid())))
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
     t.query_and_archive_tweets(backfill, fill_start_time=fill_start_time)
     twitter_conn.checkin_endpoint()
-    log.info("Finished fetch_twitter_tweets, backfill={0}.".format(backfill))
+    log.info("Finished fetch_twitter_tweets, backfill={0}. PID={1}".format(backfill, str(os.getpid())))
 
 
 def twitter_observational_analysis_basic_profiling():
