@@ -19,12 +19,12 @@ fi
 
 if [ -z $3 ]
     then
-    export CS_ENV=production
+    source $basedir"/config/environment_variables.sh"
     else
     export CS_ENV=$3
 fi
 
 echo "Running with CS_ENV=$CS_ENV"
 
-$envpython $basedir"utils/email_db_report.py"
-$envpython $basedir"utils/email_log_report.py"
+$envpython $basedir"/utils/email_db_report.py"
+$envpython $basedir"/utils/email_log_report.py"
