@@ -48,7 +48,7 @@ for logf in logs_to_parse:
             except ValueError:
                 if in_error == False:
                     # the first time here
-                    error += f'Last known timestamp was: {last_timestamp}\n'
+                    error += 'Last known timestamp was: {last_timestamp}\n'
                 in_error = True
                 error += line
 
