@@ -3,7 +3,7 @@ import sys
 
 import pandas as pd
 
-from utils.email_db_report import send_report, date_to_str
+from email_db_report import send_report, date_to_str
 
 pd.set_option('display.max_colwidth', -1)
 import datetime
