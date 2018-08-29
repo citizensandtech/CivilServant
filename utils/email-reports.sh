@@ -26,5 +26,5 @@ fi
 
 echo "Running with CS_ENV=$CS_ENV"
 
-$envpython $basedir"/email_db_report.py"
-$envpython $basedir"/email_log_report.py"
+$envpython $basedir"utils/email_db_report.py"
+$envpython $basedir"utils/email_log_report.py"
