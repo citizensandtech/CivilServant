@@ -617,6 +617,7 @@ class TwitterController():
                 utils.common.reset_CS_JobState_In_Progress(unarchived_users, "CS_oldest_tweets_archived",
                                                            self.db_session,
                                                            self.log)  # if still marked IN_PROGRESS (e.g. because of unchecked exception), reset it to NOT_PROCESSED
+                self.db_session.close()
 
             self.log.info(
                 "PID {2} queried and archived tweets for {0} users; backfill={1}".format(len(unarchived_users),
@@ -624,6 +625,7 @@ class TwitterController():
                                                                                          str(os.getpid())))
             self.log.info('PID {0} completed batch_attempt_counter={1} finding len(unarchived_users)={2}' \
                           .format(str(os.getpid()), batch_attempt_counter, len(unarchived_users)))
+
             batch_attempt_counter += 1
 
 
