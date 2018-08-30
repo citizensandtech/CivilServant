@@ -575,7 +575,8 @@ class TwitterController():
 
         # in a loop, until all_filled, get a batch and process the last_attempt_process state along with
         # fill_start_time, lets us know if that user has been attempted *this round*. The CS_JobState state let's us
-        # know if every item was either processed succesffuly or failed
+        # know if every item was either processed successfully or failed
+        batch_attempt_counter = 0
         while not all_filled:
             unarchived_users = self.db_session.query(TwitterUser). \
                 filter(and_(
@@ -608,8 +609,9 @@ class TwitterController():
                 self.with_user_records_archive_tweets(unarchived_users, backfill=backfill, is_test=is_test,
                                                       test_exception=test_exception)  # backfill hacky
             # TODO if the user has become invalid then mark this
-            except:
-                raise  # re-raise the exception
+            except sqlalchemy.orm.exc.DetachedInstanceError:
+                self.log.error("Encountered deatched instance error.")
+                self.db_session.close() #try to refresh
             # finally reset in_progress and log
             finally:
                 utils.common.reset_CS_JobState_In_Progress(unarchived_users, "CS_oldest_tweets_archived",
@@ -620,6 +622,10 @@ class TwitterController():
                 "PID {2} queried and archived tweets for {0} users; backfill={1}".format(len(unarchived_users),
                                                                                          backfill,
                                                                                          str(os.getpid())))
+            self.log.info('PID {0} completed batch_attempt_counter={1} finding len(unarchived_users)={2}' \
+                          .format(str(os.getpid()), batch_attempt_counter, len(unarchived_users)))
+            batch_attempt_counter += 1
+
 
     def with_user_records_archive_tweets(self, user_records, backfill=False, is_test=False, test_exception=False):
         """

@@ -95,6 +95,7 @@ def test_archive_twitter_new_users(mock_twitter, populate_notice_users):
 
 @patch('twitter.Api', autospec=True)
 def test_with_user_records_archive_tweets(mock_twitter_api):
+    log.debug("starting test")
     tc = app.connections.twitter_connect.TwitterConnect(log=log, db_session=db_session)
     api = mock_twitter_api.return_value
 
