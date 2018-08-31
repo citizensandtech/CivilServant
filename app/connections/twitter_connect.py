@@ -314,7 +314,7 @@ class TwitterConnect():
         self.log.debug('ratestate object had user_id:{0}'.format(ratestate.user_id))
         return ratestate
 
-    def checkin_endpoint(self, endpoint=None, close_session=True):
+    def checkin_endpoint(self, endpoint=None):
         if endpoint is None:
         # this is a way to signal to checkin the curr_endpoint without knowing its name
             if self.curr_endpoint is None:
@@ -330,10 +330,6 @@ class TwitterConnect():
         ratestate.checkin_due = checkin_time
         self.db_session.add(ratestate)
         self.db_session.commit()
-
-        if close_session:
-            # closing to try and avoid Mysql server gone away error.
-            self.db_session.close()
 
         # delete form local records
         del self.endpoint_tokens[endpoint]
