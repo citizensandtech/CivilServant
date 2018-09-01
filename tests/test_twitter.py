@@ -21,6 +21,8 @@ BASE_DIR = os.path.join(TEST_DIR, "../")
 ENV = os.environ['CS_ENV'] = "test"
 
 db_session = DbEngine(os.path.join(TEST_DIR, "../", "config") + "/{env}.json".format(env=ENV)).new_session()
+db_session_conn = DbEngine(os.path.join(TEST_DIR, "../", "config") + "/{env}.json".format(env=ENV)).new_session()
+
 log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
 
@@ -72,7 +74,7 @@ def test_archive_twitter_new_users(mock_twitter, populate_notice_users):
         t.UsersLookup.__name__ = 'UsersLookup'
         t.UsersLookup.return_value = fixture
 
-    conn = app.connections.twitter_connect.TwitterConnect(log=log, db_session=db_session)
+    conn = app.connections.twitter_connect.TwitterConnect(log=log, db_session=db_session_conn)
     t_ctrl = app.controllers.twitter_controller.TwitterController(db_session, conn, log)
 
     try:

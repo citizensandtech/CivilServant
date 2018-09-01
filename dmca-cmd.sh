@@ -2,13 +2,18 @@
 
 start_standard(){
 ### Fetch lumen notices every 3 hours
-# TODO make this variable with n-tasks
-
+echo "starting with $1 threads"
 echo "launch workers"
 rqscheduler &
+
+# the unadorned-queuename queue has just one worker
 rqworker $CS_ENV &
-rqworker $CS_ENV"_concurrent" &
-rqworker $CS_ENV"_concurrent" &
+
+for i in $(seq $1 $END)
+    do
+    echo "Launching concurrent worker $i "
+    rqworker $CS_ENV"_concurrent" &
+    done
 
 logfile="logs/CivilServant_"$CS_ENV".log"
 echo "logfile is "$logfile
@@ -62,10 +67,17 @@ fi
 
 echo "Running with CS_ENV=$CS_ENV"
 
+if [ -z $2 ]
+    then
+    n_tasks=4
+    else
+    n_tasks=$2
+fi
+
 if [ $1 = "start" ]
     then
     echo "starting"
-    start_standard
+    start_standard $n_tasks
 fi
 
 if [ $1 = "stop" ]
@@ -78,5 +90,5 @@ if [ $1 = "restart" ]
     then
     echo "restarting"
     stop_all
-    start_standard
+    start_standard $n_tasks
 fi

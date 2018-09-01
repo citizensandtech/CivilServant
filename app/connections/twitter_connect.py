@@ -354,6 +354,9 @@ class TwitterConnect():
         del self.endpoint_tokens[endpoint]
         self.curr_endpoint = None
 
+        #potentially close
+        self.db_session.close()
+
     def mark_reset_time(self, endpoint):
         reset_time = self.get_reset_time_of_endpoint(endpoint)
         ratestate = self.get_ratestate_of_endpoint(endpoint)

@@ -29,13 +29,14 @@ ENV = os.environ['CS_ENV']
 
 ### LOAD SQLALCHEMY SESSION
 db_session = DbEngine(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV)).new_session()
+db_session_twit_conn = DbEngine(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV)).new_session()
 
 # LOAD LOGGER
 log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
 conn = app.connections.reddit_connect.RedditConnect()
 lumen_conn = app.connections.lumen_connect.LumenConnect(log)
-twitter_conn = app.connections.twitter_connect.TwitterConnect(log=log, db_session = db_session)
+twitter_conn = app.connections.twitter_connect.TwitterConnect(log=log, db_session = db_session_twit_conn)
 
 def fetch_reddit_front(page_type=PageType.TOP):
     r = conn.connect(controller="FetchRedditFront")
