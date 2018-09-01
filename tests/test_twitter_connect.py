@@ -171,7 +171,7 @@ def test_release_verify_credential_endpoint(mock_rate_limit, mock_twitter):
 
 
 def recovery_after_error(mock_rate_limit, mock_twitter, error_to_test):
-    '''Higher level funciton to return a function that tests an error code.'''
+    '''Higher order function to return a function that tests an error code.'''
     reset_time = (datetime.datetime.utcnow() + datetime.timedelta(seconds=3))
     mock_rate_limit.resources = {"getfriends": {"/friends/list": {
         "reset": time.mktime(reset_time.timetuple()),
@@ -213,14 +213,61 @@ def recovery_after_error(mock_rate_limit, mock_twitter, error_to_test):
     # assert right results still came through after the too-hot error was handled.
     assert len(friends) == len(friend_accounts)
 
+
 @patch('twitter.Api', autospec=True)
 @patch('twitter.ratelimit.RateLimit', autospec=True)
 def test_recovery_after_over_capacity(mock_rate_limit, mock_twitter):
     error_to_test = twitter.error.TwitterError([{'code': 130, 'message': 'Over capacity'}])
     return recovery_after_error(mock_rate_limit, mock_twitter, error_to_test)
 
+
 @patch('twitter.Api', autospec=True)
 @patch('twitter.ratelimit.RateLimit', autospec=True)
 def test_recovery_after_internal_error(mock_rate_limit, mock_twitter):
     error_to_test = twitter.error.TwitterError([{'message': 'Internal error', 'code': 131}])
     return recovery_after_error(mock_rate_limit, mock_twitter, error_to_test)
+
+
+@patch('twitter.Api', autospec=True)
+@patch('twitter.ratelimit.RateLimit', autospec=True)
+def test_invalid_token(mock_rate_limit, mock_twitter):
+    # TODO: In the unlikelihood that a VERY slow machine is running these tests
+    # you can increase the timedelta here and below to microseconds=500
+    reset_time = (datetime.datetime.utcnow() + datetime.timedelta(seconds=3))
+    mock_rate_limit.resources = {"getfriends": {"/friends/list": {
+        "reset": time.mktime(reset_time.timetuple()),
+        "remaining": 0,
+        "limit": 15}}}  # num queries per period
+
+    t = mock_twitter.return_value
+    t.rate_limit = mock_rate_limit
+    t.VerifyCredentials.return_value = True
+    t.InitializeRateLimit.side_effect = [twitter.error.TwitterError([{'code': 326,
+                                                                      'message': 'To protect our users from spam and other malicious activity, this account is temporarily locked. Please log in to https://twitter.com to unlock your account.'}]),
+                                         True, True]
+
+
+    conn = app.connections.twitter_connect.TwitterConnect(log, db_session)
+
+    # some gynamstics because Mock overides __name__
+    getfriends = conn.api.GetFriends
+    getfriends.__name__ = 'GetFriends'
+
+    friend_accounts = []
+    with open("{script_dir}/fixture_data/twitter_get_friends.json".format(script_dir=TEST_DIR)) as f:
+        fixture = json.loads(f.read())
+        for account in fixture:
+            json_dump = json.dumps(account)
+            account_obj = json2obj(json_dump)
+            friend_accounts.append(account_obj)
+
+    t.GetFriends.side_effect = [friend_accounts]
+
+    friends = conn.query(conn.api.GetFriends)
+    # assert right results still came throught
+    assert len(friends) == len(friend_accounts)
+    ratestates = db_session.query(TwitterRateState).filter(TwitterRateState.user_id == 1)
+
+    for ratestate in ratestates:
+        log.debug('ratestate endpoint:{0}, isvalid:{1}'.format(ratestate.endpoint, ratestate.is_valid))
+        assert ratestate.is_valid is False

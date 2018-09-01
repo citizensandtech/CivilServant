@@ -206,14 +206,30 @@ class TwitterConnect():
         try:
             verification = self.api.VerifyCredentials()
             self.api.InitializeRateLimit()  # dangerous for us.
-        except twitter.error.TwitterError as e:
-            self.log.error(
-                "Twitter: Failed to connect to API with endpoint {0}. Remove from token set. Error: {1}.".format(
-                    endpoint, str(e)))
-            if e[0]['code'] == 89:  # or 'message': 'Invalid or expired token.':
-                raise NotImplementedError('mark as invalid')
+        except twitter.TwitterError as twiterr:
+            # check to see if we can get an error message out
+            self.log.info('Error Initializing Rate Limit')
+            err_msg = twiterr.message[0]['message']
+            err_code = twiterr.message[0]['code']
+            if err_code in (89, 326):  # or 'message': 'Invalid or expired token.':
+                self.invalidate_token(endpoint)
             return False
         self.curr_endpoint = endpoint
+        return True
+
+    def invalidate_token(self, endpoint):
+        endpoint_ratestate_to_invalidate = self.get_ratestate_of_endpoint(endpoint)
+        token_user_id = endpoint_ratestate_to_invalidate.user_id
+        self.log.debug('Invalidating ratestate for user:{0}'.format(endpoint_ratestate_to_invalidate.user_id))
+        endpoint_ratestate_to_invalidate.is_valid = False
+        self.db_session.commit()
+        # so far we've invalidated just one endpoint, now have to get them all
+        token_ratestates_to_invalidate = self.db_session.query(TwitterRateState).\
+            filter(TwitterRateState.user_id == token_user_id).\
+            with_for_update().all()
+        for ratestate in token_ratestates_to_invalidate:
+            ratestate.is_valid = False
+        self.db_session.commit()
         return True
 
     ## This method will select from available tokens
@@ -240,6 +256,7 @@ class TwitterConnect():
                     .filter(TwitterRateState.endpoint == endpoint) \
                     .filter(TwitterRateState.checkin_due < query_time) \
                     .filter(TwitterRateState.reset_time < query_time) \
+                    .filter(TwitterRateState.is_valid == True) \
                     .order_by(order_by) \
                     .with_for_update().first()
                 self.log.info('''Trying to get token matching \
@@ -289,7 +306,9 @@ class TwitterConnect():
                 self.curr_endpoint = endpoint
                 self.log.debug('waiting for {0}'.format(wait_before_return))
                 sleep(wait_before_return)
-                self.apply_token(endpoint)
+                successful_application = self.apply_token(endpoint)
+                if not successful_application:
+                    return self.select_available_token(endpoint, strategy=strategy)
                 return True
             except:
                 self.log.exception('exception in getting from DB for tokens')
@@ -400,6 +419,10 @@ class TwitterConnect():
                 return self.constant_wait_sleep_and_recurse(err_msg, method, *args, **kwargs)
             elif err_msg == 'Internal error':
                 return self.constant_wait_sleep_and_recurse(err_msg, method, *args, **kwargs)
+            elif err_msg == 'To protect our users from spam and other malicious activity, this account is temporarily locked. Please log in to https://twitter.com to unlock your account.':
+                self.log.info('This token is borked')
+                self.invalidate_token(endpoint)
+                return self.query(method, *args, **kwargs)
             else:
                 raise twiterr
                 # self.log.error(

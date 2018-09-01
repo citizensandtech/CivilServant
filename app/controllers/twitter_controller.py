@@ -611,7 +611,6 @@ class TwitterController():
             # TODO if the user has become invalid then mark this
             except sqlalchemy.orm.exc.DetachedInstanceError:
                 self.log.error("Encountered deatched instance error.")
-                self.db_session.close() #try to refresh
             # finally reset in_progress and log
             finally:
                 utils.common.reset_CS_JobState_In_Progress(unarchived_users, "CS_oldest_tweets_archived",
