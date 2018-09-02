@@ -227,6 +227,11 @@ def test_recovery_after_internal_error(mock_rate_limit, mock_twitter):
     error_to_test = twitter.error.TwitterError([{'message': 'Internal error', 'code': 131}])
     return recovery_after_error(mock_rate_limit, mock_twitter, error_to_test)
 
+@patch('twitter.Api', autospec=True)
+@patch('twitter.ratelimit.RateLimit', autospec=True)
+def test_recovery_after_unknown_error(mock_rate_limit, mock_twitter):
+    error_to_test = twitter.error.TwitterError({'Unknown error: '})
+    return recovery_after_error(mock_rate_limit, mock_twitter, error_to_test)
 
 @patch('twitter.Api', autospec=True)
 @patch('twitter.ratelimit.RateLimit', autospec=True)

@@ -385,17 +385,10 @@ class TwitterConnect():
         method_name = method.__name__
         # find the endpoint that will be used
         endpoint = FUNC_ENDPOINTS[method_name]
-        # switch to that token or select_available_token
-        if endpoint in self.endpoint_tokens.keys():
-            if endpoint == self.curr_endpoint:
-                pass  # no switching necessary
-            else:
-                # activate this credential if its not the active one
-                self.apply_token(endpoint)
-        # we need to get a token-endpoint from the database
-        else:
+        # check if need to switch endpoints
+        if not endpoint == self.curr_endpoint:
             self.select_available_token(endpoint)
-            # select available tokens
+        # otherwise the correct endpoint is already selected
         try:
             # try to actually execute
             result = method(*args, **kwargs)
@@ -404,10 +397,16 @@ class TwitterConnect():
         except twitter.TwitterError as twiterr:
             # check to see if we can get an error message out
             err_msg = None
-            if type(twiterr.message).__name__ == "list":
+            if isinstance(twiterr.message, list):
                 err_msg = twiterr.message[0]['message']
+            elif isinstance(twiterr.message, set):
+                if 'Unknown error: ' in twiterr.message:
+                    return self.constant_wait_sleep_and_recurse('Unknown set, probably malformed, error', method, *args, **kwargs)
+            elif isinstance(twiterr.message, dict):
+                if 'Unknown error: ' in twiterr.message.keys():
+                    return self.constant_wait_sleep_and_recurse('Unknown dict, probably malformed, error', method, *args, **kwargs)
             else:
-                self.log.info('Twitter Query encountered a twitter error without a message list')
+                self.log.info('Twitter Query encountered a twitter of an unknown type')
                 raise
             # if we got an error message handle it via message text (could have been error code too)
             if err_msg == 'Rate limit exceeded':

@@ -9,7 +9,7 @@ pd.set_option('mode.chained_assignment', None)
 from email_db_report import send_report, date_to_str
 
 
-def make_report():
+def make_report(yesterday):
     ENV = os.environ["CS_ENV"]
 
     BASE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..")
@@ -55,8 +55,6 @@ def make_report():
 
     logdf.set_index('timestamp', inplace=True)
     logdf.sort_index(inplace=True)
-
-    yesterday = datetime.datetime.utcnow() - datetime.timedelta(days=1)
 
     logdf = logdf[yesterday:]
 
@@ -166,6 +164,7 @@ def make_report():
 
 
 if __name__ == "__main__":
-    report_html = make_report()
+    yesterday = datetime.datetime.utcnow() - datetime.timedelta(days=1)
+    report_html = make_report(yesterday)
     subject = "CivilServant Log Report: {0}".format(date_to_str(yesterday))
     send_report(subject, report_html)
