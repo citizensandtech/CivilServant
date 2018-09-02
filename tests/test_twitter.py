@@ -29,7 +29,7 @@ log = app.cs_logger.get_logger(ENV, BASE_DIR)
 def clear_twitter_tables():
     for table in (TwitterRateState, TwitterToken,
                   LumenNotice, LumenNoticeExpandedURL, LumenNoticeToTwitterUser,
-                  TwitterUser, TwitterUserSnapshot, TwitterStatus):
+                  TwitterUser, TwitterUserSnapshot, TwitterStatus,):
         db_session.query(table).delete()
         db_session.commit()
 
