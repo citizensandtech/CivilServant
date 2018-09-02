@@ -239,6 +239,7 @@ class TwitterConnect():
     def select_available_token(self, endpoint, strategy='sequential'):
         wait_before_return = 0
         succeeded = False
+        selection_attempt_counter = 0
         strategy_order = {'random': sqlfunc.rand(),
                           'sequential': TwitterRateState.user_id,
                           # another strategy might be fetch the most remaining in the future
@@ -305,15 +306,21 @@ class TwitterConnect():
                 self.endpoint_tokens[endpoint] = token
                 self.curr_endpoint = endpoint
                 self.log.debug('waiting for {0}'.format(wait_before_return))
+                if wait_before_return < 0:
+                    self.log.info('WHY would wait be like this?: {0}'.format(wait_before_return))
+                    wait_before_return = -1*wait_before_return
                 sleep(wait_before_return)
                 successful_application = self.apply_token(endpoint)
                 if not successful_application:
                     return self.select_available_token(endpoint, strategy=strategy)
                 return True
-            except:
-                self.log.exception('exception in getting from DB for tokens')
+            except Exception as e:
+                self.log.error('Error in getting from DB for tokens was: {0}, of type: {1}'.format(e, type(e)))
                 self.db_session.rollback()
-                raise
+                sleep(10)
+                if selection_attempt_counter > 10:
+                    raise
+                selection_attempt_counter += 1
 
     def get_reset_time_of_endpoint(self, endpoint):
         '''Utility to walk through the rate_limit dict
