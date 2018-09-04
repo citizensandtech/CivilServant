@@ -37,7 +37,7 @@ def main():
         print("=================================")
         print("\n")
         for job in scheduler.get_jobs(until=timedelta(hours=24), with_times=True):
-           print("ID: {1}\n    Job: {0}\n    Time: {2}\n".format(job[0].description, job[0].id, job[1]))
+            print("ID: {1}\n    Job: {0}\n    Time: {2}\tInterval: {3}\n".format(job[0].description, job[0].id, job[1], job[0].meta["interval"]))
     elif(args.action == "remove"):
         if(args.object is None):
             print("Please specify the job to remove")
