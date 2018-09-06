@@ -1,0 +1,9 @@
+{
+    "database": "civilservant_development",
+    "user": "civilservant",
+    "host": "localhost",
+    "password": "",
+    "client_id" : "",
+    "client_secret" : "",
+    "redirect_uri" : ""
+}

@@ -213,7 +213,7 @@ class TwitterConnect():
             err_code = twiterr.message[0]['code']
             if err_code in (89, 326):  # or 'message': 'Invalid or expired token.':
                 self.invalidate_token(endpoint)
-            return False
+            return False if ENV != 'test' else True
         self.curr_endpoint = endpoint
         return True
 

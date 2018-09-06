@@ -1,10 +1,26 @@
+import inspect
+import sys
+
 from redis import Redis
 from rq_scheduler import Scheduler
 from datetime import datetime
 import app.controller
 import os, argparse
 import schedule_twitter_jobs
-from utils.common import PageType
+from utils.common import DbEngine
+import json
+import math
+
+### LOAD ENVIRONMENT VARIABLES
+BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))))
+ENV = os.environ['CS_ENV']
+
+### LOAD SQLALCHEMY SESSION
+db_session = DbEngine(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV)).new_session()
+
+# LOAD LOGGER
+log = app.cs_logger.get_logger(ENV, BASE_DIR)
+
 
 # documentation at
 # https://github.com/ui/rq-scheduler
@@ -35,7 +51,9 @@ def main():
     parser.add_argument("--function",
                         required=True,
                         choices=["fetch_lumen_notices", "parse_lumen_notices_for_twitter_accounts",
-                                 "fetch_twitter_users", "fetch_twitter_snapshot_and_tweets", "fetch_twitter_tweets"],
+                                 "fetch_twitter_users", "fetch_twitter_snapshot_and_tweets", "fetch_twitter_tweets",
+                                 "report_calculations",
+                                 ],
                         help="The controller function to call.")
 
     parser.add_argument("--lumen_delta_days",
@@ -59,7 +77,7 @@ def main():
                         help="Interval (in seconds) between tasks in seconds (default 60 seconds)")
 
     parser.add_argument("-e", '--env',
-                        choices=['development', 'test', 'production'],
+                        # choices=['development', 'test', 'production'],
                         required=False,
                         help="Run within a specific environment. Otherwise run under the environment defined in the environment variable CS_ENV")
 
@@ -82,16 +100,39 @@ def main():
 
     if args.queue != None:
         queue_name = args.queue
-        queue_name_concurrent = queue_name + '_concurrent'
     else:
         queue_name = os.environ['CS_ENV']
-        queue_name_concurrent = queue_name + '_concurrent'
 
     scheduler = Scheduler(queue_name=queue_name, connection=Redis())
 
-    ttl = max(172800, int(args.interval) + 3600)  # max of (2days in seconds, args.interval + 1 hr)
-    timeout = max(60 * 60 * 24, int(args.interval) + 300)  # max of (3hrs in seconds, args.interval + 50min)
+    SECONDS_IN_DAY = 60 * 60 * 24
 
+    ttl = max(2*SECONDS_IN_DAY, int(args.interval) + 3600)  # max of (2days in seconds, args.interval + 1 hr)
+    timeout = max(SECONDS_IN_DAY, int(args.interval) + 300)  # max of (3hrs in seconds, args.interval + 50min)
+
+    # LOAD Experiment details
+    config = json.load(open(os.path.join(BASE_DIR, 'config', '{env}.json'.format(env=os.environ['CS_ENV']))))
+    try:
+        experiment_onboarding_days = config["experiment_onboarding_days"]
+        experiment_collection_days = config["experiment_collection_days"]
+        log.info('Loaded experiment with experiment_onboarding_days: {}'.format(experiment_onboarding_days))
+        log.info('Loaded experiment with experiment_collection_days: {}'.format(experiment_collection_days))
+    except KeyError:  # this means that the config is unspecified
+        experiment_onboarding_days = None
+        experiment_collection_days = None
+    # Experiment has two stages.
+    #  1) Onboarding, while we are still adding new users
+    #  2) Collection. Collect happens during onboarding too, but continues afterwards to collect data on onboarded users
+    if experiment_onboarding_days is not None and experiment_collection_days is not None:
+        onboarding_seconds = SECONDS_IN_DAY * experiment_onboarding_days
+        collection_seconds = SECONDS_IN_DAY * experiment_collection_days
+        total_experiment_seconds = onboarding_seconds + collection_seconds
+        onboarding_repeats = math.ceil(onboarding_seconds / int(args.interval))
+        total_experiment_repeats = math.ceil(total_experiment_seconds / int(args.interval))
+    else:
+        # if you pass None to repeats it will continue indefinitely which is what we want for the undefined behaviour
+        onboarding_repeats = None
+        total_experiment_repeats = None
 
     if args.function == "fetch_lumen_notices":
         scheduler.schedule(
@@ -99,7 +140,7 @@ def main():
             func=app.controller.fetch_lumen_notices,
             args=[args.lumen_delta_days],
             interval=int(args.interval),
-            repeat=None,
+            repeat=onboarding_repeats,
             result_ttl=ttl,
             timeout=timeout)
     elif args.function == "parse_lumen_notices_for_twitter_accounts":
@@ -108,7 +149,7 @@ def main():
             func=app.controller.parse_lumen_notices_for_twitter_accounts,
             args=[],
             interval=int(args.interval),
-            repeat=None,
+            repeat=onboarding_repeats,
             result_ttl=ttl,
             timeout=timeout)
     elif args.function == "fetch_twitter_users":
@@ -117,7 +158,7 @@ def main():
             func=app.controller.fetch_twitter_users,
             args=[],
             interval=int(args.interval),
-            repeat=None,
+            repeat=onboarding_repeats,
             result_ttl=ttl,
             timeout=timeout)
     elif args.function == "fetch_twitter_snapshot_and_tweets":
@@ -126,20 +167,25 @@ def main():
             func=app.controller.fetch_twitter_snapshot_and_tweets,
             args=[args.snapshot_delta_min],
             interval=int(args.interval),
-            repeat=None,
+            repeat=total_experiment_repeats,
             result_ttl=ttl,
             timeout=timeout)
     elif args.function == "fetch_twitter_tweets":
+        repeats = onboarding_repeats if args.statuses_backfil else total_experiment_repeats
         scheduler.schedule(
             scheduled_time=datetime.utcnow(),
             func=schedule_twitter_jobs.schedule_fetch_tweets,
-            args=(args, ttl, timeout, queue_name),
+            args=(args, ttl, timeout, queue_name, repeats),
             interval=int(args.interval),
-            repeat=None,
+            repeat=repeats,
             result_ttl=ttl,
             timeout=timeout)
+    elif args.function == "report_calculations":
+        calc_str = str(('onboarding_repeats',onboarding_repeats,
+                        "total_experiment_repeats",total_experiment_repeats))
+        sys.stdout.write(calc_str)
 
-def schedule_fetch_tweets(args, ttl, timeout, queue_name):
+def schedule_fetch_tweets(args, ttl, timeout, queue_name, repeats):
     fill_start_time = datetime.utcnow()
     scheduler_concurrent = Scheduler(queue_name=queue_name+'_concurrent', connection=Redis())
     for task in range(args.n_tasks):
@@ -148,7 +194,7 @@ def schedule_fetch_tweets(args, ttl, timeout, queue_name):
             func=app.controller.fetch_twitter_tweets,
             args=[args.statuses_backfill, fill_start_time],
             interval=int(args.interval),
-            repeat=None,
+            repeat=repeats,
             result_ttl=ttl,
             timeout=timeout)
 

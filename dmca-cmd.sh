@@ -4,6 +4,8 @@ start_standard(){
 ### Fetch lumen notices every 3 hours
 echo "starting with $1 threads"
 echo "launch workers"
+
+#put the rq scheduler in the background
 rqscheduler &
 
 # the unadorned-queuename queue has just one worker
@@ -12,6 +14,7 @@ rqworker $CS_ENV &
 for i in $(seq $1 $END)
     do
     echo "Launching concurrent worker $i "
+#    important to use `rqworker` and not `rq worker` because the stop command kills `rqworker`.
     rqworker $CS_ENV"_concurrent" &
     done
 
@@ -67,6 +70,7 @@ fi
 
 echo "Running with CS_ENV=$CS_ENV"
 
+# the second argument represents the number of threads to use, if unset, default to 4.
 if [ -z $2 ]
     then
     n_tasks=4
@@ -74,6 +78,7 @@ if [ -z $2 ]
     n_tasks=$2
 fi
 
+# the first argument is a comman, either to start, stop, or restart(stop and then start).
 if [ $1 = "start" ]
     then
     echo "starting"
