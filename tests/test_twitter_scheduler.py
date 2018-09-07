@@ -63,7 +63,9 @@ def scheduler_calcs(configfile, expected_str, mock_twitter):
 
 
 def test_scheduler_calcs_oneday():
+    # put in a json for 1 day, with an interval of 1 day and get back 1 onboarding repeat and 2 total experiment repeats
     scheduler_calcs('test_oneday', "('onboarding_repeats', 1, 'total_experiment_repeats', 2)")
 
 def test_scheduler_calcs_no_experi():
+    #put in a json with no length details, get beck no repeats
     scheduler_calcs('test_no_experi', "('onboarding_repeats', None, 'total_experiment_repeats', None)")

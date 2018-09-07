@@ -111,7 +111,8 @@ def main():
     timeout = max(SECONDS_IN_DAY, int(args.interval) + 300)  # max of (3hrs in seconds, args.interval + 50min)
 
     # LOAD Experiment details
-    config = json.load(open(os.path.join(BASE_DIR, 'config', '{env}.json'.format(env=os.environ['CS_ENV']))))
+    with open(os.path.join(BASE_DIR, 'config', '{env}.json'.format(env=os.environ['CS_ENV']))) as f:
+        config = json.load(f)
     try:
         experiment_onboarding_days = config["experiment_onboarding_days"]
         experiment_collection_days = config["experiment_collection_days"]
@@ -175,7 +176,7 @@ def main():
         scheduler.schedule(
             scheduled_time=datetime.utcnow(),
             func=schedule_twitter_jobs.schedule_fetch_tweets,
-            args=(args, ttl, timeout, queue_name, repeats),
+            args=(args, ttl, timeout, queue_name, repeats, collection_seconds),
             interval=int(args.interval),
             repeat=repeats,
             result_ttl=ttl,
@@ -185,14 +186,15 @@ def main():
                         "total_experiment_repeats",total_experiment_repeats))
         sys.stdout.write(calc_str)
 
-def schedule_fetch_tweets(args, ttl, timeout, queue_name, repeats):
+
+def schedule_fetch_tweets(args, ttl, timeout, queue_name, repeats, collection_seconds):
     fill_start_time = datetime.utcnow()
     scheduler_concurrent = Scheduler(queue_name=queue_name+'_concurrent', connection=Redis())
     for task in range(args.n_tasks):
         scheduler_concurrent.schedule(
             scheduled_time=datetime.utcnow(),
             func=app.controller.fetch_twitter_tweets,
-            args=[args.statuses_backfill, fill_start_time],
+            args=[args.statuses_backfill, fill_start_time, collection_seconds],
             interval=int(args.interval),
             repeat=repeats,
             result_ttl=ttl,

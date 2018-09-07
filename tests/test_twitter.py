@@ -151,7 +151,6 @@ def test_with_user_records_archive_tweets(mock_twitter_api):
     try:
         t_controller.query_and_archive_tweets(backfill=True, fill_start_time=datetime.datetime.utcnow(),
                                               is_test=True, test_exception=True, batch_size=100)
-        # t_controller.with_user_records_archive_tweets(user_records, backfill=True, is_test=True)
     except Exception as e:
         log.info('Exception was {0}'.format(e))
         user_records = [x for x in db_session.query(TwitterUser).all()]
@@ -170,3 +169,69 @@ def test_with_user_records_archive_tweets(mock_twitter_api):
     for user_record in user_records:
         assert user_record.last_attempted_process is not None
         assert user_record.last_attempted_process < after_all_attempted_process
+
+
+@patch('twitter.Api', autospec=True)
+def test_with_user_records_archive_tweets_frontfill_seconds_condition(mock_twitter_api):
+    tc = app.connections.twitter_connect.TwitterConnect(log=log, db_session=db_session)
+    api = mock_twitter_api.return_value
+
+    def mocked_GetUserTimeline(user_id, count=None, max_id=None):
+        with open("{script_dir}/fixture_data/anon_twitter_tweets.json".format(script_dir=TEST_DIR)) as f:
+            data = json.loads(f.read())
+        assert len(data) == 200
+        if user_id == "2" or user_id == "3":  # suspended_user or protected_user
+            raise twitter.error.TwitterError("Not authorized.")  # not mocking TwitterError
+        elif user_id == "1":  # deleted_user
+            raise twitter.error.TwitterError([{'message': 'Sorry, that page does not exist.', 'code': 34}])
+        else:  # # existing_user ?
+            return data
+
+    m = Mock()
+    m.side_effect = mocked_GetUserTimeline
+    api.GetUserTimeline = m
+    api.GetUserTimeline.__name__ = "GetUserTimeline"
+    tc.api = api
+    patch('twitter.')
+
+    assert len(db_session.query(TwitterStatus).all()) == 0
+
+    t_controller = app.controllers.twitter_controller.TwitterController(db_session, tc, log)
+
+    def load_processed_user(user):
+        user_record = TwitterUser(
+            id=user["id"],
+            screen_name=user["screen_name"],
+            user_state=user["user_state"],
+            lang="en",
+            CS_oldest_tweets_archived=CS_JobState.PROCESSED.value
+            )
+        db_session.add(user_record)
+        db_session.commit()
+
+    user_earlier = {"screen_name": "existing_user", "id": "888", "user_state": TwitterUserState.FOUND.value}
+
+    user_later = {"screen_name": "existing_user", "id": "999", "user_state": TwitterUserState.FOUND.value}
+
+
+    # add two users ten seconds apart
+    load_processed_user(user_earlier)
+    sleep(10) # these records are 10 seconds apart
+    load_processed_user(user_later)
+
+    for u in db_session.query(TwitterUser).all():
+        log.info('Userid {0}, record_created_at {1}'.format(u.id, u.record_created_at))
+
+    not_yet_queried_timepoint = datetime.datetime.utcnow()
+    log.info("Controller starts at {}".format(not_yet_queried_timepoint))
+    # tell the controller only to frontfill for people that were added in the last 5 seconds
+    t_controller.query_and_archive_tweets(backfill=False, fill_start_time=datetime.datetime.utcnow(), collection_seconds=5)
+    # collection_condition = TwitterUser.record_created_at + datetime.timedelta( seconds=collection_seconds) > fill_start_time
+
+    # 888 should not have been attempted
+    early_record = db_session.query(TwitterUser).filter(TwitterUser.id==888).first()
+    assert early_record.last_attempted_process < not_yet_queried_timepoint
+
+    # 999 should be attempted.
+    later_record = db_session.query(TwitterUser).filter(TwitterUser.id==999).first()
+    assert later_record.last_attempted_process > not_yet_queried_timepoint

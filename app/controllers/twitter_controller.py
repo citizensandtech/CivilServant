@@ -565,11 +565,26 @@ class TwitterController():
     ################### ARCHIVE TWEET CODE
     #########################################################
 
-    def query_and_archive_tweets(self, backfill=False, fill_start_time=None, batch_size=100,
+    def query_and_archive_tweets(self, backfill=False, fill_start_time=None, collection_seconds=None, batch_size=100,
                                  order="ASC", test_exception=False, is_test=False):
+        # make the order condition
         order_strat_map = {'ASC': TwitterUser.record_created_at.asc(),
                            'DESC': TwitterUser.record_created_at.desc()}
         order_strat = order_strat_map[order]
+
+        # make the collection condition
+        if collection_seconds:
+            # their collection end window should be after right now
+            creation_deadline = fill_start_time - datetime.timedelta(seconds=collection_seconds)
+            self.log.info('Creation deadline is: {0}'.format(creation_deadline))
+            collection_condition = TwitterUser.record_created_at > creation_deadline
+            self.log.info('Collection condition is: {0}'.format(collection_condition))
+        else:
+            # otherwise we don't want to issue a condition so make this always True
+            collection_condition = True
+            self.log.info('Collection condition is: {0}'.format(collection_condition))
+
+        # make the backfil condition
         neq_or_eq = neq if backfill else eq
         all_filled = False  # this flag gets set to True when we find no more users to fill
 
@@ -580,10 +595,11 @@ class TwitterController():
         while not all_filled:
             unarchived_users = self.db_session.query(TwitterUser). \
                 filter(and_(
-                        neq_or_eq(TwitterUser.CS_oldest_tweets_archived, CS_JobState.PROCESSED.value),
-                        or_(TwitterUser.lang.in_(["en", "en-gb"]), TwitterUser.lang is None),
-                        or_(TwitterUser.last_attempted_process < fill_start_time,
-                            TwitterUser.last_attempted_process is None))). \
+                        neq_or_eq(TwitterUser.CS_oldest_tweets_archived, CS_JobState.PROCESSED.value), # back or front
+                        or_(TwitterUser.lang.in_(["en", "en-gb"]), TwitterUser.lang is None), # correct language
+                        or_(TwitterUser.last_attempted_process < fill_start_time, # not attempted by any other thread
+                            TwitterUser.last_attempted_process is None), # or never been attempted yet
+                        collection_condition)). \
                 order_by(order_strat). \
                 with_for_update(). \
                 limit(batch_size). \
@@ -600,7 +616,7 @@ class TwitterController():
             # look for our loop ending condition which is that there are no more unarchived_users
             all_filled = True if len(unarchived_users) == 0 else False
 
-            # set the current items to in progress
+            # set the current items to in-progress
             utils.common.update_CS_JobState(unarchived_users, "CS_oldest_tweets_archived", CS_JobState.IN_PROGRESS,
                                             self.db_session,
                                             self.log)
