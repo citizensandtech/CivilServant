@@ -172,7 +172,7 @@ def main():
             result_ttl=ttl,
             timeout=timeout)
     elif args.function == "fetch_twitter_tweets":
-        repeats = onboarding_repeats if args.statuses_backfil else total_experiment_repeats
+        repeats = onboarding_repeats if args.statuses_backfill else total_experiment_repeats
         scheduler.schedule(
             scheduled_time=datetime.utcnow(),
             func=schedule_twitter_jobs.schedule_fetch_tweets,
