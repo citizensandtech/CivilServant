@@ -34,11 +34,11 @@ python schedule_twitter_jobs.py --function fetch_twitter_users --interval 10800 
 
 # Backfill Twitter tweets: Every 12 hours
 echo "Backfill Twitter tweets: Every 12 hours"
-python schedule_twitter_jobs.py --function fetch_twitter_tweets --statuses_backfill --interval 43200 --n_tasks 4 2> logfile
+python schedule_twitter_jobs.py --function fetch_twitter_tweets --statuses_backfill --interval 43200 --n_tasks $1 2> logfile
 
 # Fetch Twitter Tweets: Every twenty-four hours (once a day)
 echo "Fetch Twitter Tweets: Every twenty-four hours (once a day)"
-python schedule_twitter_jobs.py --function fetch_twitter_tweets --interval 86400 --n_tasks 4 2> logfile
+python schedule_twitter_jobs.py --function fetch_twitter_tweets --interval 86400 --n_tasks $1 2> logfile
 
 ## Fetch Twitter Account Snapshots & Tweet Counts: every 24 hours, get new snapshots for users who haven't had a snapshot in the last 23.3 hours
 echo "Fetch Twitter Account Snapshots & Tweet Counts: every 24 hours, get new snapshots for users who haven't had a snapshot in the last 23.3 hours"

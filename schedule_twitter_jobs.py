@@ -121,6 +121,7 @@ def main():
     except KeyError:  # this means that the config is unspecified
         experiment_onboarding_days = None
         experiment_collection_days = None
+        collection_seconds = None # we would pass this through too.
     # Experiment has two stages.
     #  1) Onboarding, while we are still adding new users
     #  2) Collection. Collect happens during onboarding too, but continues afterwards to collect data on onboarded users
@@ -172,7 +173,7 @@ def main():
             result_ttl=ttl,
             timeout=timeout)
     elif args.function == "fetch_twitter_tweets":
-        repeats = onboarding_repeats if args.statuses_backfil else total_experiment_repeats
+        repeats = onboarding_repeats if args.statuses_backfill else total_experiment_repeats
         scheduler.schedule(
             scheduled_time=datetime.utcnow(),
             func=schedule_twitter_jobs.schedule_fetch_tweets,
