@@ -116,12 +116,9 @@ def main():
     try:
         experiment_onboarding_days = config["experiment_onboarding_days"]
         experiment_collection_days = config["experiment_collection_days"]
-        log.info('Loaded experiment with experiment_onboarding_days: {}'.format(experiment_onboarding_days))
-        log.info('Loaded experiment with experiment_collection_days: {}'.format(experiment_collection_days))
     except KeyError:  # this means that the config is unspecified
         experiment_onboarding_days = None
         experiment_collection_days = None
-        collection_seconds = None # we would pass this through too.
     # Experiment has two stages.
     #  1) Onboarding, while we are still adding new users
     #  2) Collection. Collect happens during onboarding too, but continues afterwards to collect data on onboarded users
@@ -135,6 +132,8 @@ def main():
         # if you pass None to repeats it will continue indefinitely which is what we want for the undefined behaviour
         onboarding_repeats = None
         total_experiment_repeats = None
+    log.info('Loaded experiment with experiment_onboarding_days: {}, onboarding seconds: {}'.format(experiment_onboarding_days, onboarding_seconds))
+    log.info('Loaded experiment with experiment_collection_days: {}, collection seconds: {}'.format(experiment_collection_days, collection_seconds))
 
     if args.function == "fetch_lumen_notices":
         scheduler.schedule(

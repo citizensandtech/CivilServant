@@ -574,7 +574,8 @@ class TwitterController():
 
         # make the collection condition
         if collection_seconds:
-            # their collection end window should be after right now
+            # their creation start
+            self.log.debug('Collection seconds are {0}'.format(collection_seconds))
             creation_deadline = fill_start_time - datetime.timedelta(seconds=collection_seconds)
             self.log.info('Creation deadline is: {0}'.format(creation_deadline))
             collection_condition = TwitterUser.record_created_at > creation_deadline
