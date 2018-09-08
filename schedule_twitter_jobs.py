@@ -130,7 +130,9 @@ def main():
         total_experiment_repeats = math.ceil(total_experiment_seconds / int(args.interval))
     else:
         # if you pass None to repeats it will continue indefinitely which is what we want for the undefined behaviour
+        onboarding_seconds = None
         onboarding_repeats = None
+        collection_seconds = None
         total_experiment_repeats = None
     log.info('Loaded experiment with experiment_onboarding_days: {}, onboarding seconds: {}'.format(experiment_onboarding_days, onboarding_seconds))
     log.info('Loaded experiment with experiment_collection_days: {}, collection seconds: {}'.format(experiment_collection_days, collection_seconds))
