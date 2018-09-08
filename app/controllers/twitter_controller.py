@@ -580,9 +580,9 @@ class TwitterController():
             self.log.info('Collection condition is: {0}'.format(collection_condition))
         elif collection_seconds:
             # their creation start
-            self.log.debug('Collection seconds are {0}'.format(collection_seconds))
+            self.log.info('Collection seconds are {0}'.format(collection_seconds))
             creation_deadline = fill_start_time - datetime.timedelta(seconds=collection_seconds)
-            self.log.info('Creation deadline is: {0}'.format(creation_deadline))
+            self.log.info('Collection deadline is: {0}'.format(creation_deadline))
             collection_condition = TwitterUser.record_created_at > creation_deadline
             self.log.info('Collection condition is: {0}'.format(collection_condition))
 
