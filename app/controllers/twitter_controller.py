@@ -585,6 +585,8 @@ class TwitterController():
             self.log.info('Collection deadline is: {0}'.format(creation_deadline))
             collection_condition = TwitterUser.record_created_at > creation_deadline
             self.log.info('Collection condition is: {0}'.format(collection_condition))
+            collection_eligible = self.db_session.query(TwitterUser).filter(collection_condition).count()
+            self.log.info('Collection eligible twitters users number: {0}'.format(collection_eligible))
 
         # make the backfill condition
         neq_or_eq = neq if backfill else eq
