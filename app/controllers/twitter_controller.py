@@ -573,19 +573,20 @@ class TwitterController():
         order_strat = order_strat_map[order]
 
         # make the collection condition
-        if collection_seconds:
+        # only impose collection seconds if frontfill
+        if backfill or collection_seconds is None:
+            # otherwise we don't want to issue a condition so make this always True
+            collection_condition = True
+            self.log.info('Collection condition is: {0}'.format(collection_condition))
+        elif collection_seconds:
             # their creation start
             self.log.debug('Collection seconds are {0}'.format(collection_seconds))
             creation_deadline = fill_start_time - datetime.timedelta(seconds=collection_seconds)
             self.log.info('Creation deadline is: {0}'.format(creation_deadline))
             collection_condition = TwitterUser.record_created_at > creation_deadline
             self.log.info('Collection condition is: {0}'.format(collection_condition))
-        else:
-            # otherwise we don't want to issue a condition so make this always True
-            collection_condition = True
-            self.log.info('Collection condition is: {0}'.format(collection_condition))
 
-        # make the backfil condition
+        # make the backfill condition
         neq_or_eq = neq if backfill else eq
         all_filled = False  # this flag gets set to True when we find no more users to fill
 
@@ -594,7 +595,7 @@ class TwitterController():
         # know if every item was either processed successfully or failed
         batch_attempt_counter = 0
         while not all_filled:
-            unarchived_users = self.db_session.query(TwitterUser). \
+            fill_query = self.db_session.query(TwitterUser). \
                 filter(and_(
                         neq_or_eq(TwitterUser.CS_oldest_tweets_archived, CS_JobState.PROCESSED.value), # back or front
                         or_(TwitterUser.lang.in_(["en", "en-gb"]), TwitterUser.lang is None), # correct language
@@ -603,8 +604,10 @@ class TwitterController():
                         collection_condition)). \
                 order_by(order_strat). \
                 with_for_update(). \
-                limit(batch_size). \
-                all()
+                limit(batch_size)
+
+            # self.log.info('Fill query is: {}'.format(str(fill_query)))
+            unarchived_users = fill_query.all()
 
             # mark in the database that we're claiming these items
             last_attempted_process = datetime.datetime.utcnow()

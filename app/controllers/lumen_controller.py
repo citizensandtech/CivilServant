@@ -188,8 +188,9 @@ class LumenController():
                     if counter >= len(unparsed_notices) / 2:
                         raise Exception("Throwing an exception for test purposes")
 
-            except:
+            except Exception as e:
                 # something unhandled went wrong during processing
+                self.log.error('Lumen error while parsing is: {}'.format(e))
                 notice.CS_parsed_usernames = notice_old_job_state
                 self.db_session.add(notice)
                 self.db_session.commit()
@@ -199,8 +200,8 @@ class LumenController():
                 # add & commit LumenNotice job state
                 # finish processing
                 try:
-                    job_state = CS_JobState.PROCESSED if (job_state is not CS_JobState.NEEDS_RETRY) else CS_JobState.NEEDS_RETRY
-                    notice.CS_parsed_usernames = job_state.value
+                    job_state = CS_JobState.PROCESSED.value if (job_state is not CS_JobState.NEEDS_RETRY.value) else CS_JobState.NEEDS_RETRY.value
+                    notice.CS_parsed_usernames = job_state
                     self.db_session.add(notice)
                     self.db_session.commit()
                 except:
