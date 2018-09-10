@@ -116,26 +116,41 @@ def main():
     try:
         experiment_onboarding_days = config["experiment_onboarding_days"]
         experiment_collection_days = config["experiment_collection_days"]
-    except KeyError:  # this means that the config is unspecified
-        experiment_onboarding_days = None
-        experiment_collection_days = None
-    # Experiment has two stages.
-    #  1) Onboarding, while we are still adding new users
-    #  2) Collection. Collect happens during onboarding too, but continues afterwards to collect data on onboarded users
-    if experiment_onboarding_days is not None and experiment_collection_days is not None:
-        onboarding_seconds = SECONDS_IN_DAY * experiment_onboarding_days
-        collection_seconds = SECONDS_IN_DAY * experiment_collection_days
+        experiment_start_date = datetime.strptime(config["experiment_start_date"], '%Y-%m-%d')
+        today = datetime.utcnow()
+        log.info('Loaded experiment start date: {}. Today is :{}'.format(experiment_start_date, today))
+        time_til_experiment = experiment_start_date - today
+        log.info('Time until experiment is: {}'.format(time_til_experiment))
+        if time_til_experiment.days >= 1:
+            sleep_secs = time_til_experiment.seconds
+            log.info('Experiment start date more than 1 day in the future. Sleeping for {}'.format(sleep_secs))
+
+        # Experiment has two stages.
+        #  1) Onboarding, while we are still adding new users
+        #  2) Collection. Collect happens during onboarding too, but continues afterwards to collect data on onboarded users
+        days_already_done = -1 * time_til_experiment.days
+        # plus padding to always round up to nearest day
+        onboarding_days_left = experiment_onboarding_days - days_already_done + 1
+        collection_days_left = experiment_collection_days - days_already_done + 2 # seeing if a sneaky 2 will help with frontfill issues
+        if onboarding_days_left <= 0 or collection_days_left <= 0:
+            raise ValueError('Experiment ended in the past')
+        onboarding_seconds = SECONDS_IN_DAY * onboarding_days_left
+        collection_seconds = SECONDS_IN_DAY * collection_days_left
         total_experiment_seconds = onboarding_seconds + collection_seconds
         onboarding_repeats = math.ceil(onboarding_seconds / int(args.interval))
         total_experiment_repeats = math.ceil(total_experiment_seconds / int(args.interval))
-    else:
         # if you pass None to repeats it will continue indefinitely which is what we want for the undefined behaviour
-        onboarding_seconds = None
+        log.info('Loaded experiment with experiment_onboarding_days: {}, onboarding seconds: {}'.format(
+            experiment_onboarding_days, onboarding_seconds))
+        log.info('Loaded experiment with experiment_collection_days: {}, collection seconds: {}'.format(
+            experiment_collection_days, collection_seconds))
+
+
+    except KeyError:  # this means that part of the config is unspecified
         onboarding_repeats = None
-        collection_seconds = None
         total_experiment_repeats = None
-    log.info('Loaded experiment with experiment_onboarding_days: {}, onboarding seconds: {}'.format(experiment_onboarding_days, onboarding_seconds))
-    log.info('Loaded experiment with experiment_collection_days: {}, collection seconds: {}'.format(experiment_collection_days, collection_seconds))
+        collection_seconds = None
+
 
     if args.function == "fetch_lumen_notices":
         scheduler.schedule(
@@ -194,7 +209,7 @@ def schedule_fetch_tweets(args, ttl, timeout, queue_name, repeats, collection_se
     scheduler_concurrent = Scheduler(queue_name=queue_name+'_concurrent', connection=Redis())
     for task in range(args.n_tasks):
         scheduler_concurrent.schedule(
-            scheduled_time=datetime.utcnow(),
+            scheduled_time=fill_start_time(),
             func=app.controller.fetch_twitter_tweets,
             args=[args.statuses_backfill, fill_start_time, collection_seconds],
             interval=int(args.interval),

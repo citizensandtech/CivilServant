@@ -7,3 +7,11 @@ More information about our first set of experiments & replications can be found 
 If you are interested to do an experiment with Nathan, please contact him on Github or on reddit at [/u/natematias/](https://www.reddit.com/user/natematias).
 
 The CivilServant software is available under the MIT License, a permissive open source license.
+
+## Running the DMCA study.
+### Date and length configurations
++ in env.json put date, and lengths.
+### Using `dmca-cmd`
+To start, stop, or restart the study easily.
++ second argument is threads, so to downgrade the bot do `./dmca-cmd.sh restart 2 (or however)`
++ but I calculated that after 40 days of onboarding users you will need 75-thread hours per day to keep up with the several million API calls per day.
