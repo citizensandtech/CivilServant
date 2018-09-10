@@ -79,3 +79,5 @@ target/
 \.idea/
 
 \.pytest_cache/
+
+utils/logs/
