@@ -114,8 +114,8 @@ def main():
     with open(os.path.join(BASE_DIR, 'config', '{env}.json'.format(env=os.environ['CS_ENV']))) as f:
         config = json.load(f)
     try:
-        experiment_onboarding_days = config["experiment_onboarding_days"]
-        experiment_collection_days = config["experiment_collection_days"]
+        experiment_onboarding_days = int(config["experiment_onboarding_days"])
+        experiment_collection_days = int(config["experiment_collection_days"])
         experiment_start_date = datetime.strptime(config["experiment_start_date"], '%Y-%m-%d')
         today = datetime.utcnow()
         log.info('Loaded experiment start date: {}. Today is :{}'.format(experiment_start_date, today))
@@ -132,7 +132,7 @@ def main():
         # plus padding to always round up to nearest day
         onboarding_days_left = experiment_onboarding_days - days_already_done + 1
         collection_days_left = experiment_collection_days - days_already_done + 2 # seeing if a sneaky 2 will help with frontfill issues
-        if onboarding_days_left <= 0 or collection_days_left <= 0:
+        if (onboarding_days_left <= 0) or (collection_days_left <= 0):
             raise ValueError('Experiment ended in the past')
         onboarding_seconds = SECONDS_IN_DAY * onboarding_days_left
         collection_seconds = SECONDS_IN_DAY * collection_days_left
@@ -145,11 +145,13 @@ def main():
         log.info('Loaded experiment with experiment_collection_days: {}, collection seconds: {}'.format(
             experiment_collection_days, collection_seconds))
 
-
     except KeyError:  # this means that part of the config is unspecified
         onboarding_repeats = None
         total_experiment_repeats = None
         collection_seconds = None
+    except ValueError as e:
+        log.error(e)
+        sys.exit(1)
 
 
     if args.function == "fetch_lumen_notices":

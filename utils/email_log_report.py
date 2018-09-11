@@ -118,18 +118,25 @@ def make_report(yesterday):
     backfill_df = PID_df[(is_backfill) & (is_indiv_query)]
 
     backfill_df['account'] = backfill_df['message'].apply(lambda x: x.split(' ')[9].split('.')[0])
+    frontfill_df['account'] = frontfill_df['message'].apply(lambda x: x.split(' ')[9].split('.')[0])
 
     backfill_df['tweets_queried'] = backfill_df['message'].apply(lambda x: int(x.split(' ')[5]))
+    frontfill_df['tweets_queried'] = frontfill_df['message'].apply(lambda x: int(x.split(' ')[5]))
 
     account_backfill_tweets = backfill_df.groupby('account').agg(
         {'tweets_queried': sum, 'message': time_taken, 'level': len})
     account_backfill_tweets.rename(columns={'message': 'total_minutes', 'level': 'num_calls'}, inplace=True)
+    account_frontfill_tweets = frontfill_df.groupby('account').agg(
+        {'tweets_queried': sum, 'message': time_taken, 'level': len})
+    account_frontfill_tweets.rename(columns={'message': 'total_minutes', 'level': 'num_calls'}, inplace=True)
 
     account_backfill_tweets_sum = account_backfill_tweets.sum()
-
     account_backfill_tweets_sum.name = 'sum'
+    account_frontfill_tweets_sum = account_frontfill_tweets.sum()
+    account_frontfill_tweets_sum.name = 'sum'
 
     account_backfill_tweets_html = account_backfill_tweets.describe().append(account_backfill_tweets_sum).to_html()
+    account_frontfill_tweets_html = account_frontfill_tweets.describe().append(account_frontfill_tweets_sum).to_html()
 
     backfill_stats = backfill_df.groupby(by='pid').agg({'message': time_taken}).rename(
         mapper={'message': 'total_minutes_taken'}, axis=1)
@@ -152,8 +159,9 @@ def make_report(yesterday):
         ("Log level value counts", log_level_value_counts_html),
         ("Controller profiles per PID", pid_timing_html),
         ("Account backfill info: count is number of accounts, sum is number of calls", account_backfill_tweets_html),
-        ("Backfill stats", backfill_stats_html),
-        ("Frontfill stats", frontfill_stats_html),
+        ("Account frontfill info: count is number of accounts, sum is number of calls", account_frontfill_tweets_html),
+        ("Backfill timing stats (includes unfinished runs)", backfill_stats_html),
+        ("Frontfill timing stats (includes unfinished runs)", frontfill_stats_html),
     )
     for table_title, html_table in html_tables:
         title = make_title(table_title, 3)
