@@ -261,7 +261,7 @@ class TwitterStatus(Base):
     __tablename__ = 'twitter_statuses'
     id                  = Column(BigInteger, primary_key = True)
     user_id             = Column(BigInteger, index = True)
-    created_at          = Column(DateTime)
+    created_at          = Column(DateTime, index = True)
     record_created_at   = Column(DateTime, default=datetime.datetime.utcnow, index=True) # need this index for fast counting
     status_data         = Column(MEDIUMTEXT)
 
