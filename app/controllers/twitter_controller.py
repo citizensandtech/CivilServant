@@ -587,6 +587,9 @@ class TwitterController():
             self.log.info('Collection condition is: {0}'.format(collection_condition))
             collection_eligible = self.db_session.query(TwitterUser).filter(collection_condition).count()
             self.log.info('Collection eligible twitters users number: {0}'.format(collection_eligible))
+            # TODO: remove this colection condition overwrite.
+            self.log.info('Reminder, hacking collection condition to ensure it runs during Max holiday.'.format(collection_eligible))
+            collection_condition = True
 
         # make the backfill condition
         neq_or_eq = neq if backfill else eq
@@ -605,7 +608,7 @@ class TwitterController():
                             TwitterUser.last_attempted_process is None), # or never been attempted yet
                         collection_condition)). \
                 order_by(order_strat). \
-                with_for_update(). \
+                with_for_update(skip_locked=True). \
                 limit(batch_size)
 
             # self.log.info('Fill query is: {}'.format(str(fill_query)))

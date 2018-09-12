@@ -211,7 +211,7 @@ def schedule_fetch_tweets(args, ttl, timeout, queue_name, repeats, collection_se
     scheduler_concurrent = Scheduler(queue_name=queue_name+'_concurrent', connection=Redis())
     for task in range(args.n_tasks):
         scheduler_concurrent.schedule(
-            scheduled_time=fill_start_time(),
+            scheduled_time=fill_start_time,
             func=app.controller.fetch_twitter_tweets,
             args=[args.statuses_backfill, fill_start_time, collection_seconds],
             interval=int(args.interval),

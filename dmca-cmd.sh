@@ -29,7 +29,7 @@ echo "Parse lumen notices for twitter accounts: every 3 hours"
 python schedule_twitter_jobs.py --function parse_lumen_notices_for_twitter_accounts --interval 10800 2> logfile
 
 ## Fetch Twitter Users: every 3 hours
-## Fetch Twitter Users: every 3 hours
+echo Fetch Twitter Users: every 3 hours
 python schedule_twitter_jobs.py --function fetch_twitter_users --interval 10800 2> logfile
 
 # Backfill Twitter tweets: Every 12 hours
