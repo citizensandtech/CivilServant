@@ -565,7 +565,7 @@ class TwitterController():
     ################### ARCHIVE TWEET CODE
     #########################################################
 
-    def query_and_archive_tweets(self, backfill=False, fill_start_time=None, collection_seconds=None, batch_size=100,
+    def query_and_archive_tweets(self, backfill=False, fill_start_time=None, collection_seconds=None, batch_size=10,
                                  order="ASC", test_exception=False, is_test=False):
         # make the order condition
         order_strat_map = {'ASC': TwitterUser.record_created_at.asc(),

@@ -68,6 +68,7 @@ def make_report(yesterday):
         first_and_last_html = logdf.iloc[[0, -1]].to_html()
     except IndexError:
         print('seemingly no logs')
+        return '<html>No valid log entrys found in dates later than: {0}</html>'.format(yesterday)
 
     # Timing
     def RepresentsInt(s):
@@ -135,8 +136,11 @@ def make_report(yesterday):
     account_frontfill_tweets_sum = account_frontfill_tweets.sum()
     account_frontfill_tweets_sum.name = 'sum'
 
-    account_backfill_tweets_html = account_backfill_tweets.describe().append(account_backfill_tweets_sum).to_html()
-    account_frontfill_tweets_html = account_frontfill_tweets.describe().append(account_frontfill_tweets_sum).to_html()
+    account_backfill_tweets_html = account_backfill_tweets.describe().to_html()
+    account_frontfill_tweets_html = account_frontfill_tweets.describe().to_html()
+
+    account_backfill_tweets_sum_html = account_backfill_tweets_sum.to_html()
+    account_frontfill_tweets_sum_html = account_frontfill_tweets_sum.to_html()
 
     backfill_stats = backfill_df.groupby(by='pid').agg({'message': time_taken}).rename(
         mapper={'message': 'total_minutes_taken'}, axis=1)
@@ -158,8 +162,10 @@ def make_report(yesterday):
         ("Unlogged errors", yesterday_errors_html),
         ("Log level value counts", log_level_value_counts_html),
         ("Controller profiles per PID", pid_timing_html),
-        ("Account backfill info: count is number of accounts, sum is number of calls", account_backfill_tweets_html),
-        ("Account frontfill info: count is number of accounts, sum is number of calls", account_frontfill_tweets_html),
+        ("Account backfill info: account-level statistics", account_backfill_tweets_html),
+        ("Account frontfill info: account-level statistics", account_frontfill_tweets_html),
+        ("Backfill level statistics, sum of all accounts", account_backfill_tweets_sum_html),
+        ("Frontfill level statistics, sum of all accounts", account_frontfill_tweets_sum_html),
         ("Backfill timing stats (includes unfinished runs)", backfill_stats_html),
         ("Frontfill timing stats (includes unfinished runs)", frontfill_stats_html),
     )
