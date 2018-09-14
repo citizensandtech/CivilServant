@@ -421,7 +421,7 @@ class TwitterConnect():
                 self.log.info('Rate limit encountered on endpoint:{0}'.format(endpoint))
                 self.mark_reset_time_and_checkin(endpoint)
                 # recurse!
-                self.log.info('Recursing for method:', method)
+                self.log.info('Recursing for method: {0}'.format(method))
                 return self.constant_wait_sleep_and_recurse(err_msg, method, *args, **kwargs)
             # if it's over capacity we know how to deal with that
             elif err_msg == 'Over capacity':
