@@ -422,7 +422,7 @@ class TwitterConnect():
                 self.mark_reset_time_and_checkin(endpoint)
                 # recurse!
                 self.log.info('Recursing for method:', method)
-                return self.query(method, *args, **kwargs)
+                return self.constant_wait_sleep_and_recurse(err_msg, method, *args, **kwargs)
             # if it's over capacity we know how to deal with that
             elif err_msg == 'Over capacity':
                 return self.constant_wait_sleep_and_recurse(err_msg, method, *args, **kwargs)

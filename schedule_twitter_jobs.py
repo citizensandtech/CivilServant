@@ -207,7 +207,7 @@ def main():
 
 
 def schedule_fetch_tweets(args, ttl, timeout, queue_name, repeats, collection_seconds):
-    fill_start_time = datetime.utcnow()
+    fill_start_time = None # this isn't good for frontfill. I'm going to let processes be in charge of creating their own
     scheduler_concurrent = Scheduler(queue_name=queue_name+'_concurrent', connection=Redis())
     for task in range(args.n_tasks):
         scheduler_concurrent.schedule(

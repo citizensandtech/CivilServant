@@ -10,8 +10,27 @@ The CivilServant software is available under the MIT License, a permissive open 
 
 ## Running the DMCA study.
 ### Date and length configurations
-+ in env.json put date, and lengths.
++ in {env}.json there are 3 variables to configure about the experiment, if any of them are missing then the behaviour is to run indenfinitely.
+```
+    "experiment_onboarding_days": 10, # number of days collecting and backfilling new users
+    "experiment_collection_days": 10, # number of days to follow a user after onboarding
+    "experiment_start_date": "2018-09-10" # date that the experiment starts
+```
 ### Using `dmca-cmd`
-To start, stop, or restart the study easily.
-+ second argument is threads, so to downgrade the bot do `./dmca-cmd.sh restart 2 (or however)`
-+ but I calculated that after 40 days of onboarding users you will need 75-thread hours per day to keep up with the several million API calls per day.
+1.  `./dmca-cmd.sh` takes a first argument as one of `start`, `stop`, or `restart`.
+2.  The second argument is number of threads (defaults to 4). For example start with `./dmca-cmd.sh start 8`
+3. If the experiment_start_date is set, the experiment becomes "restartable", so during running you could do `./dmca-cmd.sh restart 10` to add threads.
+4. Note, I calculated that after 40 days of onboarding users you will need 75-thread hours per day to keep up with ~2+ million API calls per day.
+
+### Config files needed.
++ `{env}.json` experiment variables
++ `environment_variables.sh` needed for "airbrake" and host check
++ `twitter_auth_{env}.json` the twitter-app oauth
++ `twitter_configuration_{env}.json` points to where twitter donated keys are kept
++ `lumen_auth_{env}.json` connect to lumn database
++ `email_db_report.json` who's gonna get report emails
+
+### Crontab
+The crontab is used to send reports. At the moment it is scheduled as.
+`0 0 * * * /home/dmca/dmca/CivilServant/utils/email-reports.sh`
+`
