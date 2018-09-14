@@ -15,7 +15,7 @@ if [ -z $2 ]
     echo "trying to source environment variables from"$basedir
     else
     basedir=$2
-    rsync -up dmca-civictechai:/home/dmca/CivilServant-mmou-twitter/logs/CivilServant_production.log logs/
+    # rsync -up dmca-civictechai:/home/dmca/CivilServant-mmou-twitter/logs/CivilServant_production.log logs/
 fi
 
 if [ -z $3 ]
