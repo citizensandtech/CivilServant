@@ -22,29 +22,29 @@ logfile="logs/CivilServant_"$CS_ENV".log"
 echo "logfile is "$logfile
 
 echo "Fetch lumen notices every 3 hours"
-python schedule_twitter_jobs.py --function fetch_lumen_notices --lumen_delta_days 2 --interval 10800 2> logfile
+python schedule_twitter_jobs.py --function fetch_lumen_notices --lumen_delta_days 2 --interval 10800 2> $logfile
 
 ## Parse lumen notices for twitter accounts: every 3 hours
 echo "Parse lumen notices for twitter accounts: every 3 hours"
-python schedule_twitter_jobs.py --function parse_lumen_notices_for_twitter_accounts --interval 10800 2> logfile
+python schedule_twitter_jobs.py --function parse_lumen_notices_for_twitter_accounts --interval 10800 2> $logfile
 
 ## Fetch Twitter Users: every 3 hours
 echo Fetch Twitter Users: every 3 hours
-python schedule_twitter_jobs.py --function fetch_twitter_users --interval 10800 2> logfile
+python schedule_twitter_jobs.py --function fetch_twitter_users --interval 10800 2> $logfile
 
 # Backfill Twitter tweets: Every 12 hours
 echo "Backfill Twitter tweets: Every 12 hours"
-python schedule_twitter_jobs.py --function fetch_twitter_tweets --statuses_backfill --interval 43200 --n_tasks $1 2> logfile
+python schedule_twitter_jobs.py --function fetch_twitter_tweets --statuses_backfill --interval 43200 --n_tasks $1 2> $logfile
 
 # Fetch Twitter Tweets: Every twenty-four hours (once a day)
 echo "Fetch Twitter Tweets: Every twenty-four hours (once a day)"
-python schedule_twitter_jobs.py --function fetch_twitter_tweets --interval 86400 --n_tasks $1 2> logfile
+python schedule_twitter_jobs.py --function fetch_twitter_tweets --interval 86400 --n_tasks $1 2> $logfile
 
 ## Fetch Twitter Account Snapshots & Tweet Counts: every 24 hours, get new snapshots for users who haven't had a snapshot in the last 23.3 hours
 echo "Fetch Twitter Account Snapshots & Tweet Counts: every 24 hours, get new snapshots for users who haven't had a snapshot in the last 23.3 hours"
-python schedule_twitter_jobs.py --function fetch_twitter_snapshot_and_tweets --snapshot_delta_min 1400 --interval 86400 2> logfile
+python schedule_twitter_jobs.py --function fetch_twitter_snapshot_and_tweets --snapshot_delta_min 1400 --interval 86400 2> $logfile
 
-python manage_scheduled_jobs.py show all 2> logfile
+python manage_scheduled_jobs.py show all 2> $logfile
 
 }
 

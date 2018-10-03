@@ -139,8 +139,8 @@ def make_report(yesterday):
     account_backfill_tweets_html = account_backfill_tweets.describe().to_html()
     account_frontfill_tweets_html = account_frontfill_tweets.describe().to_html()
 
-    account_backfill_tweets_sum_html = account_backfill_tweets_sum.to_html()
-    account_frontfill_tweets_sum_html = account_frontfill_tweets_sum.to_html()
+    account_backfill_tweets_sum_html = pd.DataFrame(account_backfill_tweets_sum).to_html()
+    account_frontfill_tweets_sum_html = pd.DataFrame(account_frontfill_tweets_sum).to_html()
 
     backfill_stats = backfill_df.groupby(by='pid').agg({'message': time_taken}).rename(
         mapper={'message': 'total_minutes_taken'}, axis=1)
