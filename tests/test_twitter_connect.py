@@ -80,7 +80,7 @@ def test_twitter_connect_friends(mock_twitter):
 def test_exception_retry(mock_rate_limit, mock_twitter):
     # TODO: In the unlikelihood that a VERY slow machine is running these tests
     # you can increase the timedelta here and below to microseconds=500
-    reset_time = (datetime.datetime.utcnow() + datetime.timedelta(seconds=3))
+    reset_time = (datetime.datetime.utcnow() + datetime.timedelta(seconds=15))
     mock_rate_limit.resources = {"getfriends": {"/friends/list": {
         "reset": time.mktime(reset_time.timetuple()),
         "remaining": 0,
@@ -122,6 +122,7 @@ def test_exception_retry(mock_rate_limit, mock_twitter):
     # assert right results still came throught
     assert len(friends) == len(friend_accounts)
     # assert that we did roll-over onto the second token
+
     assert conn.endpoint_tokens[conn.curr_endpoint].user_id == 2
     # OK, so at this point in the code we assume that the second token is active
 

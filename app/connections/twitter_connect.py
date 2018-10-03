@@ -207,12 +207,14 @@ class TwitterConnect():
             verification = self.api.VerifyCredentials()
             self.api.InitializeRateLimit()  # dangerous for us.
         except twitter.TwitterError as twiterr:
-            # check to see if we can get an error message out
             self.log.info('Error Initializing Rate Limit')
-            err_msg = twiterr.message[0]['message']
-            err_code = twiterr.message[0]['code']
-            if err_code in (89, 326):  # or 'message': 'Invalid or expired token.':
-                self.invalidate_token(endpoint)
+            if isinstance(twiterr.message, list):
+                err_msg = twiterr.message[0]['message']
+                err_code = twiterr.message[0]['code']
+                if err_code in (89, 326):  # or 'message': 'Invalid or expired token.':
+                    self.invalidate_token(endpoint)
+            elif isinstance(twiterr.message, set):
+                self.log.info('Set error returned, malformed data?: {}'.format(twiterr.message))
             return False if ENV != 'test' else True
         self.curr_endpoint = endpoint
         return True
@@ -361,17 +363,17 @@ class TwitterConnect():
         del self.endpoint_tokens[endpoint]
         self.curr_endpoint = None
 
-        #potentially close
+        # potentially close
         self.db_session.close()
 
     def mark_reset_time(self, endpoint):
         reset_time = self.get_reset_time_of_endpoint(endpoint)
         ratestate = self.get_ratestate_of_endpoint(endpoint)
-        self.log.debug(
-            'Marking exhausted user_id:{0}, endpoint:{1}, reset_time{2}.'.format(ratestate.user_id, endpoint,
-                                                                                 reset_time))
-        # put in the reset time
         ratestate.reset_time = datetime.datetime.fromtimestamp(reset_time)
+        self.log.debug(
+            'Marking exhausted user_id:{0}, endpoint:{1}, reset_time:{2}.'.format(ratestate.user_id, endpoint,
+                                                                                 ratestate.reset_time))
+        # put in the reset time
         self.db_session.add(ratestate)
         self.db_session.commit()
 

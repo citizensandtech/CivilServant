@@ -50,7 +50,8 @@ python manage_scheduled_jobs.py show all 2> logfile
 
 stop_all(){
 python manage_scheduled_jobs.py purge all
-rq empty -a
+rq empty $CS_ENV
+rq empty $CS_ENV"_concurrent"
 killall rqworker
 killall rqscheduler
 }
