@@ -593,6 +593,7 @@ class TwitterController():
 
         # make the backfill condition
         neq_or_eq = neq if backfill else eq
+        target_JobState = CS_JobState.NOT_PROCESSED if backfill else CS_JobState.PROCESSED
         all_filled = False  # this flag gets set to True when we find no more users to fill
 
         # in a loop, until all_filled, get a batch and process the last_attempt_process state along with
@@ -602,7 +603,7 @@ class TwitterController():
         while not all_filled:
             fill_query = self.db_session.query(TwitterUser). \
                 filter(and_(
-                        neq_or_eq(TwitterUser.CS_oldest_tweets_archived, CS_JobState.PROCESSED.value), # back or front
+                        eq(TwitterUser.CS_oldest_tweets_archived, target_JobState.value), # back or front
                         or_(TwitterUser.lang.in_(["en", "en-gb"]), TwitterUser.lang is None), # correct language
                         or_(TwitterUser.last_attempted_process < fill_start_time, # not attempted by any other thread
                             TwitterUser.last_attempted_process is None), # or never been attempted yet

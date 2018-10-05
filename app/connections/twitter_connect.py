@@ -261,7 +261,7 @@ class TwitterConnect():
                     .filter(TwitterRateState.reset_time < query_time) \
                     .filter(TwitterRateState.is_valid == True) \
                     .order_by(order_by) \
-                    .with_for_update().first()
+                    .with_for_update(nowait=True, skip_locked=True).first()
                 self.log.info('''Trying to get token matching \
                                   endpoint: {0} \
                                   query_time: {1}'''.format(endpoint, query_time))
@@ -290,7 +290,7 @@ class TwitterConnect():
                         # add a bit of noise for loop until
                         time_until_next_try = next_checkout.checkin_due - query_time + timedelta(seconds=random())
                         self.log.info(
-                            'PID {1}: Oh dear all the endpoints are checked out for at least seconds: {0}'.format(
+                            'PID {1} Oh dear all the endpoints are checked out for at least seconds: {0}'.format(
                                 time_until_next_try, str(os.getpid())))
                         sleep(time_until_next_try.total_seconds())
                         continue
@@ -317,7 +317,7 @@ class TwitterConnect():
                     return self.select_available_token(endpoint, strategy=strategy)
                 return True
             except Exception as e:
-                self.log.error('Error in getting from DB for tokens was: {0}, of type: {1}'.format(e, type(e)))
+                self.log.error('PID {3} Error in getting from DB for tokens was: {0}, of type: {1}. Selection attempt is: {2}'.format(e, type(e), selection_attempt_counter, str(os.getpid())))
                 self.db_session.rollback()
                 sleep(10)
                 if selection_attempt_counter > 10:
