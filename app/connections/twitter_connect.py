@@ -226,8 +226,8 @@ class TwitterConnect():
         endpoint_ratestate_to_invalidate.is_valid = False
         self.db_session.commit()
         # so far we've invalidated just one endpoint, now have to get them all
-        token_ratestates_to_invalidate = self.db_session.query(TwitterRateState).\
-            filter(TwitterRateState.user_id == token_user_id).\
+        token_ratestates_to_invalidate = self.db_session.query(TwitterRateState). \
+            filter(TwitterRateState.user_id == token_user_id). \
             with_for_update().all()
         for ratestate in token_ratestates_to_invalidate:
             ratestate.is_valid = False
@@ -246,6 +246,7 @@ class TwitterConnect():
                           'sequential': TwitterRateState.user_id,
                           # another strategy might be fetch the most remaining in the future
                           }
+        strategy = 'random' if ENV == 'production' else strategy
         order_by = strategy_order[strategy]
         self.log.info('order strategy is {0}: giving: {1}'.format(strategy, order_by))
         while not succeeded:
@@ -310,14 +311,16 @@ class TwitterConnect():
                 self.log.debug('waiting for {0}'.format(wait_before_return))
                 if wait_before_return < 0:
                     self.log.info('WHY would wait be like this?: {0}'.format(wait_before_return))
-                    wait_before_return = -1*wait_before_return
+                    wait_before_return = -1 * wait_before_return
                 sleep(wait_before_return)
                 successful_application = self.apply_token(endpoint)
                 if not successful_application:
                     return self.select_available_token(endpoint, strategy=strategy)
                 return True
             except Exception as e:
-                self.log.error('PID {3} Error in getting from DB for tokens was: {0}, of type: {1}. Selection attempt is: {2}'.format(e, type(e), selection_attempt_counter, str(os.getpid())))
+                self.log.error(
+                    'PID {3} Error in getting from DB for tokens was: {0}, of type: {1}. Selection attempt is: {2}'.format(
+                        e, type(e), selection_attempt_counter, str(os.getpid())))
                 self.db_session.rollback()
                 sleep(10)
                 if selection_attempt_counter > 10:
@@ -344,7 +347,7 @@ class TwitterConnect():
 
     def checkin_endpoint(self, endpoint=None):
         if endpoint is None:
-        # this is a way to signal to checkin the curr_endpoint without knowing its name
+            # this is a way to signal to checkin the curr_endpoint without knowing its name
             if self.curr_endpoint is None:
                 # however it may not have ever got checked-out so there'd be nothing to do
                 self.log.debug('Endpoint checkin was called but no endpoint is active')
@@ -372,7 +375,7 @@ class TwitterConnect():
         ratestate.reset_time = datetime.datetime.fromtimestamp(reset_time)
         self.log.debug(
             'Marking exhausted user_id:{0}, endpoint:{1}, reset_time:{2}.'.format(ratestate.user_id, endpoint,
-                                                                                 ratestate.reset_time))
+                                                                                  ratestate.reset_time))
         # put in the reset time
         self.db_session.add(ratestate)
         self.db_session.commit()
@@ -384,7 +387,8 @@ class TwitterConnect():
     def constant_wait_sleep_and_recurse(self, err_msg, method, *args, **kwargs):
         constant_sleep_secs = 10  # ten seconds because i don't want to recurse too often and this error is rare.
         self.log.info(
-            '{2} encountered on endpoint:{0}. Sleeping for {1} seconds'.format(self.curr_endpoint, constant_sleep_secs, err_msg))
+            '{2} encountered on endpoint:{0}. Sleeping for {1} seconds'.format(self.curr_endpoint, constant_sleep_secs,
+                                                                               err_msg))
         time.sleep(constant_sleep_secs)
         self.log.info('Recursing for method:', method)
         return self.query(method, *args, **kwargs)
@@ -410,10 +414,12 @@ class TwitterConnect():
                 err_msg = twiterr.message[0]['message']
             elif isinstance(twiterr.message, set):
                 if 'Unknown error: ' in twiterr.message:
-                    return self.constant_wait_sleep_and_recurse('Unknown set, probably malformed, error', method, *args, **kwargs)
+                    return self.constant_wait_sleep_and_recurse('Unknown set, probably malformed, error', method, *args,
+                                                                **kwargs)
             elif isinstance(twiterr.message, dict):
                 if 'Unknown error: ' in twiterr.message.keys():
-                    return self.constant_wait_sleep_and_recurse('Unknown dict, probably malformed, error', method, *args, **kwargs)
+                    return self.constant_wait_sleep_and_recurse('Unknown dict, probably malformed, error', method,
+                                                                *args, **kwargs)
             else:
                 self.log.info('Twitter Query encountered a twitter of an unknown type')
                 raise
@@ -438,4 +444,3 @@ class TwitterConnect():
                 raise twiterr
                 # self.log.error(
                 #     'Twitter Query encountered twitter error with no handler yet: {0}'.format(twiterr))
-
