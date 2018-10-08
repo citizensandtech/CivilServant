@@ -263,12 +263,12 @@ class TwitterController():
                             except:
                                 self.log.error(
                                     "Error while saving DB Session for TwitterUser, TwitterUserSnapshot object",
-                                    extra=sys.exc_info()[0])
+                                    extra=sys.exc_info())
                                 commit_users_failed(screen_name)
                         except:
                             self.log.error(
                                 "Error while creating TwitterUser, TwitterUserSnapshot objects for user {0}".format(
-                                    user_json["id"]), extra=sys.exc_info()[0])
+                                    user_json["id"]), extra=sys.exc_info())
                             commit_users_failed(screen_name)
 
         # at end, for left_users (users not found), commit to db
@@ -328,12 +328,12 @@ class TwitterController():
                     self.db_session.commit()
                 except:
                     self.log.error("Error while saving DB Session for TwitterUser, TwitterUserSnapshot object",
-                                   extra=sys.exc_info()[0])
+                                   extra=sys.exc_info())
                     commit_users_failed([name])
             except:
                 self.log.error(
                     "Error while updating TwitterUser, creating TwitterUserSnapshot object for user {0}".format(
-                        user_json["id"]), extra=sys.exc_info()[0])
+                        user_json["id"]), extra=sys.exc_info())
                 commit_users_failed([name])
 
     def is_user_suspended_or_deleted(self, username):
@@ -507,7 +507,7 @@ class TwitterController():
                     except:
                         self.log.error(
                             "Error while updating TwitterUser, creating TwitterUserSnapshot object for user {0}".format(
-                                user_json["id"]), extra=sys.exc_info()[0])
+                                user_json["id"]), extra=sys.exc_info())
                     else:
                         if has_ids:
                             left_users.discard(uid)  # discard doesn't throw an error
@@ -520,7 +520,7 @@ class TwitterController():
                     except:
                         self.log.error(
                             "Error while saving DB Session for TwitterUser, TwitterUserSnapshot object for {0} users".format(
-                                len(users_info)), extra=sys.exc_info()[0])
+                                len(users_info)), extra=sys.exc_info())
                     else:
                         self.log.info("Saved {0} found twitter users' info.".format(len(users_info)))
 
@@ -551,13 +551,13 @@ class TwitterController():
             except:
                 self.log.error(
                     "Error while updating TwitterUser, creating TwitterUserSnapshot object for user {0}".format(
-                        user_json["id"]), extra=sys.exc_info()[0])
+                        user_json["id"]), extra=sys.exc_info())
         if len(left_users) > 0:
             try:
                 self.db_session.commit()
             except:
                 self.log.error("Error while saving DB Session for {0} not_found twitter users' info.".format(
-                    len(left_users)), extra=sys.exc_info()[0])
+                    len(left_users)), extra=sys.exc_info())
             else:
                 self.log.info("Saved {0} not_found twitter users' info.".format(len(left_users)))
 
@@ -587,9 +587,9 @@ class TwitterController():
             self.log.info('Collection condition is: {0}'.format(collection_condition))
             collection_eligible = self.db_session.query(TwitterUser).filter(collection_condition).count()
             self.log.info('Collection eligible twitters users number: {0}'.format(collection_eligible))
-            # TODO: remove this colection condition overwrite.
-            self.log.info('Reminder, hacking collection condition to ensure it runs during Max holiday.'.format(collection_eligible))
-            collection_condition = True
+            # # TODO: remove this colection condition overwrite.
+            # self.log.info('Reminder, hacking collection condition to ensure it runs during Max holiday.'.format(collection_eligible))
+            # collection_condition = True
 
         # make the backfill condition
         neq_or_eq = neq if backfill else eq
@@ -818,7 +818,7 @@ class TwitterController():
                         new_seen_statuses.add(status_id)
                     except:
                         self.log.error("Error while creating TwitterStatus object for user {0}, status id {1}".format(
-                            status_json["user"]["id"]["screen_name"], status_id), extra=sys.exc_info()[0])
+                            status_json["user"]["id"]["screen_name"], status_id), extra=sys.exc_info())
                         return job_state
             try:
                 with warnings.catch_warnings():
@@ -827,7 +827,7 @@ class TwitterController():
                     self.db_session.commit()
             except:
                 self.log.error("Error while saving DB Session for {0} statuses for user {1}.".format(
-                    len(new_seen_statuses) - prev_new_seen_statuses_length, user_id), extra=sys.exc_info()[0])
+                    len(new_seen_statuses) - prev_new_seen_statuses_length, user_id), extra=sys.exc_info())
                 return job_state
             else:
                 self.log.info("PID {2} Saved {0} statuses for user {1}.".format(

@@ -5,6 +5,7 @@ import pandas as pd
 
 pd.set_option('display.max_colwidth', -1)
 pd.set_option('mode.chained_assignment', None)
+pd.set_option('display.float_format', lambda x: '%.4f' % x)
 
 from email_db_report import send_report, date_to_str
 
@@ -15,7 +16,13 @@ def make_report(yesterday):
     BASE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..")
     log_dir = os.path.join(BASE_DIR, 'logs')
     logs = os.listdir(log_dir)
-    logs_to_parse = ['CivilServant_{ENV}.log'.format(ENV=ENV)]
+    def is_prod_log(log):
+        try:
+            return log.split('_')[1].split('.')[0] == 'production'
+        except IndexError:
+            return False
+    logs_to_parse = [log for log in logs if is_prod_log(log)]
+    # logs_to_parse = ['CivilServant_{ENV}.log'.format(ENV=ENV)]
 
     log_tups = []
     errors = []
