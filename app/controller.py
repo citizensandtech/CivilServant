@@ -206,13 +206,13 @@ def fetch_twitter_snapshot_and_tweets(max_time_delta_min=60):
     log.info("Finished fetch_twitter_snapshot_and_tweets, max_time_delta_min={0} PID={1}".format(max_time_delta_min, str(os.getpid())))
 
 
-def fetch_twitter_tweets(backfill=False, fill_start_time=datetime.datetime.utcnow(), collection_seconds=None):
+def fetch_twitter_tweets(backfill=False, collection_seconds=None, user_rand_frac=None, fill_start_time=datetime.datetime.utcnow()):
     """
     For all TwitterUsers with CS_most_tweets_queried=False, fetch tweets
     """
     log.info("Calling fetch_twitter_tweets, backfill={0}. PID={1}".format(backfill, str(os.getpid())))
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
-    t.query_and_archive_tweets(backfill=backfill, fill_start_time=fill_start_time, collection_seconds=collection_seconds)
+    t.query_and_archive_tweets(backfill=backfill, fill_start_time=fill_start_time, collection_seconds=collection_seconds, user_rand_frac=user_rand_frac)
     twitter_conn.checkin_endpoint()
     log.info("Finished fetch_twitter_tweets, backfill={0}. PID={1}".format(backfill, str(os.getpid())))
 

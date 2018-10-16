@@ -565,8 +565,9 @@ class TwitterController():
     ################### ARCHIVE TWEET CODE
     #########################################################
 
-    def query_and_archive_tweets(self, backfill=False, fill_start_time=None, collection_seconds=None, batch_size=10,
-                                 order="ASC", test_exception=False, is_test=False):
+    def query_and_archive_tweets(self, backfill=False, fill_start_time=None, collection_seconds=None,
+                                 user_rand_frac=None,
+                                 batch_size=10, order="ASC", test_exception=False, is_test=False):
         # make the order condition
         order_strat_map = {'ASC': TwitterUser.record_created_at.asc(),
                            'DESC': TwitterUser.record_created_at.desc()}
@@ -585,15 +586,21 @@ class TwitterController():
             self.log.info('Collection deadline is: {0}'.format(creation_deadline))
             collection_condition = TwitterUser.record_created_at > creation_deadline
             self.log.info('Collection condition is: {0}'.format(collection_condition))
-            collection_eligible = self.db_session.query(TwitterUser).filter(collection_condition).count()
-            self.log.info('Collection eligible twitters users number: {0}'.format(collection_eligible))
+            # collection_eligible = self.db_session.query(TwitterUser).filter(collection_condition).count()
+            # self.log.info('Collection eligible twitters users number: {0}'.format(collection_eligible))
             # # TODO: remove this colection condition overwrite.
             # self.log.info('Reminder, hacking collection condition to ensure it runs during Max holiday.'.format(collection_eligible))
             # collection_condition = True
 
         # make the backfill condition
         neq_or_eq = neq if backfill else eq
+
         target_JobState = CS_JobState.NOT_PROCESSED if backfill else CS_JobState.PROCESSED
+
+        user_rand_frac = user_rand_frac if user_rand_frac else 1.0
+        self.log.info('user_rand_frac is: {0}'.format(user_rand_frac))
+        user_rand_condition = TwitterUser.user_rand <= user_rand_frac
+
         all_filled = False  # this flag gets set to True when we find no more users to fill
 
         # in a loop, until all_filled, get a batch and process the last_attempt_process state along with
@@ -607,7 +614,8 @@ class TwitterController():
                         or_(TwitterUser.lang.in_(["en", "en-gb"]), TwitterUser.lang is None), # correct language
                         or_(TwitterUser.last_attempted_process < fill_start_time, # not attempted by any other thread
                             TwitterUser.last_attempted_process is None), # or never been attempted yet
-                        collection_condition)). \
+                        collection_condition,
+                        user_rand_condition)). \
                 order_by(order_strat). \
                 with_for_update(skip_locked=True). \
                 limit(batch_size)

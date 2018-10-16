@@ -117,6 +117,7 @@ def main():
         experiment_onboarding_days = int(config["experiment_onboarding_days"])
         experiment_collection_days = int(config["experiment_collection_days"])
         experiment_start_date = datetime.strptime(config["experiment_start_date"], '%Y-%m-%d')
+        user_rand_frac = config["user_rand_frac"]
         today = datetime.utcnow()
         log.info('Loaded experiment start date: {}. Today is :{}'.format(experiment_start_date, today))
         time_til_experiment = experiment_start_date - today
@@ -195,7 +196,7 @@ def main():
         scheduler.schedule(
             scheduled_time=datetime.utcnow(),
             func=schedule_twitter_jobs.schedule_fetch_tweets,
-            args=(args, ttl, timeout, queue_name, repeats, collection_seconds),
+            args=(args, ttl, timeout, queue_name, repeats, collection_seconds, user_rand_frac),
             interval=int(args.interval),
             repeat=repeats,
             result_ttl=ttl,
@@ -206,14 +207,14 @@ def main():
         sys.stdout.write(calc_str)
 
 
-def schedule_fetch_tweets(args, ttl, timeout, queue_name, repeats, collection_seconds):
+def schedule_fetch_tweets(args, ttl, timeout, queue_name, repeats, collection_seconds, user_rand_frac):
     fill_start_time = None # this isn't good for frontfill. I'm going to let processes be in charge of creating their own
     scheduler_concurrent = Scheduler(queue_name=queue_name+'_concurrent', connection=Redis())
     for task in range(args.n_tasks):
         scheduler_concurrent.schedule(
             scheduled_time=datetime.utcnow(),
             func=app.controller.fetch_twitter_tweets,
-            args=[args.statuses_backfill],
+            args=[args.statuses_backfill, collection_seconds, user_rand_frac],
             interval=int(args.interval),
             repeat=repeats,
             result_ttl=ttl,

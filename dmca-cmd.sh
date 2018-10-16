@@ -79,7 +79,7 @@ if [ -z $2 ]
     n_tasks=$2
 fi
 
-# the first argument is a comman, either to start, stop, or restart(stop and then start).
+# the first argument is a command, either to start, stop, or restart(stop and then start).
 if [ $1 = "start" ]
     then
     echo "starting"

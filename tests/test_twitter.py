@@ -235,3 +235,57 @@ def test_with_user_records_archive_tweets_frontfill_seconds_condition(mock_twitt
     # 999 should be attempted.
     later_record = db_session.query(TwitterUser).filter(TwitterUser.id==999).first()
     assert later_record.last_attempted_process > not_yet_queried_timepoint
+
+
+@patch('twitter.Api', autospec=True)
+def test_user_rand_defaults_in_range(mock_twitter_api):
+    tc = app.connections.twitter_connect.TwitterConnect(log=log, db_session=db_session)
+    api = mock_twitter_api.return_value
+
+    def mocked_GetUserTimeline(user_id, count=None, max_id=None):
+        with open("{script_dir}/fixture_data/anon_twitter_tweets.json".format(script_dir=TEST_DIR)) as f:
+            data = json.loads(f.read())
+        assert len(data) == 200
+        if user_id == "2" or user_id == "3":  # suspended_user or protected_user
+            raise twitter.error.TwitterError("Not authorized.")  # not mocking TwitterError
+        elif user_id == "1":  # deleted_user
+            raise twitter.error.TwitterError([{'message': 'Sorry, that page does not exist.', 'code': 34}])
+        else:  # # existing_user ?
+            return data
+
+    m = Mock()
+    m.side_effect = mocked_GetUserTimeline
+    api.GetUserTimeline = m
+    api.GetUserTimeline.__name__ = "GetUserTimeline"
+    tc.api = api
+    patch('twitter.')
+
+    assert len(db_session.query(TwitterStatus).all()) == 0
+
+    t_controller = app.controllers.twitter_controller.TwitterController(db_session, tc, log)
+
+    def load_processed_user(user):
+        user_record = TwitterUser(
+            id=user["id"],
+            screen_name=user["screen_name"],
+            user_state=user["user_state"],
+            lang="en",
+            CS_oldest_tweets_archived=CS_JobState.PROCESSED.value
+            )
+        db_session.add(user_record)
+        db_session.commit()
+
+    user_given_rand = {"screen_name": "existing_user", "id": "888", "user_state": TwitterUserState.FOUND.value,
+                    "user_rand": 0.1}
+
+    user_default_rand = {"screen_name": "existing_user", "id": "889"
+                                                               "", "user_state": TwitterUserState.FOUND.value,
+                    "user_rand": 0.1}
+
+    # add two users ten seconds apart
+    load_processed_user(user_given_rand)
+    load_processed_user(user_default_rand)
+
+    for u in db_session.query(TwitterUser).all():
+        log.info('Userid {0}, record_created_at {1}. Rand value {2}'.format(u.id, u.record_created_at, u.user_rand))
+        assert 0 < u.user_rand < 1
