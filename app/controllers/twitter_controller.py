@@ -611,16 +611,15 @@ class TwitterController():
             fill_query = self.db_session.query(TwitterUser). \
                 filter(and_(
                         eq(TwitterUser.CS_oldest_tweets_archived, target_JobState.value), # back or front
-                        or_(TwitterUser.lang.in_(["en", "en-gb"]), TwitterUser.lang is None), # correct language
-                        or_(TwitterUser.last_attempted_process < fill_start_time, # not attempted by any other thread
-                            TwitterUser.last_attempted_process is None), # or never been attempted yet
+                        TwitterUser.lang.in_(["en", "en-gb", None]), # correct language
+                        or_(eq(TwitterUser.last_attempted_process, None), TwitterUser.last_attempted_process < fill_start_time).self_group(), # or never been attempted yet
                         collection_condition,
                         user_rand_condition)). \
                 order_by(order_strat). \
                 with_for_update(skip_locked=True). \
                 limit(batch_size)
 
-            # self.log.info('Fill query is: {}'.format(str(fill_query)))
+            self.log.info('Fill query is: {}'.format(str(fill_query.statement.compile())))
             unarchived_users = fill_query.all()
 
             # mark in the database that we're claiming these items
