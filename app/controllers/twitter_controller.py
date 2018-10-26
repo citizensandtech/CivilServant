@@ -619,7 +619,7 @@ class TwitterController():
                 with_for_update(skip_locked=True). \
                 limit(batch_size)
 
-            self.log.info('Fill query is: {}'.format(str(fill_query.statement.compile())))
+            # self.log.info('Fill query is: {}'.format(str(fill_query.statement.compile())))
             unarchived_users = fill_query.all()
 
             # mark in the database that we're claiming these items
