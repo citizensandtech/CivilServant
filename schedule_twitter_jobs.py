@@ -90,7 +90,7 @@ def main():
                         required=False,
                         default=1,
                         type=int,
-                        help="Number of concurrent tasks. Currently only supports fetch_twitter_tweets.")
+                        help="Number of concurrent tasks. Currently only supported for fetch_twitter_tweets.")
 
     args = parser.parse_args()
 
@@ -210,13 +210,14 @@ def main():
 def schedule_fetch_tweets(args, ttl, timeout, queue_name, repeats, collection_seconds, user_rand_frac):
     fill_start_time = None # this isn't good for frontfill. I'm going to let processes be in charge of creating their own
     scheduler_concurrent = Scheduler(queue_name=queue_name+'_concurrent', connection=Redis())
+    log.info('FILLTASKS: n_tasks is {}'.format(args.n_tasks))
     for task in range(args.n_tasks):
         scheduler_concurrent.schedule(
             scheduled_time=datetime.utcnow(),
             func=app.controller.fetch_twitter_tweets,
             args=[args.statuses_backfill, collection_seconds, user_rand_frac],
             interval=int(args.interval),
-            repeat=repeats,
+            repeat=0,
             result_ttl=ttl,
             timeout=timeout)
 
