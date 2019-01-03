@@ -124,7 +124,7 @@ def send_report(subject, html):
     try:
         send_email(email_config["fromaddr"], email_config["toaddrs"], subject, html)
     except ConnectionRefusedError:
-        print('It looks like you cant SMTP from this machine' )
+        print('It looks like you cant SMTP from this machine')
 
 
 def save_report_locally(subject, html):
@@ -310,6 +310,29 @@ def generate_twitter_users(today=datetime.datetime.utcnow(), days=7, html=True, 
                                label)  # to make everything 00:00:00
 
 
+def generate_twitter_fills(today=datetime.datetime.utcnow(), days=7, html=True, fill_type='backfill'):
+    query_str = """
+        SELECT '{fill_type}', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
+        FROM twitter_fills WHERE record_created_at <= :to_date and record_created_at >= :from_date
+        AND fill_type = '{fill_type}'
+        GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);""".format(
+        fill_type=fill_type)
+    result = run_query_for_days(query_str, today, days=days)
+    if not html:
+        return result
+    return generate_html_table(result,
+                               str_to_date(date_to_str(today)),
+                               fill_type)  # to make everything 00:00:00
+
+
+def generate_twitter_backfills(today, days):
+    return generate_twitter_fills(today=today, days=days, html=True, fill_type='backfill')
+
+
+def generate_twitter_frontfills(today, days):
+    return generate_twitter_fills(today=today, days=days, html=True, fill_type='frontfill')
+
+
 ##### TAKES (AT LEAST) 5 MIN TO RUN...
 def generate_twitter_user_snapshots(today=datetime.datetime.utcnow(), days=7, html=True,
                                     label="Twitter User Snapshots"):
@@ -460,6 +483,8 @@ def generate_report(today=datetime.datetime.utcnow(), days=7):
     html += generate_twitter_users(today, days)
     html += generate_twitter_user_snapshots(today, days)
     html += generate_tweets(today, days)
+    html += generate_twitter_backfills(today, days)
+    html += generate_twitter_frontfills(today, days)
     # html += generate_reddit_front_page(today, days)
     # html += generate_reddit_subreddit_page(today, days)
     # html += generate_reddit_subreddit(today, days)
@@ -486,7 +511,6 @@ if __name__ == "__main__":
     now = datetime.datetime.utcnow()
     end = datetime.datetime.combine(now, datetime.time())
     today = end - datetime.timedelta(seconds=1)
-
     html = generate_report(today, days=7)
     subject = "CivilServant Database Report: {0}".format(date_to_str(today))
     send_report(subject, html)

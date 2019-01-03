@@ -4,7 +4,7 @@ import sys
 import simplejson as json
 from utils.common import *
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, BigInteger, Index, Float
-from sqlalchemy.dialects.mysql import MEDIUMTEXT, LONGTEXT
+from sqlalchemy.dialects.mysql import MEDIUMTEXT, LONGTEXT, TINYTEXT
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy import create_engine
@@ -289,3 +289,13 @@ class TwitterToken(Base):
     user_id             = Column(BigInteger, primary_key = True)
     oauth_token         = Column(String(64)) #these are only 50 long
     oauth_token_secret  = Column(String(64)) #these are only 45 long
+
+class TwitterFill(Base):
+    __tablename__ = 'twitter_fills'
+    id                  = Column(BigInteger, primary_key = True)
+    user_id             = Column(BigInteger, index = True) #this is the same as twitter user id.
+    record_created_at   = Column(DateTime, default=datetime.datetime.utcnow, index=True) # need this index for fast counting
+    fill_type           = Column(TINYTEXT)
+    fill_start_time     = Column(DateTime)
+    user_state          = Column(Integer) # utils/common.py
+

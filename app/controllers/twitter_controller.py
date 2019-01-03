@@ -3,7 +3,7 @@ from operator import eq
 import twitter
 import simplejson as json
 import datetime
-from app.models import Base, TwitterUser, TwitterStatus, LumenNoticeToTwitterUser, TwitterUserSnapshot
+from app.models import Base, TwitterUser, TwitterStatus, LumenNoticeToTwitterUser, TwitterUserSnapshot, TwitterFill
 import requests
 import sqlalchemy
 from sqlalchemy import and_, or_, func
@@ -263,12 +263,12 @@ class TwitterController():
                             except:
                                 self.log.error(
                                     "Error while saving DB Session for TwitterUser, TwitterUserSnapshot object",
-                                    extra=sys.exc_info())
+                                    exc_info=True)
                                 commit_users_failed(screen_name)
                         except:
                             self.log.error(
                                 "Error while creating TwitterUser, TwitterUserSnapshot objects for user {0}".format(
-                                    user_json["id"]), extra=sys.exc_info())
+                                    user_json["id"]), exc_info=True)
                             commit_users_failed(screen_name)
 
         # at end, for left_users (users not found), commit to db
@@ -328,12 +328,12 @@ class TwitterController():
                     self.db_session.commit()
                 except:
                     self.log.error("Error while saving DB Session for TwitterUser, TwitterUserSnapshot object",
-                                   extra=sys.exc_info())
+                                   exc_info=True)
                     commit_users_failed([name])
             except:
                 self.log.error(
                     "Error while updating TwitterUser, creating TwitterUserSnapshot object for user {0}".format(
-                        user_json["id"]), extra=sys.exc_info())
+                        user_json["id"]), exc_info=True)
                 commit_users_failed([name])
 
     def is_user_suspended_or_deleted(self, username):
@@ -507,7 +507,7 @@ class TwitterController():
                     except:
                         self.log.error(
                             "Error while updating TwitterUser, creating TwitterUserSnapshot object for user {0}".format(
-                                user_json["id"]), extra=sys.exc_info())
+                                user_json["id"]), exc_info=True)
                     else:
                         if has_ids:
                             left_users.discard(uid)  # discard doesn't throw an error
@@ -520,7 +520,7 @@ class TwitterController():
                     except:
                         self.log.error(
                             "Error while saving DB Session for TwitterUser, TwitterUserSnapshot object for {0} users".format(
-                                len(users_info)), extra=sys.exc_info())
+                                len(users_info)), exc_info=True)
                     else:
                         self.log.info("Saved {0} found twitter users' info.".format(len(users_info)))
 
@@ -551,13 +551,13 @@ class TwitterController():
             except:
                 self.log.error(
                     "Error while updating TwitterUser, creating TwitterUserSnapshot object for user {0}".format(
-                        user_json["id"]), extra=sys.exc_info())
+                        user_json["id"]), exc_info=True)
         if len(left_users) > 0:
             try:
                 self.db_session.commit()
             except:
                 self.log.error("Error while saving DB Session for {0} not_found twitter users' info.".format(
-                    len(left_users)), extra=sys.exc_info())
+                    len(left_users)), exc_info=True)
             else:
                 self.log.info("Saved {0} not_found twitter users' info.".format(len(left_users)))
 
@@ -640,7 +640,7 @@ class TwitterController():
             # try to archive the users tweets
             try:
                 self.with_user_records_archive_tweets(unarchived_users, backfill=backfill, is_test=is_test,
-                                                      test_exception=test_exception)  # backfill hacky
+                                                      test_exception=test_exception, fill_start_time=fill_start_time)  # backfill hacky
             # TODO if the user has become invalid then mark this
             except sqlalchemy.orm.exc.DetachedInstanceError:
                 self.log.error("Encountered deatched instance error.")
@@ -662,7 +662,8 @@ class TwitterController():
             batch_attempt_counter += 1
 
 
-    def with_user_records_archive_tweets(self, user_records, backfill=False, is_test=False, test_exception=False):
+    def with_user_records_archive_tweets(self, user_records, backfill=False, is_test=False, test_exception=False,
+                                        fill_start_time=None):
         """
             user_records: list of TwitterUser records
 
@@ -679,6 +680,14 @@ class TwitterController():
             job_state = self.archive_user_tweets(user, backfill=backfill, is_test=is_test)
             user.CS_oldest_tweets_archived = job_state.value
             self.db_session.add(user)
+            self.db_session.commit()
+
+            fill_record = TwitterFill(user_id=user.id,
+                                      fill_start_time=fill_start_time,
+                                      fill_type='backfill' if backfill else 'frontfill',
+                                      user_state=job_state.value)
+
+            self.db_session.add(fill_record)
             self.db_session.commit()
 
             if test_exception:
@@ -826,7 +835,7 @@ class TwitterController():
                         new_seen_statuses.add(status_id)
                     except:
                         self.log.error("Error while creating TwitterStatus object for user {0}, status id {1}".format(
-                            status_json["user"]["id"]["screen_name"], status_id), extra=sys.exc_info())
+                            status_json["user"]["id"]["screen_name"], status_id), exc_info=True)
                         return job_state
             try:
                 with warnings.catch_warnings():
@@ -835,7 +844,7 @@ class TwitterController():
                     self.db_session.commit()
             except:
                 self.log.error("Error while saving DB Session for {0} statuses for user {1}.".format(
-                    len(new_seen_statuses) - prev_new_seen_statuses_length, user_id), extra=sys.exc_info())
+                    len(new_seen_statuses) - prev_new_seen_statuses_length, user_id), exc_info=True)
                 return job_state
             else:
                 self.log.info("PID {2} Saved {0} statuses for user {1}.".format(
