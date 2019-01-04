@@ -206,7 +206,7 @@ def fetch_twitter_snapshot_and_tweets(max_time_delta_min=60):
     log.info("Finished fetch_twitter_snapshot_and_tweets, max_time_delta_min={0} PID={1}".format(max_time_delta_min, str(os.getpid())))
 
 
-def fetch_twitter_tweets(backfill=False, collection_seconds=None, user_rand_frac=None, fill_start_time=datetime.datetime.utcnow()):
+def fetch_twitter_tweets(backfill=False, collection_seconds=None, user_rand_frac=None, fill_start_time=None):
     """
     For all TwitterUsers with CS_most_tweets_queried=False, fetch tweets
     """
