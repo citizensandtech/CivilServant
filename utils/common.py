@@ -7,6 +7,8 @@ import datetime
 
 NOT_FOUND_TWITTER_USER_STR = "<NOT_FOUND>"
 
+EXPERIMENT_LANGUAGES = ['en', 'en-gb', 'en-GB']
+
 class PageType(Enum):
     TOP = 1
     CONTR = 2 # controversial

@@ -8,7 +8,7 @@ import requests
 import sqlalchemy
 from sqlalchemy import and_, or_, func
 import utils.common
-from utils.common import TwitterUserState, NOT_FOUND_TWITTER_USER_STR, CS_JobState, neq
+from utils.common import TwitterUserState, NOT_FOUND_TWITTER_USER_STR, CS_JobState, neq, EXPERIMENT_LANGUAGES
 import sys, warnings, os
 from collections import defaultdict
 
@@ -373,7 +373,7 @@ class TwitterController():
         """
 
         need_snapshot_users = self.db_session.query(TwitterUser).filter(
-            or_(TwitterUser.lang.in_(["en", "en-gb"]), TwitterUser.lang is None)).all()
+            or_(TwitterUser.lang.in_(EXPERIMENT_LANGUAGES), TwitterUser.lang is None)).all()
 
         # querying TwitterUserSnapshot is very expensive
         # need_snapshot_user_snapshots = self.db_session.query(
@@ -611,7 +611,7 @@ class TwitterController():
             fill_query = self.db_session.query(TwitterUser). \
                 filter(and_(
                         eq(TwitterUser.CS_oldest_tweets_archived, target_JobState.value), # back or front
-                        TwitterUser.lang.in_(["en", "en-gb", None]), # correct language
+                        TwitterUser.lang.in_(EXPERIMENT_LANGUAGES), # correct language
                         or_(eq(TwitterUser.last_attempted_process, None), TwitterUser.last_attempted_process < fill_start_time).self_group(), # or never been attempted yet
                         collection_condition,
                         user_rand_condition)). \
@@ -687,7 +687,8 @@ class TwitterController():
             fill_record = TwitterFill(user_id=user.id,
                                       fill_start_time=fill_start_time,
                                       fill_type='backfill' if backfill else 'frontfill',
-                                      user_state=job_state.value)
+                                      job_state=job_state.value,
+                                      user_state=user.user_state)
             self.db_session.add(fill_record)
             self.db_session.commit()
 

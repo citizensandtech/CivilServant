@@ -298,4 +298,5 @@ class TwitterFill(Base):
     fill_type           = Column(TINYTEXT)
     fill_start_time     = Column(DateTime)
     user_state          = Column(Integer) # utils/common.py
+    job_state           = Column(Integer)
 
