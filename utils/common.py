@@ -34,6 +34,8 @@ class CS_JobState(Enum):
     PROCESSED = 3       # finished running
     FAILED = 4          # in_progress but never succeeded processing; because e.g. internet went down or system crashed
     NEEDS_RETRY = 5     # for flagging purposes...
+    WONT_PROCESS = 6    # decide not process because they were never existing in the first place.
+
 
 def generate_not_found_twitter_user_id(screen_name=""):
     capped_screen_name = screen_name if len(screen_name)<30 else screen_name[:30] + "..."

@@ -1,5 +1,7 @@
 import pytest
 import os
+
+import requests
 import twitter
 import datetime, time
 from mock import Mock, patch
@@ -232,6 +234,12 @@ def test_recovery_after_internal_error(mock_rate_limit, mock_twitter):
 @patch('twitter.ratelimit.RateLimit', autospec=True)
 def test_recovery_after_unknown_error(mock_rate_limit, mock_twitter):
     error_to_test = twitter.error.TwitterError({'Unknown error: '})
+    return recovery_after_error(mock_rate_limit, mock_twitter, error_to_test)
+
+@patch('twitter.Api', autospec=True)
+@patch('twitter.ratelimit.RateLimit', autospec=True)
+def test_recovery_after_requests_connection_error(mock_rate_limit, mock_twitter):
+    error_to_test = requests.exceptions.ConnectionError()
     return recovery_after_error(mock_rate_limit, mock_twitter, error_to_test)
 
 @patch('twitter.Api', autospec=True)

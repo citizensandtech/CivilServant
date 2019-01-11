@@ -306,7 +306,9 @@ class TwitterController():
                     record_created_at=now,
                     lang=None,
                     user_state=user_state.value,
-                    CS_oldest_tweets_archived=CS_JobState.PROCESSED.value)  # no tweets to find
+                    CS_oldest_tweets_archived=CS_JobState.WONT_PROCESS.value)  # no tweets to find
+                # if we set these NOT_FOUND or SUSPENDED users to CS_JobState.PROCESSED then they might be tried again
+                # but we aren't interseted
                 self.db_session.add(user_record)
 
                 # also create first TwitterUserSnapshot record
@@ -472,14 +474,12 @@ class TwitterController():
                             # then screen_name hasn't changed. update the existing user record.
                             user = key_to_users[screen_name]
                         else:
-                            # we don't expect to have called UsersLookup with some screen_names and get back
-                            # any different screen_names
-                            # if this did happen...
-                            # we wouldn't have called UsersLookup with screen_names unless we didn't have the ids (users not found)
-                            # if a previously not found user changed their screen name, AND their account got unsuspended,
-                            # such that we are able to get their account info now, we'd get an id we haven't seen before, and there is
-                            # NO WAY for us to match up these records.
-                            # so we would want to create a new record.
+                            # we don't expect to have called UsersLookup with some screen_names and get back any
+                            # different screen_names if this did happen... we wouldn't have called UsersLookup with
+                            # screen_names unless we didn't have the ids (users not found) if a previously not found
+                            # user changed their screen name, AND their account got unsuspended, such that we are
+                            # able to get their account info now, we'd get an id we haven't seen before, and there is
+                            # NO WAY for us to match up these records. so we would want to create a new record.
                             self.log.error(
                                 "Unexpected screen_name change: {0} is not in key_to_users. key_to_users' keys (screen_names): {1}".format(
                                     screen_name, key_to_users.keys()))
@@ -492,7 +492,7 @@ class TwitterController():
                             user.created_at = created_at
                             # user.record_updated_at = now    # THIS SHOULDN'T BE UPDATED. old TwitterUser records probably have wrong record_updated_at
                             user.lang = user_json["lang"]
-                            user.state = user_state.value
+                            user.user_state = user_state.value
 
                             # create TwitterUserSnapshot record
                             user_snapshot_record = TwitterUserSnapshot(
@@ -649,7 +649,8 @@ class TwitterController():
                 self.log.info('RESET CS_oldest_tweets_archived attempting.')
                 utils.common.reset_CS_JobState_In_Progress(unarchived_users, "CS_oldest_tweets_archived",
                                                            self.db_session,
-                                                           self.log)  # if still marked IN_PROGRESS (e.g. because of unchecked exception), reset it to NOT_PROCESSED
+                                                           self.log)  # if still marked IN_PROGRESS (e.g. because of
+                                                                      # unchecked exception), reset it to NOT_PROCESSED
                 self.db_session.close()
 
             self.log.info(
@@ -677,6 +678,7 @@ class TwitterController():
             counter = 0
 
         for user in user_records:
+            # users's  user_state can change by executing the next line.
             job_state = self.archive_user_tweets(user, backfill=backfill, is_test=is_test)
             user.CS_oldest_tweets_archived = job_state.value
             self.db_session.add(user)
@@ -686,7 +688,6 @@ class TwitterController():
                                       fill_start_time=fill_start_time,
                                       fill_type='backfill' if backfill else 'frontfill',
                                       user_state=job_state.value)
-
             self.db_session.add(fill_record)
             self.db_session.commit()
 

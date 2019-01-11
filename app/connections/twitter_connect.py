@@ -1,3 +1,4 @@
+import requests
 import simplejson as json
 import os, sys, glob, random, datetime, time, inspect, csv
 from datetime import timedelta
@@ -444,3 +445,6 @@ class TwitterConnect():
                 raise twiterr
                 # self.log.error(
                 #     'Twitter Query encountered twitter error with no handler yet: {0}'.format(twiterr))
+        except requests.exceptions.ConnectionError:
+            # sometimes this gets raised
+            return self.constant_wait_sleep_and_recurse("Low-level request error", method, *args, **kwargs)
