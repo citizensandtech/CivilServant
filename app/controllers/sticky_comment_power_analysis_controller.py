@@ -3,7 +3,7 @@ import simplejson as json
 import datetime
 import numpy as np
 from collections import defaultdict
-from app.models import Base, Subreddit, ModAction, FrontPage
+from app.models import Base, Subreddit, ModAction, FrontPage, Post, Comment
 from sqlalchemy import and_
 
 utc=pytz.UTC
@@ -82,10 +82,10 @@ class StickyCommentPowerAnalysisController:
         # get posts, comments, modlog from (self.start_date_utc - 6 months) to self.end_date_utc
 
         self.log.info("Getting posts...")
-        self.posts = self.get_posts()
+        self.posts = self.get_db_posts()
         #self.log.info("{0} posts retrieved".format(len(self.posts)))
         self.log.info("Getting comments...")
-        self.comments = self.get_comments()
+        self.comments = self.get_db_comments()
         #self.log.info("{0} comments retrieved".format(len(self.comments)))
 
         self.log.info("Getting modlog...")
@@ -106,6 +106,45 @@ class StickyCommentPowerAnalysisController:
         self.log.info("Applying participation and post to comment info...")
         self.apply_participation_and_post_to_comment_info() # posts, comments   # count prev posts
 
+
+    def get_db_posts(self):
+        rows = self.db_session.query(Post).filter(and_(Post.subreddit_id == self.subreddit.id, 
+                                                       Post.created_at >= self.begin_date_utc,
+                                                       Post.created_at <= self.end_date_utc)).order_by(Post.created_at).all()
+        all_posts = {}
+        for row in rows:
+            post = json.loads(row.post_data)
+            if "subreddit" in post and post["subreddit"].lower() == self.subreddit.name:
+                post_id = post["id"].replace("t3_", "")
+                date = utc.localize(datetime.datetime.utcfromtimestamp(float(post['created_utc'])))
+                post_data = {
+                    "created.utc": date,
+                    "weekday": date.weekday(),  # day of the week as an integer, where Monday is 0 and Sunday is 6
+                    "author": post["author"],
+                    "body.length": len(post["selftext"].split(" ")) if "selftext" in post else 0,
+                    "is.selftext": post["is_self"],
+                    "url": post["url"] if post["is_self"] else None, # url of link (if link)
+                    "author.deleted.later": post["author"] == "[deleted]",
+
+                    "visible": True, #was the post allowed to persist by moderators? Visible unless removed
+
+                    "author.prev.posts": None, # number of previous posts of any kind by this author in this subreddit...   
+                    "author.prev.participation": None, # number of previous posts or comments of any kind by this author in this subreddit...  
+                    "num.comments": None, # number of comments received by this post
+                    "num.comments.removed": None, # number of comments that were removed
+
+                    "newcomer.comments": None, # number of newcomer comments received by this post
+                    "newcomer.comments.removed": None, # number of newcomer comments removed
+
+                    "front_page": None, # number of minutes that the post appeared on the front page
+
+                    #"post.flair": None, # need to query API
+                }
+
+                all_posts[post_id] = post_data
+
+        self.log.info("{0} posts loaded".format(len(all_posts)))
+        return all_posts
 
     # general note for post, comment creation: yet-to-be-processed field default to None.
     # in later methods (eg when applying modlog visibility information), fields will update to True/False
@@ -161,6 +200,41 @@ class StickyCommentPowerAnalysisController:
                         all_posts[post_id] = post_data
         self.log.info("{0} posts loaded".format(len(all_posts)))
         return all_posts
+
+    def get_db_comments(self):
+        rows = self.db_session.query(Comment).filter(and_(Comment.subreddit_id == self.subreddit.id,
+                                                       Comment.created_at >= self.begin_date_utc,
+                                                       Comment.created_at <= self.end_date_utc)).order_by(Comment.created_at).all()
+        all_comments = {}
+        for row in rows:
+            comment = json.loads(row.comment_data)
+            if "subreddit" in comment and comment["subreddit"].lower() == self.subreddit.name:
+                comment_id = comment["id"]
+                date = utc.localize(datetime.datetime.utcfromtimestamp(float(comment['created_utc'])))
+                comment_data = {
+                    "created.utc": date,
+                    "author": comment["author"],
+                    "body.length": len(comment["body"].split(" ")),
+                    "toplevel": comment["link_id"] == comment["parent_id"], # Is this comment toplevel or not?
+                    "author.deleted.later": comment["author"] == "[deleted]",
+
+                    "post.id": comment["link_id"], # t3
+
+                    "author.prev.comments": None, # number of previous comments of any kind by this author in this subreddit, in the observed datasets -- a value of 0 means this is their very first comment
+                    "author.prev.participation": None, # number of previous comments or posts of any kind by this author in this subreddit....
+
+                    "visible": True, #was the post allowed to persist by moderators? Visible unless removed
+                    "post.visible": None, # Was the post removed?
+                    #"post.flair": None, # need to query API
+                    "post.author": None # Who was the post author
+                }
+
+                all_comments[comment_id] = comment_data
+
+        self.log.info("{0} comments loaded".format(len(all_comments)))
+        return all_comments
+
+
 
     def get_comments(self):
         files = os.listdir(self.data_dir)
