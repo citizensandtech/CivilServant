@@ -6,8 +6,8 @@
     "client_id" : "",
     "client_secret" : "",
     "redirect_uri" : "",
-    "experiment_onboarding_days": 1,
-    "experiment_collection_days": 1,
-    "experiment_start_date": "2019-1-1",
+    "experiment_onboarding_days": 42,
+    "experiment_collection_days": 30,
+    "experiment_start_date": "2019-3-19",
     "user_rand_frac": 0.5
 }

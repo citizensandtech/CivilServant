@@ -217,6 +217,16 @@ def fetch_twitter_tweets(backfill=False, collection_seconds=None, user_rand_frac
     log.info("Finished fetch_twitter_tweets, backfill={0}. PID={1}".format(backfill, str(os.getpid())))
 
 
+def unshorten_twitter_urls():
+    """
+    unshorten all the twitter statuses urls
+    """
+    t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
+    log.info('Starting unshorten twitter urls')
+    t.unshorten_urls()
+    # twitter_conn.checkin_endpoint()
+    log.info("Finished unshorten twitter urls")
+
 def twitter_observational_analysis_basic_profiling():
     tb = app.controllers.twitter_observational_analysis_controller.TwitterBasicProfilingController(
         "/home/mmou/Dropbox/Documents/Chronos/MIT/CM/CivilServant", db_session, log)

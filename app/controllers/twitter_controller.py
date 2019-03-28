@@ -3,14 +3,17 @@ from operator import eq
 import twitter
 import simplejson as json
 import datetime
-from app.models import Base, TwitterUser, TwitterStatus, LumenNoticeToTwitterUser, TwitterUserSnapshot, TwitterFill
+from app.models import Base, TwitterUser, TwitterStatus, LumenNoticeToTwitterUser, TwitterUserSnapshot, TwitterFill, \
+    TwitterUnshortenedUrls
 import requests
 import sqlalchemy
-from sqlalchemy import and_, or_, func
+from sqlalchemy import and_, or_, func, distinct
 import utils.common
 from utils.common import TwitterUserState, NOT_FOUND_TWITTER_USER_STR, CS_JobState, neq, EXPERIMENT_LANGUAGES
 import sys, warnings, os
 from collections import defaultdict
+
+from utils.url_unshortener import bulkUnshorten
 
 TWITTER_DATETIME_STR_FORMAT = "%a %b %d %H:%M:%S %z %Y"
 
@@ -863,3 +866,37 @@ class TwitterController():
 
         job_state = CS_JobState.PROCESSED
         return job_state
+
+    def unshorten_urls(self):
+        status_users_res = self.db_session.query(distinct(TwitterStatus.user_id)).all()
+        seen_urls_q = self.db_session.query(distinct(TwitterUnshortenedUrls.short_url)).all()
+        seen_urls = set([u[0] for u in seen_urls_q])
+        status_user_ids = [user_tup[0] for user_tup in status_users_res if user_tup[0]]
+        for i, status_user_id in enumerate(status_user_ids):
+            self.log.info('Unshortening URLS for user id {0}. {1} of {2}'.format(status_user_id, i, len(status_user_ids)))
+            user_statuses = self.db_session.query(TwitterStatus).filter(TwitterStatus.user_id==status_user_id).all()
+            status_urls_flat = []
+            for user_status in user_statuses:
+                status_data = json.loads(user_status.status_data)
+                status_url_dicts = status_data['entities']['urls']
+                just_urls = [d['url'] for d in status_url_dicts]
+                status_urls_flat.extend(just_urls)
+
+            urls_to_shorten = [url for url in status_urls_flat if url not in seen_urls]
+            self.log.debug('{} status urls found {} urls to update'.format(len(status_urls_flat), len(urls_to_shorten)))
+            if len(urls_to_shorten)>0:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    short_unshort_res = bulkUnshorten(urls_to_shorten)
+
+                unshortend_rows = []
+                for short_url, unshort_res in short_unshort_res.items():
+                    unshortend_row = TwitterUnshortenedUrls(short_url=short_url,
+                                                            unshortened_url=unshort_res['final_url'],
+                                                            error_unshortening=unshort_res['error'])
+                    unshortend_rows.append(unshortend_row)
+                self.db_session.add_all(unshortend_rows)
+                self.db_session.commit()
+                # check which of these urls are already unshortened
+                seen_urls.update(set(status_urls_flat))
+                self.log.info('Seen {} urls'.format(len(seen_urls)))

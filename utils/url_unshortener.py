@@ -2,8 +2,8 @@ import requests
 from requests_futures.sessions import FuturesSession
 from concurrent.futures import wait
 
-def bulkUnshorten(urls,workers=20):
 
+def bulkUnshorten(urls, workers=20):
     # This function will unshorten an array of shortened URLS
     # The second optional argument is the number of workers to run in parallel
 
@@ -20,18 +20,19 @@ def bulkUnshorten(urls,workers=20):
     HOPS_LIMIT = 10
 
     # Allow passing in of one url as a string object
-    if (isinstance(urls,str)):
+    if (isinstance(urls, str)):
         urls = [urls]
 
     # If method is being called initally, create a dictionary for the urls passed.  When the method calls
     # itself, it will pass this object to itself as needed.
-    if (isinstance(urls,list)):
+    if (isinstance(urls, list)):
         url_objects = urls[:]
         urls = {}
         for url in url_objects:
-            req = requests.Request('HEAD',url)
+            req = requests.Request('HEAD', url)
             normalized_url = req.prepare().url
-            urls[normalized_url] = {"hops":0,"status_code":None,"success":None,"final_url":None,"error":None,"original_url":url}
+            urls[normalized_url] = {"hops": 0, "status_code": None, "success": None, "final_url": None, "error": None,
+                                    "original_url": url}
 
     while True:
 
@@ -41,7 +42,7 @@ def bulkUnshorten(urls,workers=20):
         for key in urls:
             if urls[key]['success'] is not None: continue
             if urls[key]['hops'] >= HOPS_LIMIT: continue
-            futures.append(session.head(key,timeout=REQUEST_TIMEOUT))
+            futures.append(session.head(key, timeout=REQUEST_TIMEOUT))
 
         if futures:
             done, incomplete = wait(futures)
@@ -58,32 +59,43 @@ def bulkUnshorten(urls,workers=20):
                     urls[url]['error'] = "ReadTimeout"
                     urls[url]['success'] = False
                     continue
+                except requests.exceptions.ConnectionError as e:
+                    url = e.request.url
+                    urls[url]['error'] = "ReadTimeout"
+                    urls[url]['success'] = False
+                    continue
+
 
                 if result.status_code == 200:
                     urls[result.url]['success'] = True
                     urls[result.url]['final_url'] = result.url
                     urls[result.url]['status_code'] = result.status_code
                 elif result.status_code == 301 or result.status_code == 302:
-                    redirect_url = result.headers['location']
+                    try:
+                        redirect_url = result.headers['location']
 
-                    # Handle a location header that returns a relative path instead of an absolute path.  This is now allowed
-                    # under RFC 7231.  If the returned location does not begin with http, then it is a relative path and should
-                    # be concatenated to the original url
+                        # Handle a location header that returns a relative path instead of an absolute path.  This is now allowed
+                        # under RFC 7231.  If the returned location does not begin with http, then it is a relative path and should
+                        # be concatenated to the original url
 
-                    if not redirect_url.lower().startswith("http"):
-                        redirect_url = result.url + redirect_url
+                        if not redirect_url.lower().startswith("http"):
+                            redirect_url = result.url + redirect_url
 
-                    # Normalize the url using the requests module
-                    req = requests.Request('HEAD',redirect_url)
-                    redirect_url = req.prepare().url
+                        # Normalize the url using the requests module
+                        req = requests.Request('HEAD', redirect_url)
+                        redirect_url = req.prepare().url
 
-                    urls[result.url]['hops'] += 1
-                    urls[result.url]['final_url'] = redirect_url
-                    urls[result.url]['status_code'] = result.status_code
-                    urls[redirect_url] = urls.pop(result.url)
+                        urls[result.url]['hops'] += 1
+                        urls[result.url]['final_url'] = redirect_url
+                        urls[result.url]['status_code'] = result.status_code
+                        urls[redirect_url] = urls.pop(result.url)
+                    except KeyError: #no location to find
+                        urls[result.url]['error'] = "BadRedirect"
+                        urls[result.url]['success'] = False
                 else:
                     urls[result.url]['success'] = False
                     urls[result.url]['status_code'] = result.status_code
+                    print(urls)
 
         else:
 

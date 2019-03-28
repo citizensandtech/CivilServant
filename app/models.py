@@ -3,8 +3,8 @@ import os
 import sys
 import simplejson as json
 from utils.common import *
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, BigInteger, Index, Float
-from sqlalchemy.dialects.mysql import MEDIUMTEXT, LONGTEXT, TINYTEXT
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, BigInteger, Index, Float, ForeignKey
+from sqlalchemy.dialects.mysql import MEDIUMTEXT, LONGTEXT, TINYTEXT, TEXT
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy import create_engine
@@ -266,6 +266,16 @@ class TwitterStatus(Base):
     created_at          = Column(DateTime, index = True)
     record_created_at   = Column(DateTime, default=datetime.datetime.utcnow, index=True) # need this index for fast counting
     status_data         = Column(MEDIUMTEXT)
+
+
+class TwitterUnshortenedUrls(Base):
+    __tablename__ = 'twitter_unshortened_urls'
+    id                  = Column(BigInteger, primary_key = True)
+    short_url           = Column(TEXT)
+    unshortened_url     = Column(TEXT)
+    error_unshortening  = Column(TINYTEXT)
+    record_created_at   = Column(DateTime, default=datetime.datetime.utcnow, index=True) # need this index for fast counting
+
 
 class TwitterRateState(Base):
     # this tables keeps track of the RateLimit of each of our donated tokens

@@ -125,14 +125,16 @@ def main():
         if time_til_experiment.days >= 1:
             sleep_secs = time_til_experiment.seconds
             log.info('Experiment start date more than 1 day in the future. Sleeping for {}'.format(sleep_secs))
-
+        if time_til_experiment.days <= -1:
+            log.info('Experiment exists in past! This might be because you are restarting it. However it could also '
+                     'be because you forgot to change the experiment start date, that would be a bad thing!')
         # Experiment has two stages.
         #  1) Onboarding, while we are still adding new users
         #  2) Collection. Collect happens during onboarding too, but continues afterwards to collect data on onboarded users
         days_already_done = -1 * time_til_experiment.days
         # plus padding to always round up to nearest day
         onboarding_days_left = experiment_onboarding_days - days_already_done + 1
-        collection_days_left = experiment_collection_days - days_already_done + 2 # seeing if a sneaky 2 will help with frontfill issues
+        collection_days_left = experiment_collection_days
         if (onboarding_days_left <= 0) or (collection_days_left <= 0):
             raise ValueError('Experiment ended in the past')
         onboarding_seconds = SECONDS_IN_DAY * onboarding_days_left
