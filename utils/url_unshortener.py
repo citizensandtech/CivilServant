@@ -1,4 +1,5 @@
 import requests
+from requests.exceptions import InvalidURL
 from requests_futures.sessions import FuturesSession
 from concurrent.futures import wait
 
@@ -29,10 +30,13 @@ def bulkUnshorten(urls, workers=20):
         url_objects = urls[:]
         urls = {}
         for url in url_objects:
-            req = requests.Request('HEAD', url)
-            normalized_url = req.prepare().url
-            urls[normalized_url] = {"hops": 0, "status_code": None, "success": None, "final_url": None, "error": None,
-                                    "original_url": url}
+            try:
+                req = requests.Request('HEAD', url)
+                normalized_url = req.prepare().url
+                urls[normalized_url] = {"hops": 0, "status_code": None, "success": None, "final_url": None, "error": None,
+                                        "original_url": url}
+            except InvalidURL: # there are no guarantees in thi world.
+                pass # this url won't be coming along for the ride.
 
     while True:
 
@@ -92,11 +96,14 @@ def bulkUnshorten(urls, workers=20):
                     except KeyError: #no location to find
                         urls[result.url]['error'] = "BadRedirect"
                         urls[result.url]['success'] = False
+                    except InvalidURL:
+                        urls[result.url]['error'] = "InvalidURL"
+                        urls[result.url]['success'] = False
+
                 else:
                     urls[result.url]['success'] = False
                     urls[result.url]['status_code'] = result.status_code
-                    print(urls)
-
+                    # log.info('bad redirect found in {}'.format(result))
         else:
 
             url_dict = {}
