@@ -906,4 +906,4 @@ class TwitterController():
                     self.log.info('Seen {} urls'.format(len(seen_urls)))
                     r.set(user_r_key, True)
             else:
-                self.log.info(f"Skipping user: {status_user_id}, already done according to redis.")
+                self.log.info("Skipping user: {status_user_id}, already done according to redis.".format(status_user_id=status_user_id))
