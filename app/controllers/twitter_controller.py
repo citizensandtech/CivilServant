@@ -1,3 +1,4 @@
+import random
 from operator import eq
 
 import redis
@@ -869,41 +870,47 @@ class TwitterController():
         return job_state
 
     def unshorten_urls(self):
-        r = redis.Redis()
         status_users_res = self.db_session.query(distinct(TwitterStatus.user_id)).all()
         seen_urls_q = self.db_session.query(TwitterUnshortenedUrls.short_url).all()
         seen_urls = set([u[0] for u in seen_urls_q])
         status_user_ids = [user_tup[0] for user_tup in status_users_res if user_tup[0]]
         for i, status_user_id in enumerate(status_user_ids):
-            user_r_key = 'twitter_user:{status_user_id}'.format(status_user_id=status_user_id)
-            if r.get(user_r_key) is None:
-                self.log.info('Unshortening URLS for user id {0}. {1} of {2}'.format(status_user_id, i, len(status_user_ids)))
-                user_statuses = self.db_session.query(TwitterStatus).filter(TwitterStatus.user_id==status_user_id).all()
-                status_urls_flat = []
-                for user_status in user_statuses:
-                    status_data = json.loads(user_status.status_data)
-                    status_url_dicts = status_data['entities']['urls']
-                    just_urls = [d['url'] for d in status_url_dicts]
-                    status_urls_flat.extend(just_urls)
+            self.log.info('Seen {} urls'.format(len(seen_urls)))
+            self.log.info('Unshortening URLS for user id {0}. {1} of {2}'.format(status_user_id, i, len(status_user_ids)))
+            user_statuses = self.db_session.query(TwitterStatus).filter(TwitterStatus.user_id==status_user_id).all()
+            status_urls_flat = []
+            for user_status in user_statuses:
+                status_data = json.loads(user_status.status_data)
+                status_url_dicts = status_data['entities']['urls']
+                just_urls = [d['url'] for d in status_url_dicts]
+                status_urls_flat.extend(just_urls)
 
-                urls_to_shorten = [url for url in status_urls_flat if url not in seen_urls]
-                self.log.debug('{} status urls found {} urls to update'.format(len(status_urls_flat), len(urls_to_shorten)))
-                if len(urls_to_shorten)>0:
-                    with warnings.catch_warnings():
-                        warnings.simplefilter("ignore")
-                        short_unshort_res = bulkUnshorten(urls_to_shorten)
+            urls_to_shorten = list(set([url for url in status_urls_flat if url not in seen_urls]))
+
+            while len(urls_to_shorten)>0:
+                # because of a bug in bulkUnshorten where short URLS that have the same final_url are collapsed
+                # into one key as a work around we will check the urls that didn't get unshortened in a loop
+                # self.log.debug("urls to shorten are: {}".format(urls_to_shorten))
+
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    short_unshort_res = bulkUnshorten(urls_to_shorten)
 
                     unshortend_rows = []
+                    round_unshortened_urls = set() # the short urls that were unshortened this ronud
                     for short_url, unshort_res in short_unshort_res.items():
                         unshortend_row = TwitterUnshortenedUrls(short_url=short_url,
                                                                 unshortened_url=unshort_res['final_url'],
                                                                 error_unshortening=unshort_res['error'])
                         unshortend_rows.append(unshortend_row)
+                        round_unshortened_urls.add(short_url)
+
                     self.db_session.add_all(unshortend_rows)
                     self.db_session.commit()
                     # check which of these urls are already unshortened
-                    seen_urls.update(set(status_urls_flat))
-                    self.log.info('Seen {} urls'.format(len(seen_urls)))
-                    r.set(user_r_key, True)
-            else:
-                self.log.info("Skipping user: {status_user_id}, already done according to redis.".format(status_user_id=status_user_id))
+                    seen_urls.update(round_unshortened_urls)
+
+                    #find the leftovers
+                    self.log.debug('Sent {} items to bulkUnshorten, got back {}'.format(len(urls_to_shorten), len(short_unshort_res)))
+                    urls_to_shorten = [url for url in urls_to_shorten if url not in seen_urls]
+                    self.log.debug('Found {} urls not shortened by bulkUnshorten'.format(len(urls_to_shorten)))
