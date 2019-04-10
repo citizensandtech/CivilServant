@@ -37,8 +37,10 @@ def bulkUnshorten(urls, workers=20):
                                         "original_url": url}
             except InvalidURL: # there are no guarantees in thi world.
                 pass # this url won't be coming along for the ride.
+        # print('there are {} urls at the beggining'.format(len(urls)))
 
     while True:
+        # print('there are {} urls in the middle'.format(len(urls)))
 
         session = FuturesSession(max_workers=workers)
         futures = []
@@ -65,7 +67,7 @@ def bulkUnshorten(urls, workers=20):
                     continue
                 except requests.exceptions.ConnectionError as e:
                     url = e.request.url
-                    urls[url]['error'] = "ReadTimeout"
+                    urls[url]['error'] = "ConnectionError"
                     urls[url]['success'] = False
                     continue
 
@@ -92,7 +94,9 @@ def bulkUnshorten(urls, workers=20):
                         urls[result.url]['hops'] += 1
                         urls[result.url]['final_url'] = redirect_url
                         urls[result.url]['status_code'] = result.status_code
-                        urls[redirect_url] = urls.pop(result.url)
+                        # print('would pop')
+                        # print('redirect url is: {}, result.url is {}'.format(redirect_url, result.url))
+                        # urls[redirect_url] = urls.pop(result.url)
                     except KeyError: #no location to find
                         urls[result.url]['error'] = "BadRedirect"
                         urls[result.url]['success'] = False
@@ -106,6 +110,7 @@ def bulkUnshorten(urls, workers=20):
                     # log.info('bad redirect found in {}'.format(result))
         else:
 
+            # print('there are {} urls at the end'.format(len(urls)))
             url_dict = {}
 
             for key in urls:
