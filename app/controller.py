@@ -217,13 +217,13 @@ def fetch_twitter_tweets(backfill=False, collection_seconds=None, user_rand_frac
     log.info("Finished fetch_twitter_tweets, backfill={0}. PID={1}".format(backfill, str(os.getpid())))
 
 
-def unshorten_twitter_urls():
+def unshorten_twitter_urls(twitter_uid=None):
     """
     unshorten all the twitter statuses urls
     """
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
     log.info('Starting unshorten twitter urls')
-    t.unshorten_urls()
+    t.unshorten_urls(twitter_uid)
     # twitter_conn.checkin_endpoint()
     log.info("Finished unshorten twitter urls")
 
