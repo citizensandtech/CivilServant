@@ -17,8 +17,8 @@ def bulkUnshorten(urls, workers=20):
     # - REQUEST_TIMEOUT is the timeout when waiting for a reply from a remote server
     # - HOPS_LIMIT is the maximum number of redirect hops allowed
 
-    REQUEST_TIMEOUT = 10
-    HOPS_LIMIT = 10
+    REQUEST_TIMEOUT = 3
+    HOPS_LIMIT = 3
 
     # Allow passing in of one url as a string object
     if (isinstance(urls, str)):
