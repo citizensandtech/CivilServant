@@ -889,7 +889,8 @@ class TwitterController():
                 just_urls = [d['url'] for d in status_url_dicts]
                 status_urls_flat.extend(just_urls)
 
-            urls_to_shorten = list(set([url for url in status_urls_flat if url not in seen_urls]))
+            # urls_to_shorten = list(set([url for url in status_urls_flat if url not in seen_urls]))
+            urls_to_shorten = set(status_urls_flat).difference(seen_urls)
 
             while len(urls_to_shorten)>0:
                 # because of a bug in bulkUnshorten where short URLS that have the same final_url are collapsed
