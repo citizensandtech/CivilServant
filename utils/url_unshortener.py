@@ -1,5 +1,5 @@
 import requests
-from requests.exceptions import InvalidURL
+from requests.exceptions import InvalidURL, MissingSchema
 from requests_futures.sessions import FuturesSession
 from concurrent.futures import wait
 
@@ -37,6 +37,8 @@ def bulkUnshorten(urls, workers=20):
                                         "original_url": url}
             except InvalidURL: # there are no guarantees in thi world.
                 pass # this url won't be coming along for the ride.
+            except MissingSchema:
+                pass # potentially could add https://, but for now skipping
         # print('there are {} urls at the beggining'.format(len(urls)))
 
     while True:
@@ -94,8 +96,7 @@ def bulkUnshorten(urls, workers=20):
                         urls[result.url]['hops'] += 1
                         urls[result.url]['final_url'] = redirect_url
                         urls[result.url]['status_code'] = result.status_code
-                        # print('would pop')
-                        # print('redirect url is: {}, result.url is {}'.format(redirect_url, result.url))
+                        # Troublesome line that was collapsing the output dict by the URLS that had the same final destination
                         # urls[redirect_url] = urls.pop(result.url)
                     except KeyError: #no location to find
                         urls[result.url]['error'] = "BadRedirect"
