@@ -917,4 +917,4 @@ class TwitterController():
                     r.set(user_r_key, True)
 
             else:
-                self.log.info(f"Already done users: {status_user_id}")
+                self.log.info("Already done users: {status_user_id}".format(status_user_id=status_user_id))
