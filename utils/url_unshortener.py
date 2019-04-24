@@ -72,6 +72,9 @@ def bulkUnshorten(urls, workers=20):
                     urls[url]['error'] = "ConnectionError"
                     urls[url]['success'] = False
                     continue
+                except UnicodeDecodeError as e:
+                    print(f'Unicode error: {e.object} for obj:')
+                    continue
 
 
                 if result.status_code == 200:

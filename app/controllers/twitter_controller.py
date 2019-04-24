@@ -916,3 +916,5 @@ class TwitterController():
                     seen_urls.update(round_unshortened_urls)
                     r.set(user_r_key, True)
 
+            else:
+                self.log.info(f"Already done users: {status_user_id}")
