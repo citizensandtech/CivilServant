@@ -73,7 +73,7 @@ def bulkUnshorten(urls, workers=20):
                     urls[url]['success'] = False
                     continue
                 except UnicodeDecodeError as e:
-                    print(f'Unicode error: {e.object} for obj:')
+                    print('Unicode error: {} for obj:'.format(e.object))
                     continue
 
 
