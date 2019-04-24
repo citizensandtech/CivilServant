@@ -883,7 +883,8 @@ class TwitterController():
 
         for i, status_user_id in enumerate(status_user_ids):
             user_r_key = 'twitter_user:{status_user_id}'.format(status_user_id=status_user_id)
-            if user_r_key is not None:
+            user_done = r.get(user_r_key)
+            if user_done is None:
                 self.log.info('Seen {} urls'.format(len(seen_urls)))
                 self.log.info('Unshortening URLS for user id {0}. {1} of {2}'.format(status_user_id, i, len(status_user_ids)))
                 user_statuses = self.db_session.query(TwitterStatus).filter(TwitterStatus.user_id==status_user_id).all()
