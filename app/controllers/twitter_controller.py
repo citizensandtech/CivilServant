@@ -919,3 +919,24 @@ class TwitterController():
 
             else:
                 self.log.info("Already done users: {status_user_id}".format(status_user_id=status_user_id))
+
+
+    def output_unshorten_urls(self):
+        r = redis.Redis()
+
+        status_users_res = self.db_session.query(distinct(TwitterStatus.user_id)).all()
+        status_user_ids = [user_tup[0] for user_tup in status_users_res if user_tup[0]]
+
+        for i, status_user_id in enumerate(status_user_ids):
+            self.log.info('Unshortening URLS for user id {0}. {1} of {2}'.format(status_user_id, i, len(status_user_ids)))
+            user_statuses = self.db_session.query(TwitterStatus).filter(TwitterStatus.user_id==status_user_id).all()
+            status_urls_flat = []
+            for user_status in user_statuses:
+                status_data = json.loads(user_status.status_data)
+                status_url_dicts = status_data['entities']['urls']
+                just_urls = [d['url'] for d in status_url_dicts]
+                status_urls_flat.extend(just_urls)
+
+            for url in status_urls_flat:
+                user_r_key = 'twitter_urls_needing_unshortening:{url}'.format(url)
+                r.set(user_r_key, url)
