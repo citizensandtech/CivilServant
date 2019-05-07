@@ -227,6 +227,16 @@ def unshorten_twitter_urls(twitter_uid=None):
     # twitter_conn.checkin_endpoint()
     log.info("Finished unshorten twitter urls")
 
+def output_unshorten_urls():
+    """
+    unshorten all the twitter statuses urls
+    """
+    t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
+    log.info('Starting unshorten twitter urls')
+    t.output_unshorten_urls()
+    # twitter_conn.checkin_endpoint()
+    log.info("Finished unshorten twitter urls")
+
 def twitter_observational_analysis_basic_profiling():
     tb = app.controllers.twitter_observational_analysis_controller.TwitterBasicProfilingController(
         "/home/mmou/Dropbox/Documents/Chronos/MIT/CM/CivilServant", db_session, log)
