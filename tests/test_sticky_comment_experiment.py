@@ -606,6 +606,7 @@ def test_make_control_nonaction(mock_comment, mock_submission, mock_reddit):
         assert action_metadata['group'] == "test"
         assert action_metadata['condition'] == experiment_submission_metadata['condition']
         assert action_metadata['arm'] == "arm_" + str(experiment_submission_metadata['randomization']['treatment'])
+        assert 'randomization' in action_metadata.keys()
 
         ## make sure it aborts the call if we try a second time
         sticky_result = controller_instance.make_control_nonaction(experiment_submission, mock_submission)

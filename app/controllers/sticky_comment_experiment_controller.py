@@ -21,7 +21,10 @@ ENV = os.environ['CS_ENV']
 
 
 class StickyCommentExperimentController:
-    def __init__(self, experiment_name, db_session, r, log, required_keys):
+    def __init__(self, experiment_name, db_session, r, log, required_keys = 
+        ['subreddit', 'subreddit_id', 'username', 'conditions', 'controller', 
+         'max_eligibility_age', 'min_eligibility_age']):
+
         self.db_session = db_session
         self.log = log
         self.r = r
@@ -213,7 +216,10 @@ class StickyCommentExperimentController:
             action = "Intervention",
             action_object_type = ThingType.SUBMISSION.value,
             action_object_id = submission.id,
-            metadata_json = json.dumps({"group":group, "condition":condition, "arm": "arm_"+str(treatment_arm)})
+            metadata_json = json.dumps({"group":"treatment", "condition":condition,
+                "arm":"arm_" + str(treatment_arm),
+                "randomization": metadata['randomization'],
+                "action_object_created_utc":None})
         )
         self.db_session.add(experiment_action)
         self.db_session.commit()
@@ -340,15 +346,15 @@ class StickyCommentExperimentController:
             #        self.experiment.start_time))
             #    continue
 
-            ## THE FOLLOWING IF STATEMENT IS NOT TESTED IN THE UNIT TESTS
-            #if((curtime - submission.created_utc) > self.max_eligibility_age):
-            #    self.log.info("{0}: Submission created_utc {1} is {2} seconds greater than current time {3}, exceeding the max eligibility age of {4}. Declining to Add to the Experiment".format(
-            #        self.__class__.__name__,
-            #        submission.created_utc,
-            #        curtime - submission.created_utc,
-            #        curtime,
-            #        self.max_eligibility_age))
-            #    continue
+            # THE FOLLOWING IF STATEMENT IS NOT TESTED IN THE UNIT TESTS
+            if((curtime - submission.created_utc) > self.max_eligibility_age):
+                #self.log.info("{0}: Submission created_utc {1} is {2} seconds greater than current time {3}, exceeding the max eligibility age of {4}. Declining to Add to the Experiment".format(
+                #    self.__class__.__name__,
+                #    submission.created_utc,
+                #    curtime - submission.created_utc,
+                #    curtime,
+                #    self.max_eligibility_age))
+                continue
 
 
             eligible_submissions.append(submission)
