@@ -15,6 +15,7 @@ pyyaml
 pytz
 numpy
 pathlib
+psutil
 
 #if you have trouble with mysqlclient on OSX High Sierra
 # run:

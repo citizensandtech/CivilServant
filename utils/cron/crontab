@@ -1,4 +1,6 @@
 # m h  dom mon dow   command
+*/1 * * * * /usr/local/civilservant/platform/utils/worker_monitor.py -m 3 -e -n -s csjobs -c "/usr/local/civilservant/venv/bin/python3 /usr/local/civilservant/venv/bin/rqworker production"
 */10 * * * * /usr/local/civilservant/platform/utils/cron/log_scheduled_jobs.sh
 */10 * * * * /usr/local/civilservant/platform/utils/cron/log_mysql_size.sh
+30 20 * * * /usr/local/civilservant/venv/bin/python3 /usr/local/civilservant/platform/utils/email_db_report.py production
 
