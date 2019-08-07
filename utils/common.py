@@ -38,6 +38,13 @@ class CS_JobState(Enum):
     NEEDS_RETRY = 5     # for flagging purposes...
     WONT_PROCESS = 6    # decide not process because they were never existing in the first place.
 
+class TwitterUrlKey(Enum):
+    ENTITY = 1
+    EXTENDED = 2 # extended entity, aka media
+    RETWEETED_ENTITY = 3
+    RETWEETED_EXTENDED = 4
+    QUOTED_ENTITY = 5
+    QUOTED_EXTENDED = 6
 
 def generate_not_found_twitter_user_id(screen_name=""):
     capped_screen_name = screen_name if len(screen_name)<30 else screen_name[:30] + "..."
