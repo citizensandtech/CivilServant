@@ -881,12 +881,14 @@ class TwitterController():
         else:
             status_user_ids = [int(twitter_uid)]
 
+        # for each user...
         for i, status_user_id in enumerate(status_user_ids):
             user_r_key = 'twitter_user:{status_user_id}'.format(status_user_id=status_user_id)
             user_done = r.get(user_r_key)
             if user_done is None:
                 self.log.info('Seen {} urls'.format(len(seen_urls)))
                 self.log.info('Unshortening URLS for user id {0}. {1} of {2}'.format(status_user_id, i, len(status_user_ids)))
+                # get all user's tweets
                 user_statuses = self.db_session.query(TwitterStatus).filter(TwitterStatus.user_id==status_user_id).all()
                 status_urls_flat = []
                 for user_status in user_statuses:
@@ -931,12 +933,75 @@ class TwitterController():
             self.log.info('Unshortening URLS for user id {0}. {1} of {2}'.format(status_user_id, i, len(status_user_ids)))
             user_statuses = self.db_session.query(TwitterStatus).filter(TwitterStatus.user_id==status_user_id).all()
             status_urls_flat = []
+
+
+    def extract_urls(self, twitter_uid=None):
+ 
+        if twitter_uid is None:
+            status_users_res = self.db_session.query(distinct(TwitterStatus.user_id)).all()
+            status_user_ids = [user_tup[0] for user_tup in status_users_res if user_tup[0]]
+        else:
+            status_user_ids = [int(twitter_uid)]
+
+        for i, status_user_id in enumerate(status_user_ids):
+            self.log.info('Extracting URLS for user id {0}. {1} of {2}'.format(status_user_id, i, len(status_user_ids)))
+            # get all user's tweets
+
+            user_statuses = self.db_session.query(TwitterStatus).filter(TwitterStatus.user_id==status_user_id).all()
+
             for user_status in user_statuses:
                 status_data = json.loads(user_status.status_data)
-                status_url_dicts = status_data['entities']['urls']
-                just_urls = [d['url'] for d in status_url_dicts]
-                status_urls_flat.extend(just_urls)
+                url_rows = extract_urls_from_status_data(user_status.id, status_data)
+                self.db_session.add_all(url_rows)
+                self.db_session.commit()
 
-            for url in status_urls_flat:
-                user_r_key = 'twitter_urls_needing_unshortening:{url}'.format(url)
-                r.set(user_r_key, url)
+
+    # returns list of TwitterStatusUrls
+    def extract_urls_from_status_data(status_id, data, default_key):
+        url_rows = []
+
+        if 'entities' in status_data and 'urls' in status_data['entities']:
+            urls = status_data['entities']['urls']
+            key = default_key if default_key is not None else TwitterUrlKey.ENTITY
+
+            for url in urls:
+                url_row = TwitterStatusUrls(
+                    twitter_status_id = status_id,
+                    status_data_key = key.value,
+                    raw_url = url['url'] if 'url' in url else None,
+                    expanded_url = url['expanded_url'] if 'expanded_url' in url else None,
+                    unwound_url = url['unwound']['url'] if 'unwound' in url and 'url' in data['unwound'] else None)
+
+                url_rows.append(url_row)
+
+        if 'extended_entities' in status_data and 'media' in status_data['extended_entities']:
+            urls = status_data['extended_entities']['media']
+            key = default_key if default_key is not None else TwitterUrlKey.EXTENDED
+            if key is TwitterUrlKey.RETWEETED_ENTITY:
+                key = TwitterUrlKey.RETWEETED_EXTENDED
+            elif key is TwitterUrlKey.QUOTED_ENTITY:
+                key = TwitterUrlKey.QUOTED_EXTENDED
+
+            for media in urls:
+                url_row = TwitterStatusUrls(
+                    twitter_status_id = status_id,
+                    status_data_key = key.value, 
+                    raw_url = media['url'] if 'url' in media else None,
+                    expanded_url = media['expanded_url'] if 'expanded_url' in media else None,
+                    unwound_url = media['unwound']['url'] if 'unwound' in media and 'url' in media['unwound'] else None)
+
+                url_rows.append(url_row)
+
+        if 'retweeted_status' in status_data:
+            retweeted_url_rows = extract_urls_from_status_data(status_id,
+                    status_data['retweeted_status'],
+                    TwitterUrlKey.RETWEETED_ENTITY)
+            url_rows += retweeted_url_rows
+
+        if 'quoted_status' in status_data:
+            quoted_url_rows = extract_urls_from_status_data(status_id,
+                    status_data['quoted_status'],
+                    TwitterUrlKey.QUOTED_ENTITY)
+            url_rows += quoted_url_rows
+
+        return url_rows

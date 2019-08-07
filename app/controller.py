@@ -243,6 +243,22 @@ def twitter_observational_analysis_basic_profiling():
     tb.basic_profiling_create_dataset()
 
 
+def extract_twitter_urls(twitter_uid=None):
+    """
+    extract all the twitter statuses urls
+    """
+    t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
+    log.info('Starting exract twitter urls')
+    t.extract_urls(twitter_uid)
+    # twitter_conn.checkin_endpoint()
+    log.info("Finished extract twitter urls")
+
+def twitter_observational_analysis_basic_profiling():
+    tb = app.controllers.twitter_observational_analysis_controller.TwitterBasicProfilingController(
+        "/home/mmou/Dropbox/Documents/Chronos/MIT/CM/CivilServant", db_session, log)
+    tb.basic_profiling_create_dataset()
+
+
 # python app/controller.py twitter_observational_analysis 2017-05-31 2017-06-02 7 /home/mmou/Dropbox/Documents/Chronos/MIT/CM/CivilServant
 def twitter_observational_analysis(start_date, end_date, min_observed_days, output_dir):
     start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")

@@ -276,6 +276,25 @@ class TwitterUnshortenedUrls(Base):
     error_unshortening  = Column(TINYTEXT)
     record_created_at   = Column(DateTime, default=datetime.datetime.utcnow, index=True) # need this index for fast counting
 
+class TwitterStatusUrls(Base):
+    __tablename__ = 'twitter_status_urls'
+    id                  = Column(BigInteger, primary_key = True)
+    twitter_status_id   = Column(BigInteger, index = True)
+    status_data_key     = Column(Integer) # enum TwitterUrlKey 
+    raw_url             = Column(TEXT) 
+    expanded_url        = Column(TEXT) 
+    unwound_url         = Column(TEXT)
+    needs_unshorten     = Column(Boolean(), default = False) 
+    unshortened_url     = Column(TEXT) 
+    error_unshortening  = Column(TINYTEXT) 
+    tld_text            = Column(TEXT)
+    record_created_at   = Column(DateTime, default=datetime.datetime.utcnow, index=True) # need this index for fast counting 
+
+class TwitterTlds(Base):
+    __tablename__       = 'twitter_tlds'
+    id                  = Column(BigInteger, index = True)
+    text                = Column(TEXT, primary_key = True)
+    is_civic            = Column(Boolean(), default = False)
 
 class TwitterRateState(Base):
     # this tables keeps track of the RateLimit of each of our donated tokens
