@@ -4,7 +4,7 @@ import sys
 import simplejson as json
 from utils.common import *
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, BigInteger, Index, Float, ForeignKey
-from sqlalchemy.dialects.mysql import MEDIUMTEXT, LONGTEXT, TINYTEXT, TEXT
+from sqlalchemy.dialects.mysql import MEDIUMTEXT, LONGTEXT, TINYTEXT, TEXT, VARCHAR
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy import create_engine
@@ -293,7 +293,7 @@ class TwitterStatusUrls(Base):
 class TwitterTlds(Base):
     __tablename__       = 'twitter_tlds'
     id                  = Column(BigInteger, index = True)
-    text                = Column(TEXT, primary_key = True)
+    text                = Column(VARCHAR(300), primary_key = True)
     is_civic            = Column(Boolean(), default = False)
 
 class TwitterRateState(Base):

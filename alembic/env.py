@@ -44,7 +44,8 @@ ENV = os.environ['CS_ENV']
 metadata = {
       'development':models.Base.metadata,
       'test':models.Base.metadata,
-      'production':models.Base.metadata 
+      'production':models.Base.metadata,
+      'merry':models.Base.metadata 
   }
 
 

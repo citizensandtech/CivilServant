@@ -6,12 +6,12 @@ import twitter
 import simplejson as json
 import datetime
 from app.models import Base, TwitterUser, TwitterStatus, LumenNoticeToTwitterUser, TwitterUserSnapshot, TwitterFill, \
-    TwitterUnshortenedUrls
+    TwitterUnshortenedUrls, TwitterStatusUrls
 import requests
 import sqlalchemy
 from sqlalchemy import and_, or_, func, distinct
 import utils.common
-from utils.common import TwitterUserState, NOT_FOUND_TWITTER_USER_STR, CS_JobState, neq, EXPERIMENT_LANGUAGES
+from utils.common import TwitterUserState, NOT_FOUND_TWITTER_USER_STR, CS_JobState, neq, EXPERIMENT_LANGUAGES, TwitterUrlKey
 import sys, warnings, os
 from collections import defaultdict
 
@@ -951,13 +951,13 @@ class TwitterController():
 
             for user_status in user_statuses:
                 status_data = json.loads(user_status.status_data)
-                url_rows = extract_urls_from_status_data(user_status.id, status_data)
+                url_rows = self.extract_urls_from_status_data(user_status.id, status_data, None)
                 self.db_session.add_all(url_rows)
                 self.db_session.commit()
 
 
     # returns list of TwitterStatusUrls
-    def extract_urls_from_status_data(status_id, data, default_key):
+    def extract_urls_from_status_data(self, status_id, status_data, default_key):
         url_rows = []
 
         if 'entities' in status_data and 'urls' in status_data['entities']:
@@ -972,6 +972,7 @@ class TwitterController():
                     expanded_url = url['expanded_url'] if 'expanded_url' in url else None,
                     unwound_url = url['unwound']['url'] if 'unwound' in url and 'url' in data['unwound'] else None)
 
+                #self.log.info('...status id {0}: got url={1}; total={2}'.format(status_id, url['url'], len(url_rows)+1))
                 url_rows.append(url_row)
 
         if 'extended_entities' in status_data and 'media' in status_data['extended_entities']:
@@ -990,16 +991,17 @@ class TwitterController():
                     expanded_url = media['expanded_url'] if 'expanded_url' in media else None,
                     unwound_url = media['unwound']['url'] if 'unwound' in media and 'url' in media['unwound'] else None)
 
+                #self.log.info('...user id {0}: got url; total={1}'.format(status_id, len(url_rows)+1))
                 url_rows.append(url_row)
 
         if 'retweeted_status' in status_data:
-            retweeted_url_rows = extract_urls_from_status_data(status_id,
+            retweeted_url_rows = self.extract_urls_from_status_data(status_id,
                     status_data['retweeted_status'],
                     TwitterUrlKey.RETWEETED_ENTITY)
             url_rows += retweeted_url_rows
 
         if 'quoted_status' in status_data:
-            quoted_url_rows = extract_urls_from_status_data(status_id,
+            quoted_url_rows = self.extract_urls_from_status_data(status_id,
                     status_data['quoted_status'],
                     TwitterUrlKey.QUOTED_ENTITY)
             url_rows += quoted_url_rows
