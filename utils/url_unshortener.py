@@ -129,8 +129,9 @@ def bulkUnshorten(urls, workers=20, REQUEST_TIMEOUT=10, HOPS_LIMIT=5):
                     except InvalidURL:
                         urls = setErrorOnUrls(urls, result.url, 'InvalidURL')
                 else:
-                    urls = setErrorOnUrls(urls, result.url, err_msg=None, status_code=result.status_code)
+                    urls = setErrorOnUrls(urls, result.url, err_msg=result.status_code, status_code=result.status_code)
         else:
+            session.close()
             return urls
 
 
