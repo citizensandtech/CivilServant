@@ -880,18 +880,19 @@ class TwitterController():
         status_url_id_max = self.db_session.query(func.max(TwitterStatusUrls.id)).one()[0]
         status_url_id_min = self.db_session.query(func.min(TwitterStatusUrls.id)).one()[0]
         status_url_id_cnt = self.db_session.query(func.count(TwitterStatusUrls.id)).one()[0]
-        self.log.info(f'status_url_id_max is {status_url_id_max}')
-        self.log.info(f'status_url_id_min is {status_url_id_min}')
-        self.log.info(f'status_url_id_cnt is {status_url_id_cnt}')
+        self.log.info('status_url_id_max is {status_url_id_max}'.format(status_url_id_max=status_url_id_max))
+        self.log.info('status_url_id_min is {status_url_id_min}'.format(status_url_id_min=status_url_id_min))
+        self.log.info('status_url_id_cnt is {status_url_id_cnt}'.format(status_url_id_cnt=status_url_id_cnt))
 
         num_batches = math.ceil((status_url_id_max-status_url_id_min)/unshorten_batch_size)
         for batch_i in range(num_batches):
             start_id = status_url_id_min + (batch_i * unshorten_batch_size)
             end_id = status_url_id_min + ((batch_i+1) * unshorten_batch_size)
-            self.log.debug(f'working on status url ids {start_id} --- {end_id}')
+            self.log.debug('working on status url ids {start_id} --- {end_id}'.format(start_id=start_id))
             batch_status_urls = self.db_session.query(TwitterStatusUrls) \
                 .filter(and_(TwitterStatusUrls.id >= start_id, TwitterStatusUrls.id < end_id)).all()
-            self.log.info(f'Working on batch:{batch_i} {len(batch_status_urls)} status urls')
+            self.log.info('Working on batch:{batch_i} {len_batch_status_urls} status urls'.format(batch_i=batch_i,
+                                                                                                  len_batch_status_urls=len(batch_status_urls)))
             urls_to_unshorten = [su.expanded_url for su in batch_status_urls]
             # run them through the unshortener
             with warnings.catch_warnings():
