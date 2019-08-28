@@ -888,7 +888,7 @@ class TwitterController():
         for batch_i in range(num_batches):
             start_id = status_url_id_min + (batch_i * unshorten_batch_size)
             end_id = status_url_id_min + ((batch_i+1) * unshorten_batch_size)
-            self.log.debug('working on status url ids {start_id} --- {end_id}'.format(start_id=start_id))
+            self.log.debug('working on status url ids {start_id} --- {end_id}'.format(start_id=start_id, end_id=end_id))
             batch_status_urls = self.db_session.query(TwitterStatusUrls) \
                 .filter(and_(TwitterStatusUrls.id >= start_id, TwitterStatusUrls.id < end_id)).all()
             self.log.info('Working on batch:{batch_i} {len_batch_status_urls} status urls'.format(batch_i=batch_i,
