@@ -1,3 +1,4 @@
+import math
 import random
 from operator import eq
 
@@ -869,61 +870,49 @@ class TwitterController():
         job_state = CS_JobState.PROCESSED
         return job_state
 
-    def unshorten_urls(self, twitter_uid=None):
-        r = redis.Redis()
 
-        seen_urls_q = self.db_session.query(TwitterUnshortenedUrls.short_url).all()
-        seen_urls = set([u[0] for u in seen_urls_q])
+    def unshorten_urls(self, unshorten_batch_size=100):
+        # iterate over twitter_status_urls converting expanded urls to unshortened urls
+        # get the max and minimum status ids
+        # batch between those # 10,000 items
+        # run the url unshortener on the batch
+        # re-insert the results based on table id or expanded_url
+        status_url_id_max = self.db_session.query(func.max(TwitterStatusUrls.id)).one()[0]
+        status_url_id_min = self.db_session.query(func.min(TwitterStatusUrls.id)).one()[0]
+        status_url_id_cnt = self.db_session.query(func.count(TwitterStatusUrls.id)).one()[0]
+        self.log.info(f'status_url_id_max is {status_url_id_max}')
+        self.log.info(f'status_url_id_min is {status_url_id_min}')
+        self.log.info(f'status_url_id_cnt is {status_url_id_cnt}')
 
-        if twitter_uid is None:
-            status_users_res = self.db_session.query(distinct(TwitterStatus.user_id)).all()
-            status_user_ids = [user_tup[0] for user_tup in status_users_res if user_tup[0]]
-        else:
-            status_user_ids = [int(twitter_uid)]
+        num_batches = math.ceil((status_url_id_max-status_url_id_min)/unshorten_batch_size)
+        for batch_i in range(num_batches):
+            start_id = status_url_id_min + (batch_i * unshorten_batch_size)
+            end_id = status_url_id_min + ((batch_i+1) * unshorten_batch_size)
+            self.log.debug(f'working on status url ids {start_id} --- {end_id}')
+            batch_status_urls = self.db_session.query(TwitterStatusUrls) \
+                .filter(and_(TwitterStatusUrls.id >= start_id, TwitterStatusUrls.id < end_id)).all()
+            self.log.info(f'Working on batch:{batch_i} {len(batch_status_urls)} status urls')
+            urls_to_unshorten = [su.expanded_url for su in batch_status_urls]
+            # run them through the unshortener
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                unshort_results = bulkUnshorten(urls_to_unshorten)
 
-        # for each user...
-        for i, status_user_id in enumerate(status_user_ids):
-            user_r_key = 'twitter_user:{status_user_id}'.format(status_user_id=status_user_id)
-            user_done = r.get(user_r_key)
-            if user_done is None:
-                self.log.info('Seen {} urls'.format(len(seen_urls)))
-                self.log.info('Unshortening URLS for user id {0}. {1} of {2}'.format(status_user_id, i, len(status_user_ids)))
-                # get all user's tweets
-                user_statuses = self.db_session.query(TwitterStatus).filter(TwitterStatus.user_id==status_user_id).all()
-                status_urls_flat = []
-                for user_status in user_statuses:
-                    status_data = json.loads(user_status.status_data)
-                    status_url_dicts = status_data['entities']['urls']
-                    just_urls = [d['url'] for d in status_url_dicts]
-                    status_urls_flat.extend(just_urls)
+            #stich these back up
 
-                # urls_to_shorten = list(set([url for url in status_urls_flat if url not in seen_urls]))
-                urls_to_shorten = list(set(status_urls_flat).difference(seen_urls))
+            for unshort_res in unshort_results:
+                # find the db objects associated
+                matching_sus = [su for su in batch_status_urls if unshort_res['original_url']==su.expanded_url]
+                for matching_su in matching_sus:
+                    matching_su.unshortened_url = unshort_res['final_url']
+                    matching_su.error_unshortening = unshort_res['error'] if not unshort_res['success'] else None
 
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
-                    short_unshort_res = bulkUnshorten(urls_to_shorten)
-
-                    unshortend_rows = []
-                    round_unshortened_urls = set() # the short urls that were unshortened this ronud
-                    for short_url, unshort_res in short_unshort_res.items():
-                        unshortend_row = TwitterUnshortenedUrls(short_url=short_url,
-                                                                unshortened_url=unshort_res['final_url'],
-                                                                error_unshortening=unshort_res['error'])
-                        unshortend_rows.append(unshortend_row)
-                        round_unshortened_urls.add(short_url)
-
-                    self.db_session.add_all(unshortend_rows)
-                    self.db_session.commit()
-                    # check which of these urls are already unshortened
-                    seen_urls.update(round_unshortened_urls)
-                    r.set(user_r_key, True)
-
-            else:
-                self.log.info("Already done users: {status_user_id}".format(status_user_id=status_user_id))
+            self.db_session.add_all(batch_status_urls)
+            self.db_session.commit()
 
 
     def output_unshorten_urls(self):
+        # deprecated based on new way unshortening is happening
         r = redis.Redis()
 
         status_users_res = self.db_session.query(distinct(TwitterStatus.user_id)).all()
@@ -936,7 +925,7 @@ class TwitterController():
 
 
     def extract_urls(self, twitter_uid=None):
- 
+
         if twitter_uid is None:
             status_users_res = self.db_session.query(distinct(TwitterStatus.user_id)).all()
             status_user_ids = [user_tup[0] for user_tup in status_users_res if user_tup[0]]
@@ -986,7 +975,7 @@ class TwitterController():
             for media in urls:
                 url_row = TwitterStatusUrls(
                     twitter_status_id = status_id,
-                    status_data_key = key.value, 
+                    status_data_key = key.value,
                     raw_url = media['url'] if 'url' in media else None,
                     expanded_url = media['expanded_url'] if 'expanded_url' in media else None,
                     unwound_url = media['unwound']['url'] if 'unwound' in media and 'url' in media['unwound'] else None)
