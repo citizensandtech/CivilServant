@@ -96,7 +96,9 @@ def bulkUnshorten(urls, workers=20, REQUEST_TIMEOUT=10, HOPS_LIMIT=5):
                     urls = setErrorOnUrls(urls, e.request.url, "ReadTimeout")
                     continue
                 except requests.exceptions.InvalidSchema as e:
-                    urls = setErrorOnUrls(urls, e.request.url, "InvalidSchema")
+                    req_url = obj._exception.args[0].split('No connection adapters were found for \'')[1].split('\'')[0]
+                    urls = setErrorOnUrls(urls, req_url, "InvalidSchema")
+                    continue
                 except UnicodeDecodeError as e:
                     log.error('Unicode error: {} for obj:'.format(e.object))
                     continue
