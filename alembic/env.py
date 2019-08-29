@@ -45,7 +45,7 @@ metadata = {
       'development':models.Base.metadata,
       'test':models.Base.metadata,
       'production':models.Base.metadata,
-      'merry':models.Base.metadata 
+      # 'merry':models.Base.metadata
   }
 
 
