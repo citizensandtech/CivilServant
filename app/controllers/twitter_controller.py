@@ -902,21 +902,22 @@ class TwitterController():
                                                                                                   len_batch_status_urls=len(batch_status_urls)))
             urls_to_unshorten = [su.expanded_url for su in batch_status_urls]
 
-            # run them through the unshortener
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                unshort_results = bulkUnshorten(urls_to_unshorten)
+            if urls_to_unshorten:
+                # run them through the unshortener
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    unshort_results = bulkUnshorten(urls_to_unshorten)
 
-            #stich these back up
-            for unshort_res in unshort_results:
-                # find the db objects associated
-                matching_sus = [su for su in batch_status_urls if unshort_res['original_url']==su.expanded_url]
-                for matching_su in matching_sus:
-                    matching_su.unshortened_url = unshort_res['final_url']
-                    matching_su.error_unshortening = unshort_res['error'] if not unshort_res['success'] else None
+                #stich these back up
+                for unshort_res in unshort_results:
+                    # find the db objects associated
+                    matching_sus = [su for su in batch_status_urls if unshort_res['original_url']==su.expanded_url]
+                    for matching_su in matching_sus:
+                        matching_su.unshortened_url = unshort_res['final_url']
+                        matching_su.error_unshortening = unshort_res['error'] if not unshort_res['success'] else None
 
-            self.db_session.add_all(batch_status_urls)
-            self.db_session.commit()
+                self.db_session.add_all(batch_status_urls)
+                self.db_session.commit()
 
 
     def output_unshorten_urls(self):
