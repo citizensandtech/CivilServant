@@ -871,7 +871,7 @@ class TwitterController():
         return job_state
 
 
-    def unshorten_urls(self, unshorten_batch_size=100, idempotent=True):
+    def unshorten_urls(self, unshorten_batch_size=100):
         # iterate over twitter_status_urls converting expanded urls to unshortened urls
         # get the max and minimum status ids
         # batch between those # 10,000 items
@@ -889,25 +889,18 @@ class TwitterController():
             start_id = status_url_id_min + (batch_i * unshorten_batch_size)
             end_id = status_url_id_min + ((batch_i+1) * unshorten_batch_size)
             self.log.debug('working on status url ids {start_id} --- {end_id}'.format(start_id=start_id, end_id=end_id))
-            batch_status_urls_a = self.db_session.query(TwitterStatusUrls) \
+            batch_status_urls = self.db_session.query(TwitterStatusUrls) \
                 .filter(and_(TwitterStatusUrls.id >= start_id, TwitterStatusUrls.id < end_id)).all()
-
-            if idempotent:
-                batch_status_urls = [su for su in batch_status_urls_a if
-                                     (su.unshortened_url is None and su.error_unshortening is None)]
-            else:
-                batch_status_urls = batch_status_urls_a
-
             self.log.info('Working on batch:{batch_i} {len_batch_status_urls} status urls'.format(batch_i=batch_i,
                                                                                                   len_batch_status_urls=len(batch_status_urls)))
             urls_to_unshorten = [su.expanded_url for su in batch_status_urls]
-
             # run them through the unshortener
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 unshort_results = bulkUnshorten(urls_to_unshorten)
 
             #stich these back up
+
             for unshort_res in unshort_results:
                 # find the db objects associated
                 matching_sus = [su for su in batch_status_urls if unshort_res['original_url']==su.expanded_url]

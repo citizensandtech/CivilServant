@@ -82,7 +82,7 @@ def bulkUnshorten(urls, workers=20, REQUEST_TIMEOUT=10, HOPS_LIMIT=5):
 
         if futures:
             done, incomplete = wait(futures)
-            # log.debug("done:{0} incomplete:{1}".format(len(done), len(incomplete)))
+            log.debug("done:{0} incomplete:{1}".format(len(done), len(incomplete)))
             for obj in done:
                 try:
                     result = obj.result()
