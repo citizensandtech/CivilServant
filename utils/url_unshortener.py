@@ -41,7 +41,7 @@ def bulkUnshorten(urls, workers=20, REQUEST_TIMEOUT=10, HOPS_LIMIT=5):
         return return_urls
 
     log.info("Bulk Unshorten 2 called with {len_urls} urls. Num workers specified: {workers}".format(len_urls=len(urls), workers=workers))
-    log.info("Hops limit is {HOPS_LIMIT} and request Timeout Seconds = {REQUEST_TIMEOUT}".format(HOPS_LIMIT=HOPS_LIMIT, REQUEST_TIMEOUT=REQUEST_TIMEOUT))
+    # log.info("Hops limit is {HOPS_LIMIT} and request Timeout Seconds = {REQUEST_TIMEOUT}".format(HOPS_LIMIT=HOPS_LIMIT, REQUEST_TIMEOUT=REQUEST_TIMEOUT))
 
     # Allow passing in of one url as a string object
     if (isinstance(urls, str)):
@@ -67,7 +67,7 @@ def bulkUnshorten(urls, workers=20, REQUEST_TIMEOUT=10, HOPS_LIMIT=5):
                 url_dict['success'] = False
             finally:
                 urls.append(url_dict)
-        log.debug('Starting URLS before unshortening are: {urls}'.format(urls=urls))
+        # log.debug('Starting URLS before unshortening are: {urls}'.format(urls=urls))
 
     while True:
 
@@ -82,6 +82,7 @@ def bulkUnshorten(urls, workers=20, REQUEST_TIMEOUT=10, HOPS_LIMIT=5):
 
         if futures:
             done, incomplete = wait(futures)
+            log.debug("done:{0} incomplete:{1}".format(len(done), len(incomplete)))
             for obj in done:
                 try:
                     result = obj.result()
@@ -130,8 +131,8 @@ def bulkUnshorten(urls, workers=20, REQUEST_TIMEOUT=10, HOPS_LIMIT=5):
                         urls = setErrorOnUrls(urls, result.url, 'InvalidURL')
                 else:
                     urls = setErrorOnUrls(urls, result.url, err_msg=result.status_code, status_code=result.status_code)
-        else:
             session.close()
+        else:
             return urls
 
 
