@@ -100,6 +100,9 @@ def bulkUnshorten(urls, workers=20, REQUEST_TIMEOUT=5, HOPS_LIMIT=4):
                     urls = setErrorOnUrls(urls, req_url, "InvalidSchema")
                     continue
                 except UnicodeDecodeError as e:
+                    log.error('UnicodeDecodeError error: {} for obj:'.format(e.object))
+                    continue
+                except UnicodeError as e:
                     log.error('Unicode error: {} for obj:'.format(e.object))
                     continue
 
