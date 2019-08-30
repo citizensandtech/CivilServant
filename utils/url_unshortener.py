@@ -133,6 +133,7 @@ def bulkUnshorten(urls, workers=20, REQUEST_TIMEOUT=5, HOPS_LIMIT=4):
                                 url_dict['final_url'] = redirect_url
                                 url_dict['status_code'] = result.status_code
                                 url_dict['curr_url'] = redirect_url
+                                url_dict['success'] = 'redirecting...'
                     except KeyError:  # no location to find
                         urls = setErrorOnUrls(urls, result.url, 'BadRedirect')
                     except InvalidURL:
