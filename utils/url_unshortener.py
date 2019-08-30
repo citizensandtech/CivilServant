@@ -103,7 +103,12 @@ def bulkUnshorten(urls, workers=20, REQUEST_TIMEOUT=5, HOPS_LIMIT=4):
                     log.error('UnicodeDecodeError error: {} for obj:'.format(e.object))
                     continue
                 except UnicodeError as e:
-                    log.error('Unicode error: {} for obj:'.format(e.object))
+                    log.error('Unicode error: {} for obj:'.format(e))
+                    log.error('Objs internal exception {}'.format(obj._exception))
+                    continue
+                except Exception as e:
+                    log.error("An unknown error {} for obj".format(e))
+                    log.error('Objs internal exception {}'.format(obj._exception))
                     continue
 
                 if result.status_code == 200:
@@ -140,6 +145,10 @@ def bulkUnshorten(urls, workers=20, REQUEST_TIMEOUT=5, HOPS_LIMIT=4):
                     urls = setErrorOnUrls(urls, result.url, err_msg=result.status_code, status_code=result.status_code)
             session.close()
         else:
+            # unsuccessful_without_error = [url_dict for url_dict in urls if
+            #                              url_dict['orginal_url']==url_dict['curr_url'] and url_dict['success'] is None]
+            # for unsuccessful in unsuccessful_without_error:
+            #     urls = setErrorOnUrls(urls, unsuccessful, 'UnknownError')
             return urls
 
 
