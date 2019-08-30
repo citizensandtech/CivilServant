@@ -12,7 +12,7 @@ BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.
 log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
 
-def bulkUnshorten(urls, workers=20, REQUEST_TIMEOUT=10, HOPS_LIMIT=5):
+def bulkUnshorten(urls, workers=20, REQUEST_TIMEOUT=5, HOPS_LIMIT=4):
     """ Slightly less performant version that will keep input and output dimensions 1-1.
         :param urls urls to follow redirects
         :param workers number of concurrent futures to pursue

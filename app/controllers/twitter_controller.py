@@ -871,7 +871,7 @@ class TwitterController():
         return job_state
 
 
-    def unshorten_urls(self, unshorten_batch_size=100, idempotent=True):
+    def unshorten_urls(self, unshorten_batch_size=1000, idempotent=True):
         # iterate over twitter_status_urls converting expanded urls to unshortened urls
         # get the max and minimum status ids
         # batch between those # 10,000 items
