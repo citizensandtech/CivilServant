@@ -17,6 +17,7 @@ import app.controllers.stylesheet_experiment_controller
 import app.controllers.sticky_comment_experiment_controller
 import app.controllers.lumen_controller
 import app.controllers.twitter_controller
+import app.controllers.twitter_analysis_controller
 import app.controllers.twitter_observational_analysis_controller
 from utils.common import PageType, DbEngine
 import app.cs_logger
@@ -29,6 +30,7 @@ ENV = os.environ['CS_ENV']
 
 ### LOAD SQLALCHEMY SESSION
 db_session = DbEngine(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV)).new_session()
+db_session_write = DbEngine(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV)).new_session()
 db_session_twit_conn = DbEngine(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV)).new_session()
 
 # LOAD LOGGER
@@ -236,6 +238,21 @@ def output_unshorten_urls():
     t.output_unshorten_urls()
     # twitter_conn.checkin_endpoint()
     log.info("Finished unshorten twitter urls")
+
+def twitter_observational_analysis_basic_profiling():
+    tb = app.controllers.twitter_observational_analysis_controller.TwitterBasicProfilingController(
+        "/home/mmou/Dropbox/Documents/Chronos/MIT/CM/CivilServant", db_session, log)
+    tb.basic_profiling_create_dataset()
+
+def extract_twitter_urls2():
+    """
+    extract all the twitter statuses urls
+    """
+    t = app.controllers.twitter_analysis_controller.TwitterAnalysisController(db_session, db_session_write, twitter_conn, log)
+    log.info('Starting extract twitter urls')
+    t.extract_urls2()
+    # twitter_conn.checkin_endpoint()
+    log.info("Finished extract twitter urls")
 
 def twitter_observational_analysis_basic_profiling():
     tb = app.controllers.twitter_observational_analysis_controller.TwitterBasicProfilingController(
