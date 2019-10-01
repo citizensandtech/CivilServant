@@ -239,11 +239,6 @@ def output_unshorten_urls():
     # twitter_conn.checkin_endpoint()
     log.info("Finished unshorten twitter urls")
 
-def twitter_observational_analysis_basic_profiling():
-    tb = app.controllers.twitter_observational_analysis_controller.TwitterBasicProfilingController(
-        "/home/mmou/Dropbox/Documents/Chronos/MIT/CM/CivilServant", db_session, log)
-    tb.basic_profiling_create_dataset()
-
 def extract_twitter_urls2():
     """
     extract all the twitter statuses urls
@@ -265,12 +260,6 @@ def get_tlds(start, end):
     t.get_tlds(int(start), int(end))
 
     log.info('Finishing get tlds')
-
-def twitter_observational_analysis_basic_profiling():
-    tb = app.controllers.twitter_observational_analysis_controller.TwitterBasicProfilingController(
-        "/home/mmou/Dropbox/Documents/Chronos/MIT/CM/CivilServant", db_session, log)
-    tb.basic_profiling_create_dataset()
-
 
 def extract_twitter_urls(twitter_uid=None):
     """

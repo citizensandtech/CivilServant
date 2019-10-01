@@ -105,7 +105,6 @@ class TwitterAnalysisController():
                     unwound_url = url['unwound']['url'] if 'unwound' in url and 'url' in data['unwound'] else None)
 
                 self.log.info('...status id {0}: got url={1}; total={2}'.format(status_id, url['url'], len(url_rows)+1))
-                print(">>>>>> url_row.expanded_url: {0}".format(url_row.expanded_url))
                 url_rows.append(url_row)
 
         if 'extended_entities' in status_data and 'media' in status_data['extended_entities']:
