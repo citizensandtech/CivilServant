@@ -254,6 +254,18 @@ def extract_twitter_urls2():
     # twitter_conn.checkin_endpoint()
     log.info("Finished extract twitter urls")
 
+# example usage: `python3 app/controller.py get_tlds 1400 1700`
+def get_tlds(start, end):
+    """
+    get tlds from unshortened twitter status urls
+    """
+    t = app.controllers.twitter_analysis_controller.TwitterAnalysisController(db_session, db_session_write, twitter_conn, log)
+    log.info('Starting get tlds')
+
+    t.get_tlds(int(start), int(end))
+
+    log.info('Finishing get tlds')
+
 def twitter_observational_analysis_basic_profiling():
     tb = app.controllers.twitter_observational_analysis_controller.TwitterBasicProfilingController(
         "/home/mmou/Dropbox/Documents/Chronos/MIT/CM/CivilServant", db_session, log)

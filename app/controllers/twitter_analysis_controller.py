@@ -6,7 +6,7 @@ import twitter
 import simplejson as json
 import datetime
 from app.models import Base, TwitterUser, TwitterStatus, LumenNoticeToTwitterUser, TwitterUserSnapshot, TwitterFill, \
-    TwitterUnshortenedUrls, TwitterStatusUrls
+    TwitterUnshortenedUrls, TwitterStatusUrls, TwitterTlds
 import requests
 import sqlalchemy
 from sqlalchemy import and_, or_, func, distinct
@@ -16,6 +16,8 @@ import sys, warnings, os
 from collections import defaultdict
 
 from utils.url_unshortener import bulkUnshorten
+
+import tldextract
 
 TWITTER_DATETIME_STR_FORMAT = "%a %b %d %H:%M:%S %z %Y"
 
@@ -27,14 +29,28 @@ class TwitterAnalysisController():
         self.db_session_write = db_session_write
         self.log = log
 
+    # "script 2"
+    def get_tlds(self, start, end):
+        batch = 5000
+        for i in range(start, end):
+            rows = self.db_session.query(TwitterStatusUrls) \
+                .filter(and_(TwitterStatusUrls.id >= i*batch, \
+                        TwitterStatusUrls.id < (i+1)*batch, \
+                        TwitterStatusUrls.tld_text == None \
+                        ))
+            self.log.info('Extracting tlds from URLS... {0} rows'.format(i*batch))
+            for row in rows:
+                full_url = row.unshortened_url if row.unshortened_url is not None else row.expanded_url
+                tld = tldextract.extract(full_url).registered_domain.lower() # primary key
+                self.log.info('...... id={0}, url={1}, tld={2}'.format(row.id, full_url, tld))
+                row.tld_text = tld
+                self.db_session.commit()
+
+    # "script 1"
     def extract_urls2(self):
-            # get all user's tweets
-
-        # ids = ('457071416543023104','653650657283584003','735632499561406466','736964861050097664','737001893386420224','737222038767718400','737258692236705796','737314495492726784')
-
         i = 0
         count = 0
-        for user_status in self.db_session.query(TwitterStatus).filter(TwitterStatus.id >= '1083413693998616576').order_by(TwitterStatus.id).yield_per(1000):
+        for user_status in self.db_session.query(TwitterStatus).order_by(TwitterStatus.id).yield_per(1000):
             self.log.info('Extracting URLS... {0} statuses, {1} urls; current status id = {2}'.format(i, count, user_status.id))
             status_data = json.loads(user_status.status_data.encode("utf-8", "replace")) if user_status.status_data is not None else None
             url_rows = self.extract_urls_from_status_data(user_status.id, status_data, None)
