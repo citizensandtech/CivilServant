@@ -17,6 +17,7 @@ import app.controllers.stylesheet_experiment_controller
 import app.controllers.sticky_comment_experiment_controller
 import app.controllers.lumen_controller
 import app.controllers.twitter_controller
+import app.controllers.twitter_analysis_controller
 import app.controllers.twitter_observational_analysis_controller
 from utils.common import PageType, DbEngine
 import app.cs_logger
@@ -29,6 +30,7 @@ ENV = os.environ['CS_ENV']
 
 ### LOAD SQLALCHEMY SESSION
 db_session = DbEngine(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV)).new_session()
+db_session_write = DbEngine(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV)).new_session()
 db_session_twit_conn = DbEngine(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV)).new_session()
 
 # LOAD LOGGER
@@ -217,13 +219,13 @@ def fetch_twitter_tweets(backfill=False, collection_seconds=None, user_rand_frac
     log.info("Finished fetch_twitter_tweets, backfill={0}. PID={1}".format(backfill, str(os.getpid())))
 
 
-def unshorten_twitter_urls(twitter_uid=None):
+def unshorten_twitter_urls():
     """
     unshorten all the twitter statuses urls
     """
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
     log.info('Starting unshorten twitter urls')
-    t.unshorten_urls(twitter_uid)
+    t.unshorten_urls()
     # twitter_conn.checkin_endpoint()
     log.info("Finished unshorten twitter urls")
 
@@ -236,6 +238,38 @@ def output_unshorten_urls():
     t.output_unshorten_urls()
     # twitter_conn.checkin_endpoint()
     log.info("Finished unshorten twitter urls")
+
+def extract_twitter_urls2():
+    """
+    extract all the twitter statuses urls
+    """
+    t = app.controllers.twitter_analysis_controller.TwitterAnalysisController(db_session, db_session_write, twitter_conn, log)
+    log.info('Starting extract twitter urls')
+    t.extract_urls2()
+    # twitter_conn.checkin_endpoint()
+    log.info("Finished extract twitter urls")
+
+# example usage: `python3 app/controller.py get_tlds 1400 1700`
+def get_tlds(start, end):
+    """
+    get tlds from unshortened twitter status urls
+    """
+    t = app.controllers.twitter_analysis_controller.TwitterAnalysisController(db_session, db_session_write, twitter_conn, log)
+    log.info('Starting get tlds')
+
+    t.get_tlds(int(start), int(end))
+
+    log.info('Finishing get tlds')
+
+def extract_twitter_urls(twitter_uid=None):
+    """
+    extract all the twitter statuses urls
+    """
+    t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
+    log.info('Starting exract twitter urls')
+    t.extract_urls(twitter_uid)
+    # twitter_conn.checkin_endpoint()
+    log.info("Finished extract twitter urls")
 
 def twitter_observational_analysis_basic_profiling():
     tb = app.controllers.twitter_observational_analysis_controller.TwitterBasicProfilingController(

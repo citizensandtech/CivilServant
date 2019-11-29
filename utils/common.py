@@ -38,6 +38,13 @@ class CS_JobState(Enum):
     NEEDS_RETRY = 5     # for flagging purposes...
     WONT_PROCESS = 6    # decide not process because they were never existing in the first place.
 
+class TwitterUrlKey(Enum):
+    ENTITY = 1
+    EXTENDED = 2 # extended entity, aka media
+    RETWEETED_ENTITY = 3
+    RETWEETED_EXTENDED = 4
+    QUOTED_ENTITY = 5
+    QUOTED_EXTENDED = 6
 
 def generate_not_found_twitter_user_id(screen_name=""):
     capped_screen_name = screen_name if len(screen_name)<30 else screen_name[:30] + "..."
@@ -112,11 +119,11 @@ class DbEngine:
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
         from app.models import Base
-        db_engine = create_engine("mysql://{user}:{password}@{host}/{database}".format(
+        db_engine = create_engine("mysql://{user}:{password}@{host}/{database}?charset=utf8mb4".format(
             host = DBCONFIG['host'],
             user = DBCONFIG['user'],
             password = DBCONFIG['password'],
-            database = DBCONFIG['database']), pool_recycle=3600)
+            database = DBCONFIG['database']), pool_recycle=3600, encoding='utf8')
 
         Base.metadata.bind = db_engine
         DBSession = sessionmaker(bind=db_engine)

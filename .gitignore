@@ -81,3 +81,11 @@ target/
 \.pytest_cache/
 
 utils/logs/
+
+utils/sql/
+
+*.ipynb
+
+utils/url_unshortener_frequency_count\.py
+
+*.json~
