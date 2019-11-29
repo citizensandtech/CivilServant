@@ -119,11 +119,11 @@ class DbEngine:
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
         from app.models import Base
-        db_engine = create_engine("mysql://{user}:{password}@{host}/{database}".format(
+        db_engine = create_engine("mysql://{user}:{password}@{host}/{database}?charset=utf8mb4".format(
             host = DBCONFIG['host'],
             user = DBCONFIG['user'],
             password = DBCONFIG['password'],
-            database = DBCONFIG['database']), pool_recycle=3600)
+            database = DBCONFIG['database']), pool_recycle=3600, encoding='utf8')
 
         Base.metadata.bind = db_engine
         DBSession = sessionmaker(bind=db_engine)
