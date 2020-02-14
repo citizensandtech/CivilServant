@@ -77,7 +77,7 @@ class StickyCommentExperimentController:
             )
             self.db_session.add(experiment)
             self.db_session.commit()
-        
+       
         ### SET UP INSTANCE PROPERTIES
         self.experiment = experiment
         self.experiment_settings = json.loads(self.experiment.settings_json)
@@ -322,7 +322,7 @@ class StickyCommentExperimentController:
 
         eligible_submissions = []
         eligible_submission_ids = []
-        curtime = time.time()
+        curtime = datetime.datetime.utcnow().timestamp()
 
         for id, submission in submissions.items():
             if id in already_processed_ids:
@@ -346,14 +346,7 @@ class StickyCommentExperimentController:
             #        self.experiment.start_time))
             #    continue
 
-            # THE FOLLOWING IF STATEMENT IS NOT TESTED IN THE UNIT TESTS
             if((curtime - submission.created_utc) > self.max_eligibility_age):
-                #self.log.info("{0}: Submission created_utc {1} is {2} seconds greater than current time {3}, exceeding the max eligibility age of {4}. Declining to Add to the Experiment".format(
-                #    self.__class__.__name__,
-                #    submission.created_utc,
-                #    curtime - submission.created_utc,
-                #    curtime,
-                #    self.max_eligibility_age))
                 continue
 
 
@@ -406,7 +399,6 @@ class StickyCommentExperimentController:
             experiment_things.append(experiment_thing)
             
         self.experiment.settings_json = json.dumps(self.experiment_settings)
-        self.db_session.commit()
         self.log.info("{0}: Experiment {1}: assigned conditions to {2} submissions".format(
             self.__class__.__name__, self.experiment.name,len(experiment_things)))
         return experiment_things
@@ -527,8 +519,8 @@ class StickyCommentExperimentController:
                 metadata_json = json.dumps(snapshot)
             )
             self.db_session.add(experiment_thing_snapshot)
-
             snapshots.append(experiment_thing_snapshot)
+
         self.db_session.commit()
 
         self.log.info("{controller}: Experiment {experiment}: Logged metadata for {submissions} submissions.".format(
@@ -632,7 +624,7 @@ class FrontPageStickyCommentExperimentController(StickyCommentExperimentControll
 
         # list of praw objects
         to_archive_posts = [eligible_submissions[sid] for sid in eligible_submissions if sid not in existing_post_ids]
-
+            
         for post in to_archive_posts:
             post_info = post.json_dict if("json_dict" in dir(post)) else post['data'] ### TO HANDLE TEST FIXTURES
             new_post = Post(
