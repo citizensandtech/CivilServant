@@ -216,7 +216,7 @@ class StickyCommentExperimentController:
             action = "Intervention",
             action_object_type = ThingType.SUBMISSION.value,
             action_object_id = submission.id,
-            metadata_json = json.dumps({"group":"treatment", "condition":condition,
+            metadata_json = json.dumps({"group":group, "condition":condition,
                 "arm":"arm_" + str(treatment_arm),
                 "randomization": metadata['randomization'],
                 "action_object_created_utc":None})
