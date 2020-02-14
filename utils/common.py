@@ -64,15 +64,33 @@ class DbEngine:
 		db_session = DBSession()
 		return db_session
 
-def _json_object_hook(dobj):
-	dobj['json_dict'] = dobj.copy()
-	X =  namedtuple('X', dobj.keys(), rename=True)
-	X.remove = lambda x: None
-	return(X(*dobj.values()))
+def _index_or_none(l, obj):
+    try:
+        return l.index(obj)
+    except ValueError:
+        return None
 
-def json2obj(data):
-	return json.loads(data, object_hook=_json_object_hook)
+def _json_object_hook(dobj, now=False, offset=0):
+    dobj['json_dict'] = dobj.copy()
+    keys = list(dobj.keys())
+    values = list(dobj.values())
+    if now:
+        from datetime import datetime
+        created_utc = int(datetime.utcnow().timestamp()) + offset
+        created_utc_idx = _index_or_none(keys, 'created_utc')
+        if created_utc_idx:
+            values[created_utc_idx] = created_utc
+        else:
+            keys.append('created_utc')
+            values.append(created_utc)
+        dobj['json_dict']['created_utc'] = created_utc
+    Hydrated = namedtuple('Hydrated', keys, rename=True)
+    Hydrated.remove = lambda x: None
+    return Hydrated(*values)
 
+def json2obj(data, now=False, offset=0):
+    object_hook = lambda dobj: _json_object_hook(dobj, now, offset)
+    return json.loads(data, object_hook=object_hook)
 
 class CommentNode:
 	def __init__(self, id, data, link_id = None, toplevel = False, parent=None):
