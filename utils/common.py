@@ -28,15 +28,19 @@ class EventWhen(Enum):
     AFTER = 2
 
 class RetryableDbSession(sqlalchemy.orm.session.Session):
-    @retryable(backoff=True)
-    def add_retryable(self, one_or_many, commit=True):
-        try:
-            self.add_all(one_or_many)
-        except TypeError:
-            self.add(one_or_many)
-        if commit:
-            self.commit()
-        return one_or_many
+    # TODO Move commit logic into retryable for consistency now that it handles rollbacks
+
+    def add_retryable(self, one_or_many, commit=True, rollback=True):
+        @retryable(backoff=True, session=self, rollback=rollback)
+        def _perform_add():
+            try:
+                self.add_all(one_or_many)
+            except TypeError:
+                self.add(one_or_many)
+            if commit:
+                self.commit()
+            return one_or_many
+        _perform_add()
 
     @retryable(backoff=True)
     def execute_retryable(self, clause, params=None, commit=True):

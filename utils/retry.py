@@ -26,7 +26,8 @@ BACKOFF_MAX_TIMES = 5
 def retryable(fn=None, retry=RETRY, backoff=BACKOFF, retry_wait=RETRY_WAIT,
               retry_max_times=RETRY_MAX_TIMES, backoff_base=BACKOFF_BASE,
               backoff_max_exp=BACKOFF_MAX_EXP,
-              backoff_max_times=BACKOFF_MAX_TIMES, _testing=False):
+              backoff_max_times=BACKOFF_MAX_TIMES, rollback=False,
+              session=None, _testing=False):
     if fn is None:
         return functools.partial(retryable, retry=retry, backoff=backoff,
                                  retry_wait=retry_wait,
@@ -76,6 +77,8 @@ def retryable(fn=None, retry=RETRY, backoff=BACKOFF, retry_wait=RETRY_WAIT,
             except Exception as e:
                 _retry._retryable_last_exception = e
                 _log.exception("Exception encountered in a retryable function")
+                if session and rollback:
+                    session.rollback()
 
         if _retry._retryable_last_exception:
             raise _retry._retryable_last_exception
