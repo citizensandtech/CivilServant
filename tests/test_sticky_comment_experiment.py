@@ -119,9 +119,10 @@ def test_get_eligible_objects(mock_subreddit, mock_reddit):
         sub_data = []
         with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
             fixture = [x['data'] for x in json.loads(f.read())['data']['children']]
+            min_age = experiment_settings["min_eligibility_age"]
             for post in fixture:
                 json_dump = json.dumps(post)
-                postobj = json2obj(json_dump)
+                postobj = json2obj(json_dump, now=True, offset=-1*min_age)
                 sub_data.append(postobj)
 
         mock_subreddit.get_new.return_value = sub_data
@@ -198,9 +199,10 @@ def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
         sub_data = []
         with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
             fixture = [x['data'] for x in json.loads(f.read())['data']['children']]
+            min_age = experiment_settings["min_eligibility_age"]
             for post in fixture:
                 json_dump = json.dumps(post)
-                postobj = json2obj(json_dump)
+                postobj = json2obj(json_dump, now=True, offset=-1*min_age)
                 sub_data.append(postobj)
         mock_subreddit.get_new.return_value = sub_data
         mock_subreddit.display_name = experiment_settings['subreddit']
@@ -322,9 +324,10 @@ def test_update_experiment(intervene_ama_arm_1, intervene_ama_arm_0,
         sub_data = []
         with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
             fixture = [x['data'] for x in json.loads(f.read())['data']['children']]
+            min_age = experiment_settings["min_eligibility_age"]
             for post in fixture:
                 json_dump = json.dumps(post)
-                postobj = json2obj(json_dump)
+                postobj = json2obj(json_dump, now=True, offset=-1*min_age)
                 sub_data.append(postobj)
         mock_subreddit.get_new.return_value = sub_data
         mock_subreddit.display_name = experiment_settings['subreddit']
@@ -398,7 +401,7 @@ def test_submission_acceptable(mock_comment, mock_submission, mock_reddit):
     with open("{script_dir}/fixture_data/submission_0.json".format(script_dir=TEST_DIR)) as f:
         submission_json = json.loads(f.read())
         ## setting the submission time to be recent enough
-        submission = json2obj(json.dumps(submission_json))
+        submission = json2obj(json.dumps(submission_json), now=True)
         mock_submission.id = submission.id
         mock_submission.json_dict = submission.json_dict
 
@@ -762,9 +765,10 @@ def test_identify_condition(mock_subreddit, mock_reddit):
         sub_data = []
         with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
             fixture = [x['data'] for x in json.loads(f.read())['data']['children']]
+            min_age = experiment_settings["min_eligibility_age"]
             for post in fixture:
                 json_dump = json.dumps(post)
-                postobj = json2obj(json_dump)
+                postobj = json2obj(json_dump, now=True, offset=-1*min_age)
                 sub_data.append(postobj)
         mock_subreddit.get_new.return_value = sub_data
         mock_subreddit.display_name = experiment_settings['subreddit']
@@ -806,15 +810,18 @@ def test_identify_condition(mock_subreddit, mock_reddit):
 @patch('praw.Reddit', autospec=True)
 def test_frontpage_get_eligible_objects(mock_reddit):
     r = mock_reddit.return_value
+    controller = FrontPageStickyCommentExperimentController
+    controller_instance = controller("sticky_comment_frontpage_test", db_session, r, log)
+    
     with open("{script_dir}/fixture_data/front_page_0.json".format(script_dir=TEST_DIR)) as f:
         fp_json = json.loads(f.read())['data']['children']
         ## setting the submission time to be recent enough
         mock_fp_posts = []
+        min_age = controller_instance.min_eligibility_age
         for post in fp_json:
-            mock_fp_posts.append(json2obj(json.dumps(post['data'])))
+            mock_post = json2obj(json.dumps(post['data']), now=True, offset=-1*min_age)
+            mock_fp_posts.append(mock_post)
 
-    controller = FrontPageStickyCommentExperimentController
-    controller_instance = controller("sticky_comment_frontpage_test", db_session, r, log)
     eligible_objects = controller_instance.get_eligible_objects(mock_fp_posts)
     assert len(eligible_objects) == 6
     for obj in eligible_objects:
