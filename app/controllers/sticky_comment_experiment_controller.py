@@ -75,9 +75,10 @@ class StickyCommentExperimentController:
                 end_time = parser.parse(experiment_config['end_time']),
                 settings_json = json.dumps(experiment_config)
             )
-            self.db_session.add(experiment)
-            self.db_session.commit()
-       
+            self.db_session.add_retryable(experiment)
+            #self.db_session.add(experiment)
+            #self.db_session.commit()
+        
         ### SET UP INSTANCE PROPERTIES
         self.experiment = experiment
         self.experiment_settings = json.loads(self.experiment.settings_json)
@@ -129,8 +130,9 @@ class StickyCommentExperimentController:
                     callee_module = hooks[hook_name]['callee_module'],
                     callee_controller = hooks[hook_name]['callee_controller'],
                     callee_method = hooks[hook_name]['callee_method'])
-                self.db_session.add(hook_record)
-                self.db_session.commit()
+                self.db_session.add_retryable(hook_record)
+                #self.db_session.add(hook_record)
+                #self.db_session.commit()
 
     ## main scheduled job
     def update_experiment(self):
@@ -221,8 +223,9 @@ class StickyCommentExperimentController:
                 "randomization": metadata['randomization'],
                 "action_object_created_utc":None})
         )
-        self.db_session.add(experiment_action)
-        self.db_session.commit()
+        self.db_session.add_retryable(experiment_action)
+        #self.db_session.add(experiment_action)
+        #self.db_session.commit()
         self.log.info("{0}: Experiment {1} applied arm {2} to post {3} (condition = {4})".format(
             self.__class__.__name__,
             self.experiment_name, 
@@ -295,9 +298,10 @@ class StickyCommentExperimentController:
                                         "submission_id":submission.id})
         )
 
-        self.db_session.add(comment_thing)
-        self.db_session.add(experiment_action)
-        self.db_session.commit()
+        self.db_session.add_retryable([comment_thing, experiment_action])
+        #self.db_session.add(comment_thing)
+        #self.db_session.add(experiment_action)
+        #self.db_session.commit()
         return distinguish_results
 
 
@@ -395,10 +399,12 @@ class StickyCommentExperimentController:
                 object_created = datetime.datetime.fromtimestamp(submission.created_utc),
                 metadata_json  = json.dumps({"randomization":randomization, "condition":label})
             )
-            self.db_session.add(experiment_thing)
+            #self.db_session.add(experiment_thing)
             experiment_things.append(experiment_thing)
             
         self.experiment.settings_json = json.dumps(self.experiment_settings)
+        self.db_session.add_retryable(experiment_things)
+        #self.db_session.commit()
         self.log.info("{0}: Experiment {1}: assigned conditions to {2} submissions".format(
             self.__class__.__name__, self.experiment.name,len(experiment_things)))
         return experiment_things
@@ -465,8 +471,9 @@ class StickyCommentExperimentController:
                 "removed_comment_ids": removed_comment_ids
                 })
         )
-        self.db_session.add(experiment_action)
-        self.db_session.commit()
+        self.db_session.add_retryable(experiment_action)
+        #self.db_session.add(experiment_action)
+        #self.db_session.commit()
 
         self.log.info("{controller}: Experiment {experiment}: found {replies} replies to {treatments} treatment comments. Removed {removed} comments.".format(
             controller = self.__class__.__name__,
@@ -518,10 +525,11 @@ class StickyCommentExperimentController:
                 object_type = ThingType.SUBMISSION.value,
                 metadata_json = json.dumps(snapshot)
             )
-            self.db_session.add(experiment_thing_snapshot)
+            #self.db_session.add(experiment_thing_snapshot)
             snapshots.append(experiment_thing_snapshot)
 
-        self.db_session.commit()
+        self.db_session.add_retryable(snapshots)
+        #self.db_session.commit()
 
         self.log.info("{controller}: Experiment {experiment}: Logged metadata for {submissions} submissions.".format(
             controller = self.__class__.__name__,
@@ -625,6 +633,7 @@ class FrontPageStickyCommentExperimentController(StickyCommentExperimentControll
         # list of praw objects
         to_archive_posts = [eligible_submissions[sid] for sid in eligible_submissions if sid not in existing_post_ids]
             
+        new_posts = []
         for post in to_archive_posts:
             post_info = post.json_dict if("json_dict" in dir(post)) else post['data'] ### TO HANDLE TEST FIXTURES
             new_post = Post(
@@ -632,8 +641,10 @@ class FrontPageStickyCommentExperimentController(StickyCommentExperimentControll
                     subreddit_id = post_info['subreddit_id'].strip("t5_"), # janky
                     created = datetime.datetime.fromtimestamp(post_info['created_utc']),        
                     post_data = json.dumps(post_info))
-            self.db_session.add(new_post)
-        self.db_session.commit()
+            new_posts.append(new_post)
+            #self.db_session.add(new_post)
+        self.db_session.add_retryable(new_posts)
+        #self.db_session.commit()
 
     def get_eligible_objects(self, object_list):
       subreddit_id_fullname = "t5_"+ self.subreddit_id
