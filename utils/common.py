@@ -28,8 +28,6 @@ class EventWhen(Enum):
     AFTER = 2
 
 class RetryableDbSession(sqlalchemy.orm.session.Session):
-    # TODO: Round out this class with a standalone commit_retryable() method
-
     @retryable(backoff=True)
     def add_retryable(self, one_or_many, commit=True):
         try:
