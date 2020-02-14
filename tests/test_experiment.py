@@ -107,20 +107,21 @@ def test_identify_condition(mock_subreddit, mock_reddit):
         #"mod_user_test": ModUserExperimentController
     }
 
-    sub_data = []
-    with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
-        fixture = [x['data'] for x in json.loads(f.read())['data']['children']]
-        for post in fixture:
-            json_dump = json.dumps(post)
-            postobj = json2obj(json_dump)
-            sub_data.append(postobj)
-    mock_subreddit.get_new.return_value = sub_data
-
     ############
 
     for experiment_name in experiment_name_to_controller:
         with open(os.path.join(BASE_DIR, "config", "experiments") + "/"+ experiment_name + ".yml", "r") as f:
             experiment_settings = yaml.load(f.read())['test']
+
+        sub_data = []
+        with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
+            fixture = [x['data'] for x in json.loads(f.read())['data']['children']]
+            min_age = experiment_settings["min_eligibility_age"]
+            for post in fixture:
+                json_dump = json.dumps(post)
+                postobj = json2obj(json_dump, now=True, offset=-1*min_age)
+                sub_data.append(postobj)
+        mock_subreddit.get_new.return_value = sub_data
 
         mock_subreddit.display_name = experiment_settings['subreddit']
         mock_subreddit.name = experiment_settings['subreddit']
