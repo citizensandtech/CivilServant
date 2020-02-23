@@ -1,4 +1,5 @@
 from enum import Enum
+import contextlib
 import pathlib
 import simplejson as json
 import sqlalchemy.orm.session
@@ -55,6 +56,33 @@ class RetryableDbSession(sqlalchemy.orm.session.Session):
         if ignore_dupes:
             clause = clause.prefix_with("IGNORE")
         self.execute_retryable(clause, params, commit)
+    
+    def new_sibling_session(self):
+        from sqlalchemy.orm import sessionmaker
+        engine = self.get_bind()
+        SiblingSession = sessionmaker(bind=engine, class_=RetryableDbSession)
+        return SiblingSession()
+    
+    @contextlib.contextmanager
+    def cooplock(self, resource, experiment_id):
+        lock_session = self.new_sibling_session()
+        from app.models import ResourceLock
+        try:
+            self.insert_retryable(
+                ResourceLock,
+                {"resource": resource, "experiment_id": experiment_id},
+                ignore_dupes=True)
+            query = lock_session.query(ResourceLock) \
+                .with_for_update() \
+                .filter_by(resource=resource, experiment_id=experiment_id)
+            lock_rows = query.all()
+            yield lock_session, lock_rows
+            lock_session.commit()
+        except:
+            lock_session.rollback()
+            raise
+        finally:
+            lock_session.close()
 
 class DbEngine:
 	def __init__(self, config_path):
@@ -90,7 +118,7 @@ def _json_object_hook(dobj, now=False, offset=0):
     values = list(dobj.values())
     if now:
         from datetime import datetime
-        created_utc = int(datetime.utcnow().timestamp()) + offset
+        created_utc = int(datetime.now().timestamp()) + offset
         created_utc_idx = _index_or_none(keys, 'created_utc')
         if created_utc_idx:
             values[created_utc_idx] = created_utc

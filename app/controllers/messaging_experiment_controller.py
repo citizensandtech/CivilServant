@@ -11,7 +11,7 @@ from utils.common import *
 from app.models import Base, SubredditPage, Subreddit, Post, ModAction, PrawKey, Comment
 from app.models import Experiment, ExperimentThing, ExperimentAction, ExperimentThingSnapshot
 from app.models import EventHook
-from sqlalchemy import and_, or_, asc, desc
+from sqlalchemy import and_, or_, not_, asc, desc
 from app.controllers.messaging_controller import MessagingController
 from app.controllers.experiment_controller import *
 from collections import defaultdict
@@ -273,6 +273,18 @@ class NewcomerMessagingExperimentController(MessagingExperimentController):
             ExperimentThing.experiment_id == self.experiment.id,
             ExperimentThing.query_index == "Intervention TBD"
             )).order_by(ExperimentThing.created_at).all()
+
+    def get_surveyable_user_things(self):
+        followup = self.experiment_settings["survey_followup_in_days"]
+        cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=followup)
+        return self.db_session.query(ExperimentThing).filter(
+            ExperimentThing.experiment_id == self.experiment.id,
+            ExperimentThing.created_at < cutoff,
+            ExperimentThing.object_type == ThingType.USER.value,
+            not_(ExperimentThing.metadata_json.contains("\"survey_status\": \"sent\""))
+            ).order_by(ExperimentThing.created_at).all()
+            #TODO: Determine why adding this constraint fails:
+            #      ExperimentThing.query_index != "Intervention Impossible"
 
     ## Accepts a list of comments
     # and returns a list of comment authors who are newcomers

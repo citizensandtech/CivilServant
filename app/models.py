@@ -3,7 +3,7 @@ import os
 import sys
 import simplejson as json
 from utils.common import *
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Index
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Index, UniqueConstraint
 from sqlalchemy.dialects.mysql import MEDIUMTEXT, LONGTEXT
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -214,3 +214,12 @@ class MessageLog(Base):
     message_task_id     = Column(String(256), index=True)
     body                = Column(MEDIUMTEXT)
     metadata_json       = Column(MEDIUMTEXT)
+
+class ResourceLock(Base):
+    __tablename__       = "resource_locks"
+    __table_args__      = (UniqueConstraint("resource", "experiment_id"),)
+    id                  = Column(Integer, primary_key=True)
+    created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    resource            = Column(String(256), nullable=False, index=True)
+    experiment_id       = Column(Integer, nullable=False, index=True)
+

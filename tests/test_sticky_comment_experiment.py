@@ -444,12 +444,12 @@ def test_submission_acceptable(mock_comment, mock_submission, mock_reddit):
         ## First check acceptability on a submission with an old timestamp
         ## which should return None and take no action
         assert db_session.query(ExperimentAction).count() == 0
-        mock_submission.created_utc = int(datetime.datetime.utcnow().timestamp()) - 1000
+        mock_submission.created_utc = int(datetime.datetime.now().timestamp()) - 1000
         # Can be safely commented out according to JNM
         #assert controller_instance.submission_acceptable(mock_submission) == False
 
         ## Next, check acceptability on a more recent submission
-        mock_submission.created_utc = int(datetime.datetime.utcnow().timestamp())
+        mock_submission.created_utc = int(datetime.datetime.now().timestamp())
         assert db_session.query(ExperimentThing).filter(ExperimentThing.object_type==ThingType.COMMENT.value).count() == 0
         assert controller_instance.submission_acceptable(mock_submission) == True
 

@@ -5,11 +5,11 @@ test:
   newcomer_period_interval_days: 180
   newcomer_supplemental_json_file: tests/fixture_data/file_comments_0.json
   survey_followup_in_days: 14
-  ## THE SURVEY URL SHOULD HAVE A {userkey} inside
-  survey_url: TBA
-  survey_message_subject: TBA
+  ## THE SURVEY URL SHOULD HAVE A {username} inside
+  survey_url: http://example.com/testing?={username}
+  survey_message_subject: This is a test subject
   ## THE SURVEY MESSAGE SHOULD HAVE A {username} inside
-  survey_message_text: TBA
+  survey_message_text: This is a test containing {url} and {username}
   conditions: 
     main:
         randomizations: newcomer_messaging_experiment_test_main.conditions.csv 

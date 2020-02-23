@@ -7,6 +7,7 @@ import app.controllers.comment_controller
 import app.controllers.moderator_controller
 import app.controllers.stylesheet_experiment_controller
 import app.controllers.sticky_comment_experiment_controller
+import app.controllers.messaging_controller
 import app.controllers.messaging_experiment_controller
 from utils.common import PageType, DbEngine
 from utils.perftest import profilable
@@ -164,8 +165,26 @@ def update_newcomer_messaging_experiment(experiment_name):
         log = log
     )
     mec.update_experiment()
-  
+
+@profilable
+def send_surveys(experiment_name):
+    r = conn.connect(controller=experiment_name)
+    #c = get_experiment_class(experiment_name)
+    e = app.controllers.messaging_experiment_controller.NewcomerMessagingExperimentController(
+        experiment_name = experiment_name,
+        db_session = db_session,
+        r = r,
+        log = log
+    )
+    survey_controller = app.controllers.messaging_controller.SurveyController(
+        db_session = db_session,
+        r = r,
+        log = log,
+        experiment_controller = e)
+    survey_controller.send_surveys()
+
 if __name__ == "__main__":
     fnc = sys.argv[1]
     args =  sys.argv[2:]
     locals()[fnc](*args)
+

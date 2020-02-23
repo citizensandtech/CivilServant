@@ -316,17 +316,23 @@ class StickyCommentExperimentController:
         
         submissions = {o.id:o for o in objs}
 
-        already_processed_ids = []
-        if len(submissions) > 0:
-            already_processed_ids = [thing.id for thing in 
+        # TODO Determine how a non-locking select statement could possibly
+        # result in a deadlock. Made retryable to handle that for now.
+        @retryable(backoff=True, rollback=True, session=self.db_session)
+        def _fetch_already_processed_objects():
+            if len(submissions) == 0:
+                return []
+            return [thing.id for thing in 
                 self.db_session.query(ExperimentThing).filter(and_(
                     ExperimentThing.object_type==ThingType.SUBMISSION.value, 
                     ExperimentThing.experiment_id == self.experiment.id,
                     ExperimentThing.id.in_(list(submissions.keys())))).all()]
+        already_processed_ids = _fetch_already_processed_objects()
 
         eligible_submissions = []
         eligible_submission_ids = []
-        curtime = datetime.datetime.utcnow().timestamp()
+        curtime = datetime.datetime.now().timestamp()
+        aged_out_submissions = []
 
         for id, submission in submissions.items():
             if id in already_processed_ids:
@@ -351,6 +357,13 @@ class StickyCommentExperimentController:
             #    continue
 
             if((curtime - submission.created_utc) > self.max_eligibility_age):
+                aged_out_submissions.append(submission)
+                #self.log.info("{0}: Submission created_utc {1} is {2} seconds greater than current time {3}, exceeding the max eligibility age of {4}. Declining to Add to the Experiment".format(
+                #    self.__class__.__name__,
+                #    submission.created_utc,
+                #    curtime - submission.created_utc,
+                #    curtime,
+                #    self.max_eligibility_age))
                 continue
 
 
@@ -362,6 +375,13 @@ class StickyCommentExperimentController:
             self.experiment_name,
             len(eligible_submission_ids),
             json.dumps(eligible_submission_ids)))
+
+        self.log.info("{0}: Experiment {1} Discovered {2} submissions over max age of {3} seconds.".format(
+            self.__class__.__name__,
+            self.experiment_name,
+            len(aged_out_submissions),
+            self.max_eligibility_age
+        ))
 
         return eligible_submissions
 

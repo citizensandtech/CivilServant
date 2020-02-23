@@ -2,12 +2,19 @@ import praw
 import inspect, os, sys # set the BASE_DIR
 import simplejson as json
 import datetime
+import os
 import reddit.connection
 import reddit.praw_utils as praw_utils
 import reddit.queries
-from app.models import Base, MessageLog
+from pathlib import Path
+from app.models import Base, ExperimentAction, MessageLog
 import app.event_handler
+from utils.common import ThingType
 from collections import defaultdict, Counter
+
+ENV = os.environ["CS_ENV"]
+SURVEY_LOG_PATH = Path(__file__) / ".." / ".." / ".." / "logs" / ("surveyed_users_%s.log" % ENV)
+SURVEY_LOG_PATH = str(SURVEY_LOG_PATH.resolve())
 
 class MessageError(Exception):
     def __init__(self, message, errors = []):
@@ -114,3 +121,111 @@ class MessagingController:
     ## FILTERED OPTIONALLY BY MESSAGE TASK ID
     def get_previous_messages(self, username, message_task_id=None):
         pass
+
+class SurveyController:
+    def __init__(self, db_session, r, log, experiment_controller):
+        self.db_session = db_session
+        self.log = log
+        self.r = r
+        self.experiment_controller = experiment_controller
+        
+        settings = experiment_controller.experiment_settings
+        self.survey_subject = settings["survey_message_subject"]
+        self.survey_text = settings["survey_message_text"]
+        self.survey_url = settings["survey_url"]
+        self.survey_task_id = "SurveyController(name)".format(
+            name=experiment_controller.experiment_name)
+        
+        self.messaging_controller = MessagingController(
+            db_session = db_session,
+            r = r,
+            log = log
+        )
+
+    def _update_metadata(self, exp_object, key, value):
+        metadata = {}
+        if exp_object.metadata_json:
+            metadata = json.loads(exp_object.metadata_json)
+        metadata[key] = value
+        exp_object.metadata_json = json.dumps(metadata)
+
+    def append_surveyed_user_log(self, username, response):
+        invalid_username = False
+        sent_status = True
+        url = self.survey_url.format(username=username)
+        for error in response.get("errors", []):
+            sent_status = False
+            if error["error"] == "invalid username":
+                invalid_username = True
+                break
+        entry = [username,
+                 invalid_username,
+                 datetime.datetime.utcnow(),
+                 False if not invalid_username else None,
+                 url,
+                 sent_status
+        ]
+        entry = ",".join([str(col) for col in entry]) + "\n"
+        with open(SURVEY_LOG_PATH, "a+") as f:
+            f.write(entry)
+                    
+    def get_unique_recipient_message_dicts(self, user_things):
+        # Dictionary used to guarantee uniqueness rather than a set in order
+        # to maintain insertion order in case this is presumed by the caller
+        unique_recipients = {}
+        for user_thing in user_things:
+            url = self.survey_url.format(username=user_thing.thing_id)
+            message = self.survey_text.format(
+                username = user_thing.thing_id,
+                url = url
+            )
+            unique_recipients[user_thing.thing_id] = {
+                "account": user_thing.thing_id,
+                "subject": self.survey_subject,
+                "message": message
+            }
+        return list(unique_recipients.values())
+
+    def send_surveys(self):
+        experiment_id = self.experiment_controller.experiment.id
+        experiment_name = self.experiment_controller.experiment.name
+        
+        try:
+            with self.db_session.cooplock(self.survey_task_id, experiment_id):
+                user_things = self.experiment_controller.get_surveyable_user_things()
+                self.log.info("Experiment {0}: identified {1} surveyable users.".format(
+                    experiment_name, len(user_things)))
+                self.log.info("Experiment {0}: messaging users: {1}".format(
+                    experiment_name, [user_thing.thing_id for user_thing in user_things]))
+                message_dicts = self.get_unique_recipient_message_dicts(user_things)
+                responses = self.messaging_controller.send_messages(message_dicts, self.survey_task_id)
+                
+                updates = []
+                for user_thing in user_things:
+                    if user_thing.thing_id in responses.keys():
+                        response = responses[user_thing.thing_id]
+                        self.append_surveyed_user_log(user_thing.thing_id, response)
+                        if len(response.get("errors", {})) > 0:
+                            self.log.info("Experiment {0}: failed to survey user {1}: {2}".format(
+                                experiment_name, user_thing.thing_id, str(response)))
+                            self._update_metadata(user_thing, "survey_status", "failed")
+                            updates.append(user_thing)
+                        else:
+                            self.log.info("Experiment {0}: successfully surveyed user {1}: {2}".format(
+                                experiment_name, user_thing.thing_id, str(response)))
+                            survey_action = ExperimentAction(
+                                experiment_id = experiment_id,
+                                action = "SendSurvey",
+                                action_object_type = ThingType.USER.value,
+                                action_object_id = user_thing.thing_id
+                            )
+                            self._update_metadata(survey_action, "survey_status", "sent")
+                            self._update_metadata(user_thing, "survey_status", "sent")
+                            updates.append(survey_action)
+                            updates.append(user_thing)
+                if updates:
+                    self.db_session.add_retryable(updates)
+        except Exception as e:
+            self.log.exception("Experiment {0}: error occurred while sending surveys: ".format(
+                experiment_name))
+
