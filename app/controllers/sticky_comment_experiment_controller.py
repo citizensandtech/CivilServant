@@ -312,7 +312,7 @@ class StickyCommentExperimentController:
 
     ## TODO: REDUCE THE NUMBER OF API CALLS INVOLVED
     ## in the future possibly merge with submission_acceptable
-    def get_eligible_objects(self, objs):
+    def get_eligible_objects(self, objs, require_flair=False):
         
         submissions = {o.id:o for o in objs}
 
@@ -340,6 +340,16 @@ class StickyCommentExperimentController:
 
             if((curtime - submission.created_utc) < self.min_eligibility_age):
                 self.log.info("{0}: Submission {1} created_utc {2} is {3} seconds less than current time {4}, below the minimum eligibility age of {5}. Waiting to Add to the Experiment".format(
+                    self.__class__.__name__,
+                    submission.id,
+                    submission.created_utc,
+                    curtime - submission.created_utc,
+                    curtime,
+                    self.min_eligibility_age))
+                continue
+            
+            if require_flair and not submission.json_dict["link_flair_css_class"]:
+                self.log.info("{0}: Submission {1} does not have any flair applied. Declining to Add to the Experiment".format(
                     self.__class__.__name__,
                     submission.id,
                     submission.created_utc,
@@ -606,6 +616,19 @@ class AMAStickyCommentExperimentController(StickyCommentExperimentController):
     ## TREATMENT GROUP (NONAMA)
     def intervene_ama_arm_1(self, experiment_thing, submission):
         return self.make_sticky_post(experiment_thing, submission)
+
+
+# Created for the 2020.02 replication of the r/science study to account for:
+#   * updated criteria for detecting an r/science type of AMA
+#   * adding the presence of flair as a study eligibility criterion
+class AMA2020StickyCommentExperimentController(AMAStickyCommentExperimentController):
+    def is_ama(self, submission):
+        self_domain = "self.%s" % self.subreddit
+        ama = submission.json_dict["domain"] == self_domain
+        return ama
+
+    def get_eligible_objects(self, objs):
+        return super().get_eligible_objects(objs, require_flair=True)
 
 
 class SubsetStickyCommentExperimentController(StickyCommentExperimentController):

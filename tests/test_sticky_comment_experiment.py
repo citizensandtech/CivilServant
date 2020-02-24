@@ -109,6 +109,7 @@ def test_get_eligible_objects(mock_subreddit, mock_reddit):
 
     experiment_name_to_controller = {
         "sticky_comment_0": AMAStickyCommentExperimentController,
+        "sticky_comment_ama_2020_test": AMA2020StickyCommentExperimentController,
         "sticky_comment_frontpage_test": FrontPageStickyCommentExperimentController
         }
 
@@ -150,9 +151,17 @@ def test_get_eligible_objects(mock_subreddit, mock_reddit):
         if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
             objs = controller_instance.set_eligible_objects(instance)
         elif controller_instance.__class__ is AMAStickyCommentExperimentController:
-            objs = controller_instance.set_eligible_objects()            
+            objs = controller_instance.set_eligible_objects()
+        elif controller_instance.__class__ is AMA2020StickyCommentExperimentController:
+            objs = controller_instance.set_eligible_objects()
+            for obj in objs[::10]:
+                obj.json_dict["link_flair_css_class"] = ""
         eligible_objects = controller_instance.get_eligible_objects(objs)
-        assert len(eligible_objects) == 100
+        if controller_instance.__class__ is AMA2020StickyCommentExperimentController:
+            expected_eligible_count = 90
+        else:
+            expected_eligible_count = 100
+        assert len(eligible_objects) == expected_eligible_count
 
         if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
             eligible_submissions = {sub.id: sub for sub in eligible_objects}
@@ -178,8 +187,14 @@ def test_get_eligible_objects(mock_subreddit, mock_reddit):
             objs = controller_instance.set_eligible_objects(instance)
         elif controller_instance.__class__ is AMAStickyCommentExperimentController:
             objs = controller_instance.set_eligible_objects()
+        elif controller_instance.__class__ is AMA2020StickyCommentExperimentController:
+            objs = controller_instance.set_eligible_objects()
         eligible_objects = controller_instance.get_eligible_objects(objs)
-        assert len(eligible_objects) == 50
+        if controller_instance.__class__ is AMA2020StickyCommentExperimentController:
+            expected_eligible_count = 40
+        else:
+            expected_eligible_count = 50
+        assert len(eligible_objects) == expected_eligible_count
         clear_all_tables()    
 
 @patch('praw.Reddit', autospec=True)
@@ -754,6 +769,7 @@ def test_identify_condition(mock_subreddit, mock_reddit):
 
     experiment_name_to_controller = {
         "sticky_comment_0": AMAStickyCommentExperimentController,
+        "sticky_comment_ama_2020_test": AMA2020StickyCommentExperimentController,
         "sticky_comment_frontpage_test": FrontPageStickyCommentExperimentController
     }
 
@@ -791,6 +807,9 @@ def test_identify_condition(mock_subreddit, mock_reddit):
             objs = controller_instance.set_eligible_objects(instance)
         elif controller_instance.__class__ is AMAStickyCommentExperimentController:
             objs = controller_instance.set_eligible_objects()
+        elif controller_instance.__class__ is AMA2020StickyCommentExperimentController:
+            objs = controller_instance.set_eligible_objects()
+            
 
         eligible_objects = controller_instance.get_eligible_objects(objs)
 
@@ -801,6 +820,9 @@ def test_identify_condition(mock_subreddit, mock_reddit):
         if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
             assert Counter(condition_list)['frontpage_post'] == 100
         elif controller_instance.__class__ is AMAStickyCommentExperimentController:
+            assert Counter(condition_list)['nonama'] == 98
+            assert Counter(condition_list)['ama'] == 2
+        elif controller_instance.__class__ is AMA2020StickyCommentExperimentController:
             assert Counter(condition_list)['nonama'] == 98
             assert Counter(condition_list)['ama'] == 2
             
