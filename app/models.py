@@ -52,11 +52,11 @@ class ModAction(Base):
     __tablename__       = "mod_actions"
     id                  = Column(String(256), primary_key = True, unique=True, autoincrement=False)
     created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)  
-    created_utc         = Column(DateTime)
+    created_utc         = Column(DateTime, index=True)
     subreddit_id        = Column(String(32), index=True)
-    mod                 = Column(String(64))
+    mod                 = Column(String(64), index=True)
     target_author       = Column(String(64), index=True)
-    action              = Column(String(256))
+    action              = Column(String(256), index=True)
     target_fullname     = Column(String(256))
     action_data         = Column(MEDIUMTEXT) # json_dict
 
