@@ -340,9 +340,10 @@ def test_archive_mod_action_page(mock_reddit):
     )
 
     assert db_session.query(ModAction).count() == 0
-    last_action_id = mac.archive_mod_action_page()
+    last_action_id, unique_action_count_1 = mac.archive_mod_action_page()
     db_session.commit()
     assert db_session.query(ModAction).count() == len(mod_action_fixtures[0])
+    assert unique_action_count_1 == len(mod_action_fixtures[0])
     assert last_action_id == mod_action_fixtures[0][-1]['id']
 
     # makes sure all the properties were assigned
@@ -362,15 +363,18 @@ def test_archive_mod_action_page(mock_reddit):
     
     # NOW TRY TO ADD DUPLICATES
     # AND ASSERT THAT NO DUPLICATES WERE ADDED
-    mac.archive_mod_action_page()
+    _, unique_action_count_after_dupes = mac.archive_mod_action_page()
     db_session.commit()
-    assert db_session.query(ModAction).count() == len(mod_action_fixtures[0])
+    db_count_after_dupes = db_session.query(ModAction).count()
+    assert db_count_after_dupes == len(mod_action_fixtures[0])
+    assert db_count_after_dupes + unique_action_count_after_dupes == len(mod_action_fixtures[0])
 
     # NOW ADD A NEW PAGE
     r.get_mod_log.return_value = mod_action_fixtures[1]
     patch('praw.')
-    last_action_id = mac.archive_mod_action_page(after_id = mod_action_fixtures[0][-1]['id'])
+    last_action_id, unique_action_count_2 = mac.archive_mod_action_page(after_id = mod_action_fixtures[0][-1]['id'])
     assert db_session.query(ModAction).count() == len(mod_action_fixtures[0]) + len(mod_action_fixtures[1])
+    assert unique_action_count_1 + unique_action_count_2 == len(mod_action_fixtures[0]) + len(mod_action_fixtures[1])
     assert last_action_id == mod_action_fixtures[1][-1]['id']
 
 @patch('praw.Reddit', autospec=True)
@@ -602,9 +606,10 @@ def test_archive_mod_action_page(mock_reddit):
     )
 
     assert db_session.query(ModAction).count() == 0
-    last_action_id = mac.archive_mod_action_page()
+    last_action_id, unique_action_count_1 = mac.archive_mod_action_page()
     db_session.commit()
     assert db_session.query(ModAction).count() == len(mod_action_fixtures[0])
+    assert unique_action_count_1 == len(mod_action_fixtures[0])
     assert last_action_id == mod_action_fixtures[0][-1]['id']
 
     # makes sure all the properties were assigned
@@ -624,13 +629,16 @@ def test_archive_mod_action_page(mock_reddit):
     
     # NOW TRY TO ADD DUPLICATES
     # AND ASSERT THAT NO DUPLICATES WERE ADDED
-    mac.archive_mod_action_page()
+    _, unique_action_count_after_dupes = mac.archive_mod_action_page()
     db_session.commit()
-    assert db_session.query(ModAction).count() == len(mod_action_fixtures[0])
+    db_count_after_dupes = db_session.query(ModAction).count()
+    assert db_count_after_dupes == len(mod_action_fixtures[0])
+    assert db_count_after_dupes + unique_action_count_after_dupes == len(mod_action_fixtures[0])
 
     # NOW ADD A NEW PAGE
     r.get_mod_log.return_value = mod_action_fixtures[1]
     patch('praw.')
-    last_action_id = mac.archive_mod_action_page(after_id = mod_action_fixtures[0][-1]['id'])
+    last_action_id, unique_action_count_2 = mac.archive_mod_action_page(after_id = mod_action_fixtures[0][-1]['id'])
     assert db_session.query(ModAction).count() == len(mod_action_fixtures[0]) + len(mod_action_fixtures[1])
+    assert unique_action_count_1 + unique_action_count_2 == len(mod_action_fixtures[0]) + len(mod_action_fixtures[1])
     assert last_action_id == mod_action_fixtures[1][-1]['id']

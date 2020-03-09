@@ -59,16 +59,13 @@ def fetch_mod_action_history(subreddit, after_id = None):
     log.info("Fetching Moderation Action History for {subreddit}. {n} actions are currently in the archive.".format(
         subreddit = subreddit,
         n = first_action_count))
-    after_id = mac.archive_mod_action_page(after_id)
-    db_session.commit()
-    num_actions_stored = db_session.query(ModAction).filter(ModAction.subreddit_id == subreddit_id).count() - first_action_count
+    after_id, num_actions_stored = mac.archive_mod_action_page(after_id)
 
+    pre_action_count = first_action_count
     while(num_actions_stored > 0):
         pre_action_count = db_session.query(ModAction).filter(ModAction.subreddit_id == subreddit_id).count()
-        after_id = mac.archive_mod_action_page(after_id)
-        db_session.commit()
-        num_actions_stored = db_session.query(ModAction).filter(ModAction.subreddit_id == subreddit_id).count() - pre_action_count
-   
+        after_id, num_actions_stored = mac.archive_mod_action_page(after_id)
+
     log.info("Finished Fetching Moderation Action History for {subreddit}. {stored} actions were stored, with a total of {total}.".format(
         subreddit = subreddit,
         stored = pre_action_count - first_action_count,

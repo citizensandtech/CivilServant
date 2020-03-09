@@ -26,14 +26,11 @@ class ModeratorController:
             self.log.info("Querying moderation log for {subreddit}".format(subreddit=self.subreddit)) 
 
         actions = self.r.get_mod_log(self.subreddit, limit = 500, params={"after": after_id})
-        action_count = 0
-        last_action = None
+        action_dicts = []
         for action in actions:
-            #### TO HANDLE TEST FIXTURES
             if("json_dict" in dir(action)):
-                action = action.json_dict
-            #### CREATE NEW OBJECT
-            modaction = ModAction(
+                action = action.json_dict # to handle test fixtures
+            action_dicts.append(dict(
                 id = action['id'],
                 created_utc = datetime.datetime.fromtimestamp(action['created_utc']),
                 subreddit_id = action['sr_id36'],
@@ -42,22 +39,18 @@ class ModeratorController:
                 action = action['action'],
                 target_fullname = action['target_fullname'],
                 action_data = json.dumps(action)   
-            )
-            try:
-                self.db_session.add(modaction)
-                self.db_session.commit()
-            except (sqlalchemy.orm.exc.FlushError, sqlalchemy.exc.IntegrityError) as err:
-                self.db_session.rollback()
-                if("conflicts with" in err.__str__() or "Duplicate" in err.__str__()):
-                    self.log.info("Some Moderator actions were already in the database. Not saving. Error: {}".format(err.__str__()))
-                    print("Some Moderator actions were already in the database. Not saving.")
-                else:
-                    self.log.error(err.__str__())
-            last_action = action
-            action_count += 1
-
-        self.log.info("Completed archive of {n} returned moderation actions for {subreddit}".format(
-            n=action_count,
+            ))
+        
+        try:
+            result = self.db_session.insert_retryable(ModAction, action_dicts)
+        except:
+            log.exception("An error occurred while trying to bulk insert moderation actions for {subreddit}".format(
+                subreddit = self.subreddit))
+            raise
+            
+        self.log.info("Completed archive of {unique_n} unique moderation actions of {returned_n} returned moderation actions for {subreddit}".format(
+            unique_n=result.rowcount,
+            returned_n=len(action_dicts),
             subreddit = self.subreddit))
 
-        return last_action['id']
+        return action_dicts[-1]['id'], result.rowcount
