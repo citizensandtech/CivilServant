@@ -47,15 +47,16 @@ class RetryableDbSession(sqlalchemy.orm.session.Session):
     def execute_retryable(self, clause, params=None, commit=True):
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", r"\(1062, \"Duplicate entry")
-            self.execute(clause, params)
+            result = self.execute(clause, params)
             if commit:
                 self.commit()
+            return result
 
     def insert_retryable(self, model, params, commit=True, ignore_dupes=True):
         clause = model.__table__.insert()
         if ignore_dupes:
             clause = clause.prefix_with("IGNORE")
-        self.execute_retryable(clause, params, commit)
+        return self.execute_retryable(clause, params, commit)
     
     def new_sibling_session(self):
         from sqlalchemy.orm import sessionmaker
