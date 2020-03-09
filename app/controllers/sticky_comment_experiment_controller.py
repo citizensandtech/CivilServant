@@ -349,7 +349,7 @@ class StickyCommentExperimentController:
                 continue
             
             if require_flair and not submission.json_dict["link_flair_css_class"]:
-                self.log.info("{0}: Submission {1} does not have any flair applied. Declining to Add to the Experiment".format(
+                self.log.info("{0}: Submission {1} does not have any flair applied. Waiting to Add to the Experiment".format(
                     self.__class__.__name__,
                     submission.id,
                     submission.created_utc,
