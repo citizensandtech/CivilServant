@@ -30,6 +30,7 @@ class TwitterUserState(Enum):
     NOT_FOUND = 2 # deleted (or never existed)
     SUSPENDED = 3
     PROTECTED = 4
+    NOT_QUALIFYING = 5
 
 class TwitterUserCreateType(Enum):
     LUMEN_NOTICE = 1

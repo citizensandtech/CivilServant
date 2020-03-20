@@ -219,7 +219,7 @@ def fetch_twitter_tweets(backfill=False, collection_seconds=None, user_rand_frac
     log.info("Finished fetch_twitter_tweets, backfill={0}. PID={1}".format(backfill, str(os.getpid())))
 
 
-def twitter_generate_random_id_users(daily_limit=500000):
+def fetch_twitter_random_id_users(daily_limit=500000):
     """
     Create users for comparison making sure
     """
@@ -230,7 +230,7 @@ def twitter_generate_random_id_users(daily_limit=500000):
     log.info("Finished generating users from random IDs, PID={0}".format( str(os.getpid())))
 
 
-def match_comparison_group():
+def twitter_match_comparison_groups():
     """
     Match dmca-receiving and randomly generated users.
     """

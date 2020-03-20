@@ -10,7 +10,7 @@ import datetime
 from twitter import TwitterError
 
 from app.models import Base, TwitterUser, TwitterStatus, LumenNoticeToTwitterUser, TwitterUserSnapshot, TwitterFill, \
-    TwitterUnshortenedUrls, TwitterStatusUrls
+    TwitterUnshortenedUrls, TwitterStatusUrls, ExperimentThing
 import requests
 import sqlalchemy
 from sqlalchemy import and_, or_, func, distinct
@@ -1013,13 +1013,13 @@ class TwitterController():
 
         return url_rows
 
-    def make_random_integers(self):
+    def make_random_integers(self, num_to_make=100):
         # valid ranges are in beginning,end tups
         VALID_RANGES = ((10008932, 3308208032),
                         (695135704930783232, 1095781403323707393))
 
         random_user_ids = []
-        for i in range(100):
+        for i in range(num_to_make):
             rand_range_i = random.randrange(0, len(VALID_RANGES))
             #     print(rand_range_i)
             rand_range_low, rand_range_high = VALID_RANGES[rand_range_i]
@@ -1114,9 +1114,44 @@ class TwitterController():
             num_exist=len(users_lookup_result)))
         return num_generated
 
+    def filter_matchable_users(self, unmatched_users):
+        # find just those who have had a status in the last n-days
+        # just those
+        # TODO make this configurable
+        now = datetime.datetime.utcnow()
+        period_ago = now -datetime.timedelta(days=7)
+
+        return valid_unmatched_users, invalid_unmatched_users
+
     def match_lumen_and_random_id_users(self, batch_size=100):
         """Select all the twitter_users that are not part of a matched pair and pair them.
         matching criteria should be day added
         if matches can't be made, report that, but don't error."""
-        num_matched = 0
+
+        # find the unmatched twitter users of both create types
+        # query-index in experiment-things to know users are matched
+        # object-type # don't use or make the randomization-block id
+        # metadata keep randomization-block-id and block sizes other match data here
+        # TODO how to make randomization block ids
+
+        join_clause = and_(TwitterUser.id == ExperimentThing.query_index)
+        filter_clause = and_(ExperimentThing.id == None,
+                             TwitterUser.user_state == utils.common.TwitterUserState.FOUND.value)# want to find the users that have not been matched and eligible
+
+        unmatched_users = self.db_session.query(TwitterUser, ExperimentThing)\
+            .outerjoin(ExperimentThing, join_clause)\
+            .filter(filter_clause)\
+            .all()
+
+        valid_unmatched_users, invalid_unmatched_users = self.filter_matchable_users(unmatched_users)
+
+        self.invalidate_not_qualifying_users(invalid_unmatched_users)
+
+        matches, still_unmatched = self.make_matches(valid_unmatched_users)
+
+        self.log.info('There were {} matches and {} left unmatched'.format(len(matches), len(still_unmatched)))
+
+        self.save_matches(matches)
+
+        num_matched = len(matches)
         return num_matched
