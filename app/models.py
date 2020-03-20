@@ -243,11 +243,14 @@ class TwitterUser(Base):
     screen_name         = Column(String(256), index = True) # if not found, # if not found, NOT_FOUND_TWITTER_USER_STR
     created_at          = Column(DateTime)
     record_created_at   = Column(DateTime, default=datetime.datetime.utcnow)
+    created_type        = Column(Integer, default=1)
     lang                = Column(String(32))
     user_state          = Column(Integer) # utils/common.py
     CS_oldest_tweets_archived = Column(Integer, default=1) # see CS_JobState Enum
     last_attempted_process = Column(DateTime, default=datetime.datetime.utcnow)
+    last_status_dt = Column(DateTime, default=None)
     user_rand           = Column(Float, default=random.random)  # a random number created for each new user.
+    metadata_json       = Column(MEDIUMTEXT)
 
 class TwitterUserSnapshot(Base):
     __tablename__ = 'twitter_user_snapshots'
@@ -280,15 +283,15 @@ class TwitterStatusUrls(Base):
     __tablename__ = 'twitter_status_urls'
     id                  = Column(BigInteger, primary_key = True)
     twitter_status_id   = Column(BigInteger, index = True)
-    status_data_key     = Column(Integer) # enum TwitterUrlKey 
-    raw_url             = Column(TEXT) 
-    expanded_url        = Column(TEXT) 
+    status_data_key     = Column(Integer) # enum TwitterUrlKey
+    raw_url             = Column(TEXT)
+    expanded_url        = Column(TEXT)
     unwound_url         = Column(TEXT)
-    needs_unshorten     = Column(Boolean(), default = False) 
-    unshortened_url     = Column(TEXT) 
-    error_unshortening  = Column(TINYTEXT) 
+    needs_unshorten     = Column(Boolean(), default = False)
+    unshortened_url     = Column(TEXT)
+    error_unshortening  = Column(TINYTEXT)
     tld_text            = Column(TEXT)
-    record_created_at   = Column(DateTime, default=datetime.datetime.utcnow, index=True) # need this index for fast counting 
+    record_created_at   = Column(DateTime, default=datetime.datetime.utcnow, index=True) # need this index for fast counting
 
 class TwitterTlds(Base):
     __tablename__       = 'twitter_tlds'

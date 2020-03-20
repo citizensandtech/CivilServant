@@ -9,6 +9,8 @@ NOT_FOUND_TWITTER_USER_STR = "<NOT_FOUND>"
 
 EXPERIMENT_LANGUAGES = ['en', 'en-gb', 'en-GB']
 
+TWITTER_STRPTIME = '%a %b %d %H:%M:%S %z %Y'
+
 class PageType(Enum):
     TOP = 1
     CONTR = 2 # controversial
@@ -28,6 +30,10 @@ class TwitterUserState(Enum):
     NOT_FOUND = 2 # deleted (or never existed)
     SUSPENDED = 3
     PROTECTED = 4
+
+class TwitterUserCreateType(Enum):
+    LUMEN_NOTICE = 1
+    RANDOMLY_GENERATED = 2
 
 # for model fields CS_*
 class CS_JobState(Enum):

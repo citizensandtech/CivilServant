@@ -1,18 +1,22 @@
 import math
 import random
-from operator import eq
+from operator import eq, ne
 
 import redis
 import twitter
 import simplejson as json
 import datetime
+
+from twitter import TwitterError
+
 from app.models import Base, TwitterUser, TwitterStatus, LumenNoticeToTwitterUser, TwitterUserSnapshot, TwitterFill, \
     TwitterUnshortenedUrls, TwitterStatusUrls
 import requests
 import sqlalchemy
 from sqlalchemy import and_, or_, func, distinct
 import utils.common
-from utils.common import TwitterUserState, NOT_FOUND_TWITTER_USER_STR, CS_JobState, neq, EXPERIMENT_LANGUAGES, TwitterUrlKey
+from utils.common import TwitterUserState, NOT_FOUND_TWITTER_USER_STR, CS_JobState, neq, EXPERIMENT_LANGUAGES, \
+    TwitterUrlKey
 import sys, warnings, os
 from collections import defaultdict
 
@@ -615,12 +619,17 @@ class TwitterController():
         batch_attempt_counter = 0
         while not all_filled:
             fill_query = self.db_session.query(TwitterUser). \
-                filter(and_(
-                        eq(TwitterUser.CS_oldest_tweets_archived, target_JobState.value), # back or front
-                        TwitterUser.lang.in_(EXPERIMENT_LANGUAGES), # correct language
-                        or_(eq(TwitterUser.last_attempted_process, None), TwitterUser.last_attempted_process < fill_start_time).self_group(), # or never been attempted yet
-                        collection_condition,
-                        user_rand_condition)). \
+                filter(
+                and_(
+                    eq(TwitterUser.CS_oldest_tweets_archived, target_JobState.value),  # back or front
+                    TwitterUser.lang.in_(EXPERIMENT_LANGUAGES),  # correct language
+                    or_(eq(TwitterUser.last_attempted_process, None),
+                        TwitterUser.last_attempted_process < fill_start_time).self_group(),
+                    # or never been attempted yet
+                    collection_condition,
+                    user_rand_condition),
+                ne(TwitterUser.user_state, utils.common.TwitterUserState.NOT_FOUND)
+            ). \
                 order_by(order_strat). \
                 with_for_update(skip_locked=True). \
                 limit(batch_size)
@@ -646,7 +655,8 @@ class TwitterController():
             # try to archive the users tweets
             try:
                 self.with_user_records_archive_tweets(unarchived_users, backfill=backfill, is_test=is_test,
-                                                      test_exception=test_exception, fill_start_time=fill_start_time)  # backfill hacky
+                                                      test_exception=test_exception,
+                                                      fill_start_time=fill_start_time)  # backfill hacky
             # TODO if the user has become invalid then mark this
             except sqlalchemy.orm.exc.DetachedInstanceError:
                 self.log.error("Encountered deatched instance error.")
@@ -656,7 +666,7 @@ class TwitterController():
                 utils.common.reset_CS_JobState_In_Progress(unarchived_users, "CS_oldest_tweets_archived",
                                                            self.db_session,
                                                            self.log)  # if still marked IN_PROGRESS (e.g. because of
-                                                                      # unchecked exception), reset it to NOT_PROCESSED
+                # unchecked exception), reset it to NOT_PROCESSED
                 self.db_session.close()
 
             self.log.info(
@@ -668,9 +678,8 @@ class TwitterController():
 
             batch_attempt_counter += 1
 
-
     def with_user_records_archive_tweets(self, user_records, backfill=False, is_test=False, test_exception=False,
-                                        fill_start_time=None):
+                                         fill_start_time=None):
         """
             user_records: list of TwitterUser records
 
@@ -870,7 +879,6 @@ class TwitterController():
         job_state = CS_JobState.PROCESSED
         return job_state
 
-
     def unshorten_urls(self, unshorten_batch_size=1000, idempotent=True):
         # iterate over twitter_status_urls converting expanded urls to unshortened urls
         # get the max and minimum status ids
@@ -884,10 +892,10 @@ class TwitterController():
         self.log.info('status_url_id_min is {status_url_id_min}'.format(status_url_id_min=status_url_id_min))
         self.log.info('status_url_id_cnt is {status_url_id_cnt}'.format(status_url_id_cnt=status_url_id_cnt))
 
-        num_batches = math.ceil((status_url_id_max-status_url_id_min)/unshorten_batch_size)
+        num_batches = math.ceil((status_url_id_max - status_url_id_min) / unshorten_batch_size)
         for batch_i in range(num_batches):
             start_id = status_url_id_min + (batch_i * unshorten_batch_size)
-            end_id = status_url_id_min + ((batch_i+1) * unshorten_batch_size)
+            end_id = status_url_id_min + ((batch_i + 1) * unshorten_batch_size)
             self.log.debug('working on status url ids {start_id} --- {end_id}'.format(start_id=start_id, end_id=end_id))
             batch_status_urls_a = self.db_session.query(TwitterStatusUrls) \
                 .filter(and_(TwitterStatusUrls.id >= start_id, TwitterStatusUrls.id < end_id)).all()
@@ -899,7 +907,8 @@ class TwitterController():
                 batch_status_urls = batch_status_urls_a
 
             self.log.info('Working on batch:{batch_i} {len_batch_status_urls} status urls'.format(batch_i=batch_i,
-                                                                                                  len_batch_status_urls=len(batch_status_urls)))
+                                                                                                  len_batch_status_urls=len(
+                                                                                                      batch_status_urls)))
             urls_to_unshorten = [su.expanded_url for su in batch_status_urls]
 
             if urls_to_unshorten:
@@ -908,17 +917,16 @@ class TwitterController():
                     warnings.simplefilter("ignore")
                     unshort_results = bulkUnshorten(urls_to_unshorten)
 
-                #stich these back up
+                # stich these back up
                 for unshort_res in unshort_results:
                     # find the db objects associated
-                    matching_sus = [su for su in batch_status_urls if unshort_res['original_url']==su.expanded_url]
+                    matching_sus = [su for su in batch_status_urls if unshort_res['original_url'] == su.expanded_url]
                     for matching_su in matching_sus:
                         matching_su.unshortened_url = unshort_res['final_url']
                         matching_su.error_unshortening = unshort_res['error'] if not unshort_res['success'] else None
 
                 self.db_session.add_all(batch_status_urls)
                 self.db_session.commit()
-
 
     def output_unshorten_urls(self):
         # deprecated based on new way unshortening is happening
@@ -928,10 +936,10 @@ class TwitterController():
         status_user_ids = [user_tup[0] for user_tup in status_users_res if user_tup[0]]
 
         for i, status_user_id in enumerate(status_user_ids):
-            self.log.info('Unshortening URLS for user id {0}. {1} of {2}'.format(status_user_id, i, len(status_user_ids)))
-            user_statuses = self.db_session.query(TwitterStatus).filter(TwitterStatus.user_id==status_user_id).all()
+            self.log.info(
+                'Unshortening URLS for user id {0}. {1} of {2}'.format(status_user_id, i, len(status_user_ids)))
+            user_statuses = self.db_session.query(TwitterStatus).filter(TwitterStatus.user_id == status_user_id).all()
             status_urls_flat = []
-
 
     def extract_urls(self, twitter_uid=None):
 
@@ -945,14 +953,13 @@ class TwitterController():
             self.log.info('Extracting URLS for user id {0}. {1} of {2}'.format(status_user_id, i, len(status_user_ids)))
             # get all user's tweets
 
-            user_statuses = self.db_session.query(TwitterStatus).filter(TwitterStatus.user_id==status_user_id).all()
+            user_statuses = self.db_session.query(TwitterStatus).filter(TwitterStatus.user_id == status_user_id).all()
 
             for user_status in user_statuses:
                 status_data = json.loads(user_status.status_data)
                 url_rows = self.extract_urls_from_status_data(user_status.id, status_data, None)
                 self.db_session.add_all(url_rows)
                 self.db_session.commit()
-
 
     # returns list of TwitterStatusUrls
     def extract_urls_from_status_data(self, status_id, status_data, default_key):
@@ -964,13 +971,13 @@ class TwitterController():
 
             for url in urls:
                 url_row = TwitterStatusUrls(
-                    twitter_status_id = status_id,
-                    status_data_key = key.value,
-                    raw_url = url['url'] if 'url' in url else None,
-                    expanded_url = url['expanded_url'] if 'expanded_url' in url else None,
-                    unwound_url = url['unwound']['url'] if 'unwound' in url and 'url' in data['unwound'] else None)
+                    twitter_status_id=status_id,
+                    status_data_key=key.value,
+                    raw_url=url['url'] if 'url' in url else None,
+                    expanded_url=url['expanded_url'] if 'expanded_url' in url else None,
+                    unwound_url=url['unwound']['url'] if 'unwound' in url and 'url' in data['unwound'] else None)
 
-                #self.log.info('...status id {0}: got url={1}; total={2}'.format(status_id, url['url'], len(url_rows)+1))
+                # self.log.info('...status id {0}: got url={1}; total={2}'.format(status_id, url['url'], len(url_rows)+1))
                 url_rows.append(url_row)
 
         if 'extended_entities' in status_data and 'media' in status_data['extended_entities']:
@@ -983,25 +990,133 @@ class TwitterController():
 
             for media in urls:
                 url_row = TwitterStatusUrls(
-                    twitter_status_id = status_id,
-                    status_data_key = key.value,
-                    raw_url = media['url'] if 'url' in media else None,
-                    expanded_url = media['expanded_url'] if 'expanded_url' in media else None,
-                    unwound_url = media['unwound']['url'] if 'unwound' in media and 'url' in media['unwound'] else None)
+                    twitter_status_id=status_id,
+                    status_data_key=key.value,
+                    raw_url=media['url'] if 'url' in media else None,
+                    expanded_url=media['expanded_url'] if 'expanded_url' in media else None,
+                    unwound_url=media['unwound']['url'] if 'unwound' in media and 'url' in media['unwound'] else None)
 
-                #self.log.info('...user id {0}: got url; total={1}'.format(status_id, len(url_rows)+1))
+                # self.log.info('...user id {0}: got url; total={1}'.format(status_id, len(url_rows)+1))
                 url_rows.append(url_row)
 
         if 'retweeted_status' in status_data:
             retweeted_url_rows = self.extract_urls_from_status_data(status_id,
-                    status_data['retweeted_status'],
-                    TwitterUrlKey.RETWEETED_ENTITY)
+                                                                    status_data['retweeted_status'],
+                                                                    TwitterUrlKey.RETWEETED_ENTITY)
             url_rows += retweeted_url_rows
 
         if 'quoted_status' in status_data:
             quoted_url_rows = self.extract_urls_from_status_data(status_id,
-                    status_data['quoted_status'],
-                    TwitterUrlKey.QUOTED_ENTITY)
+                                                                 status_data['quoted_status'],
+                                                                 TwitterUrlKey.QUOTED_ENTITY)
             url_rows += quoted_url_rows
 
         return url_rows
+
+    def make_random_integers(self):
+        # valid ranges are in beginning,end tups
+        VALID_RANGES = ((10008932, 3308208032),
+                        (695135704930783232, 1095781403323707393))
+
+        random_user_ids = []
+        for i in range(100):
+            rand_range_i = random.randrange(0, len(VALID_RANGES))
+            #     print(rand_range_i)
+            rand_range_low, rand_range_high = VALID_RANGES[rand_range_i]
+
+            rand_user_int = random.randrange(rand_range_low, rand_range_high)
+            random_user_ids.append(rand_user_int)
+        random_user_ids = list(set(random_user_ids))  # to make sure we aren't sending duplicates to the API
+        return random_user_ids
+
+    def save_random_id_users(self, random_users_dict):
+        """
+        there should be a user id for every user that was guessed, if they existed they have a non-None user-detail dict.
+        :param random_users_dict:
+        :return:
+        """
+        twitter_users_to_add = []
+        for user_id, user_details in random_users_dict.items():
+            user_state = utils.common.TwitterUserState.FOUND.value \
+                if user_details else utils.common.TwitterUserState.NOT_FOUND.value
+            not_found_id = None if user_details else '{0}_{1}'.format(utils.common.NOT_FOUND_TWITTER_USER_STR, user_id)
+            screen_name = user_details.screen_name if user_details else None
+            created_at = datetime.datetime.strptime(user_details.created_at, utils.common.TWITTER_STRPTIME) \
+                if user_details else None
+            lang = user_details.lang if user_details else None
+            last_status_dt = datetime.datetime.strptime(user_details.status.created_at, utils.common.TWITTER_STRPTIME) \
+                if user_details and hasattr(user_details.status, 'created_at') \
+                else None
+            metadata_json = user_details._json if user_details else None
+            rand_twitter_user = dict(
+                id=user_id,
+                not_found_id=not_found_id,
+                user_state=user_state,
+                screen_name=screen_name,
+                created_at=created_at,
+                lang=lang,
+                last_status_dt=last_status_dt,
+                metadata_json=metadata_json,
+                created_type=utils.common.TwitterUserCreateType.RANDOMLY_GENERATED.value,
+                CS_oldest_tweets_archived=utils.common.CS_JobState.NOT_PROCESSED.value
+            )
+            twitter_users_to_add.append(rand_twitter_user)
+
+        try:
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", r"\(1062, \"Duplicate entry")
+                self.db_session.execute(TwitterUser.__table__.insert().prefix_with("IGNORE"), twitter_users_to_add)
+                self.db_session.commit()
+        except sqlalchemy.exc.SQLAlchemyError:
+            self.log.error("Error while saving random id twitter users for user ids: {}.".format(
+                [u['id'] for u in twitter_users_to_add]), exc_info=True)
+
+        return len(twitter_users_to_add)
+
+    def num_random_id_generated_so_far_today(self):
+        now = datetime.datetime.utcnow()
+        yesterday = now - datetime.timedelta(days=1)
+        today_guessed_q = self.db_session.query(TwitterUser).filter(
+            TwitterUser.created_type == utils.common.TwitterUserCreateType.RANDOMLY_GENERATED). \
+            filter(TwitterUser.record_created_at > yesterday)
+        num_guessed_today = today_guessed_q.count()
+        return num_guessed_today
+
+    def generate_random_id_users(self, daily_limit=500000):
+        '''
+        https://github.com/SMAPPNYU/smapputil/blob/master/py/query_twitter/old_queries/generate_random_twitter_potential_ids.py
+        from twitter :  These IDs are unique 64-bit unsigned integers, which are based on time, instead of being sequential. The full ID is composed of a timestamp, a worker number, and a sequence number.  When consuming the API using JSON, it is important to always use the field id_str instead of id.
+        https://developer.twitter.com/en/docs/basics/twitter-ids
+        Use a bloom filter to know what IDs have already been tried.
+        Don't create more than daily limit number of users.
+        '''
+        # Get the number guessed today.
+        if self.num_random_id_generated_so_far_today() >= daily_limit:
+            return 0  # zero made in this batch
+
+        random_user_ids = self.make_random_integers()
+        # TODO use a bloom filter here
+        # Get the IDs of those already guessed or Lumen-onboarded
+        try:
+            users_lookup_result = self.t.query(self.t.api.UsersLookup, user_id=random_user_ids)
+        except TwitterError as e:
+            if e.message[0]['code'] in (50, 63):
+                pass
+            else:
+                raise e
+        random_users_dict = {ruid: None for ruid in random_user_ids}
+        for random_exist_user in users_lookup_result:
+            random_users_dict[random_exist_user.id] = random_exist_user
+
+        num_generated = self.save_random_id_users(random_users_dict)
+        self.log.info("Persisted {num_generated} random ID users. {num_exist} actually existed.".format(
+            num_generated=num_generated,
+            num_exist=len(users_lookup_result)))
+        return num_generated
+
+    def match_lumen_and_random_id_users(self, batch_size=100):
+        """Select all the twitter_users that are not part of a matched pair and pair them.
+        matching criteria should be day added
+        if matches can't be made, report that, but don't error."""
+        num_matched = 0
+        return num_matched

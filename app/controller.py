@@ -219,6 +219,27 @@ def fetch_twitter_tweets(backfill=False, collection_seconds=None, user_rand_frac
     log.info("Finished fetch_twitter_tweets, backfill={0}. PID={1}".format(backfill, str(os.getpid())))
 
 
+def twitter_generate_random_id_users(daily_limit=500000):
+    """
+    Create users for comparison making sure
+    """
+    log.info("Starting to generate users from random IDs, PID={0}".format( str(os.getpid())))
+    t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
+    t.generate_random_id_users(daily_limit=daily_limit)
+    twitter_conn.checkin_endpoint()
+    log.info("Finished generating users from random IDs, PID={0}".format( str(os.getpid())))
+
+
+def match_comparison_group():
+    """
+    Match dmca-receiving and randomly generated users.
+    """
+    log.info("Starting to match comparison group, PID={0}".format( str(os.getpid())))
+    t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
+    t.match_lumen_and_random_id_users()
+    twitter_conn.checkin_endpoint()
+    log.info("Finished matching comparison group, PID={0}".format( str(os.getpid())))
+
 def unshorten_twitter_urls():
     """
     unshorten all the twitter statuses urls
