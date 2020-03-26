@@ -1,0 +1,32 @@
+match_criteria:
+  random_user_active_within_days: 10
+  langs:
+    - en
+    - en-gb
+
+
+#test:
+#  subreddit: science
+#  subreddit_id: mouw
+#  username: CivilServantBot
+#  conditions:
+#    ama:
+#        randomizations: sticky_comment_science_0_ama.conditions.csv
+#        next_randomization: 0
+#        arms:
+#            arm_0: null
+#            arm_1: |
+#                This is arm 1 of the 1st condition.
+#    nonama:
+#        randomizations: sticky_comment_science_0_nonama.conditions.csv
+#        next_randomization: 0
+#        arms:
+#            arm_0: null
+#            arm_1: |
+#                This is arm 1 of the 2nd condition.
+#  controller: AMAStickyCommentExperimentController
+#  start_time: 06/25/2016 00:00:00 UTC
+#  end_time: 12/30/2020 23:59:59 UTC
+#  max_eligibility_age: 300
+#  min_eligibility_age: 120
+#
