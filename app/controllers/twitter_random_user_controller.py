@@ -12,6 +12,9 @@ import utils.common
 from utils.common import TwitterUserState, NOT_FOUND_TWITTER_USER_STR, CS_JobState, neq, EXPERIMENT_LANGUAGES, \
     TwitterUrlKey
 import sys, warnings, os
+from collections import defaultdict
+
+from utils.url_unshortener import bulkUnshorten
 
 TWITTER_DATETIME_STR_FORMAT = "%a %b %d %H:%M:%S %z %Y"
 
