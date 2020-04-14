@@ -42,7 +42,13 @@ python schedule_twitter_jobs.py --function fetch_twitter_tweets --interval 86400
 
 ## Fetch Twitter Account Snapshots & Tweet Counts: every 24 hours, get new snapshots for users who haven't had a snapshot in the last 23.3 hours
 echo "Fetch Twitter Account Snapshots & Tweet Counts: every 24 hours, get new snapshots for users who haven't had a snapshot in the last 23.3 hours"
-python schedule_twitter_jobs.py --function fetch_twitter_snapshot_and_tweets --snapshot_delta_min 1400 --interval 86400 2> $logfile
+
+
+echo "Generate random ID users every half and ten minutes"
+python schedule_twitter_jobs.py --function twitter_generate_random_id_users --interval  600 2> $logfile
+
+echo "Match ID groups twice per day"
+python schedule_twitter_jobs.py --function twitter_match_comparison_groups --interval 43200 2> $logfile
 
 python manage_scheduled_jobs.py show all 2> $logfile
 
