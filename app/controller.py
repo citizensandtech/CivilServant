@@ -237,13 +237,13 @@ def fetch_twitter_tweets(backfill=False, collection_seconds=None, user_rand_frac
     log.info("Finished fetch_twitter_tweets, backfill={0}. PID={1}".format(backfill, str(os.getpid())))
 
 
-def fetch_twitter_random_id_users(daily_limit=500000):
+def fetch_twitter_random_id_users(daily_limit=500000, target_additions=500):
     """
     Create users for comparison making sure
     """
     log.info("Starting to generate users from random IDs, PID={0}".format(str(os.getpid())))
     t = app.controllers.twitter_random_user_controller.TwitterRandomUserController(db_session, twitter_conn, log)
-    t.generate_random_id_users(daily_limit=daily_limit)
+    t.generate_random_id_users(daily_limit=daily_limit, target_additions=target_additions)
     twitter_conn.checkin_endpoint()
     log.info("Finished generating users from random IDs, PID={0}".format(str(os.getpid())))
 
