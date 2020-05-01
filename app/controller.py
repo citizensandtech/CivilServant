@@ -14,7 +14,6 @@ from utils.perftest import profilable
 import app.cs_logger
 from app.models import Base, SubredditPage, Subreddit, Post, ModAction, Experiment
 
-
 ### LOAD ENVIRONMENT VARIABLES
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), "..")
 ENV = os.environ['CS_ENV']

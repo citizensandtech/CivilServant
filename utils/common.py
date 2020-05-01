@@ -18,11 +18,12 @@ class PageType(Enum):
     HOT = 4
 
 class ThingType(Enum):
-	SUBMISSION = 1
-	COMMENT = 2
-	SUBREDDIT = 3
-	USER = 4
-	STYLESHEET = 5
+    SUBMISSION = 1
+    COMMENT = 2
+    SUBREDDIT = 3
+    USER = 4
+    STYLESHEET = 5
+    MODACTION = 6
 
 class EventWhen(Enum):
     BEFORE = 1
@@ -43,7 +44,7 @@ class RetryableDbSession(sqlalchemy.orm.session.Session):
             return one_or_many
         _perform_add()
 
-    @retryable(backoff=True)
+    @retryable(backoff=False)
     def execute_retryable(self, clause, params=None, commit=True):
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", r"\(1062, \"Duplicate entry")
@@ -127,9 +128,9 @@ def _json_object_hook(dobj, now=False, offset=0):
             keys.append('created_utc')
             values.append(created_utc)
         dobj['json_dict']['created_utc'] = created_utc
-    Hydrated = namedtuple('Hydrated', keys, rename=True)
-    Hydrated.remove = lambda x: None
-    return Hydrated(*values)
+    cls = namedtuple('HydratedTestObject', keys, rename=True)
+    cls.remove = lambda x: None
+    return cls(*values)
 
 def json2obj(data, now=False, offset=0):
     object_hook = lambda dobj: _json_object_hook(dobj, now, offset)

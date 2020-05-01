@@ -6,6 +6,7 @@ import reddit.connection
 import reddit.praw_utils as praw_utils
 import reddit.queries
 import sqlalchemy
+import app.event_handler
 from utils.common import PageType
 from app.models import Base, SubredditPage, Subreddit, Post, User
 
@@ -14,27 +15,28 @@ class SubredditPageController:
         self.subname = subname
         self.db_session = db_session
         self.log = log
-        self.r = r    
+        self.r = r
+        self.fetched_posts = []
+        self.fetched_subreddit_id = None
   
-
     def fetch_subreddit_page(self, pg_type, limit=300, return_praw_object=False):
-        posts = []
-        fetched = []
         sub = self.r.get_subreddit(self.subname)
+        self.fetched_subreddit_id = sub.id
 
         # fetch subreddit posts from reddit
         try:
             if pg_type==PageType.TOP:
-                fetched = sub.get_top(limit=limit)
+                self.fetched_posts = sub.get_top(limit=limit)
             elif pg_type==PageType.CONTR:
-                fetched = sub.get_controversial(limit=limit)
+                self.fetched_posts = sub.get_controversial(limit=limit)
             elif pg_type==PageType.NEW:
-                fetched = sub.get_new(limit=limit)   
+                self.fetched_posts = sub.get_new(limit=limit)   
             elif pg_type==PageType.HOT:
-                fetched = sub.get_hot(limit=limit)   
+                self.fetched_posts = sub.get_hot(limit=limit)   
         except:
             self.log.error("Error querying /r/{0} {1} page: {2}".format(self.subname, pg_type.name, str(e)))
             return []         
+        self.fetched_posts = list(self.fetched_posts)
         self.log.info("Queried /r/{0} {1} page".format(self.subname, pg_type.name))
         # add sub to subreddit table if not already there
         try:
@@ -44,10 +46,9 @@ class SubredditPageController:
             self.log.error("Failed to save new record for subreddit /r/{0}".format(self.subname))
 
         # save subreddit posts to database
-
+        json_posts = []
         try:
-            json_posts = []
-            for post in fetched:
+            for post in self.fetched_posts:
                 new_post = post.json_dict #if("json_dict" in dir(post)) else post['data'] ### TO HANDLE TEST FIXTURES
                 pruned_post = {
                     'id': new_post['id'],
@@ -60,7 +61,6 @@ class SubredditPageController:
                     'mod_reports': len(new_post['mod_reports']),
                     'created_utc':new_post['created_utc']
                 }
-                posts.append(post)
                 json_posts.append(pruned_post)
                 is_new_post = self.archive_post(post.json_dict)
                 is_new_user = self.archive_user(pruned_post['author'], datetime.datetime.fromtimestamp(post.created))
@@ -71,10 +71,11 @@ class SubredditPageController:
             self.log.error("Error Saving posts from /r/{0} {1} page: {2}".format(self.subname, pg_type.name, str(e)))
         
         if(return_praw_object):
-            return posts
+            return self.fetched_posts
         else:
             return json_posts
 
+    @app.event_handler.event_handler
     def archive_subreddit_page(self, pg_type=PageType.HOT):
         posts = self.fetch_subreddit_page(pg_type, return_praw_object=False)
 

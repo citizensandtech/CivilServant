@@ -57,7 +57,7 @@ def test_initialize_experiment(mock_reddit):
     experiment_name = "stylesheet_experiment_test"
 
     with open(os.path.join(BASE_DIR,"config", "experiments", experiment_name + ".yml"), "r") as f:
-        experiment_config = yaml.load(f)['test']
+        experiment_config = yaml.full_load(f)['test']
 
     assert len(db_session.query(Experiment).all()) == 0
     controller = StylesheetExperimentController(experiment_name, db_session, r, log)
@@ -92,7 +92,7 @@ def test_determine_intervention_eligible(mock_reddit):
 
     experiment_name = "stylesheet_experiment_test"
     with open(os.path.join(BASE_DIR,"config", "experiments", experiment_name + ".yml"), "r") as f:
-        experiment_config = yaml.load(f)['test']
+        experiment_config = yaml.full_load(f)['test']
 
     assert len(db_session.query(Experiment).all()) == 0
     controller = StylesheetExperimentController(experiment_name, db_session, r, log)
@@ -133,7 +133,7 @@ def test_select_condition(mock_reddit):
 
     experiment_name = "stylesheet_experiment_test"
     with open(os.path.join(BASE_DIR,"config", "experiments", experiment_name + ".yml"), "r") as f:
-        experiment_config = yaml.load(f)['test']
+        experiment_config = yaml.full_load(f)['test']
     controller = StylesheetExperimentController(experiment_name, db_session, r, log)
     
     assert controller.select_condition(current_time = parser.parse("07/21/2017 00:00:00")) == "special"
@@ -151,7 +151,7 @@ def test_set_stylesheet(mock_reddit):
 
     experiment_name = "stylesheet_experiment_test"
     with open(os.path.join(BASE_DIR,"config", "experiments", experiment_name + ".yml"), "r") as f:
-        experiment_config = yaml.load(f)['test']
+        experiment_config = yaml.full_load(f)['test']
     controller = StylesheetExperimentController(experiment_name, db_session, r, log)
 
     for condition in ['special', 'normal']:
@@ -174,7 +174,7 @@ def setup_comment_monitoring(r, yesterday_posts, today_posts):
 
     experiment_name = "stylesheet_experiment_test"
     with open(os.path.join(BASE_DIR,"config", "experiments", experiment_name + ".yml"), "r") as f:
-        experiment_config = yaml.load(f)['test']
+        experiment_config = yaml.full_load(f)['test']
     controller = StylesheetExperimentController(experiment_name, db_session, r, log)
 
     today = datetime.datetime.utcnow()

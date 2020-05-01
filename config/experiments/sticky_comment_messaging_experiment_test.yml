@@ -1,0 +1,71 @@
+test:
+    subreddit: iama
+    subreddit_id: 2qzb6
+    username: CivilServantBot
+    dry_run: True
+    controller: StickyCommentMessagingExperimentController
+    non_study_messaging_enabled: True
+    conditions:
+        ama_post:
+            randomizations: sticky_comment_messaging_test.post.randomizations.csv
+            next_randomization: 0
+            arms:
+                arm_0: # no guestbook
+                    pm_max_count: null
+                    pm_subject_key: standard_pm_subject
+                    pm_text_key: standard_pm_text
+                arm_1: # full guestbook
+                    pm_max_count: null
+                    pm_subject_key: guestbook_pm_subject
+                    pm_text_key: guestbook_pm_text
+                    sticky_text_key: sticky_text
+                arm_2: # within guestbook
+                    pm_max_count: null
+                    sticky_text_key: sticky_text
+                    randomize_dependents: True
+        ama_nonquestion_mod_action:
+            randomizations: sticky_comment_messaging_test.mod.randomizations.csv
+            next_randomization: 0
+            arms:
+                arm_0: # within guestbook control
+                    pm_max_count: null
+                    pm_subject_key: standard_pm_subject
+                    pm_text_key: standard_pm_text
+                arm_1: # within guestbook message
+                    pm_max_count: null
+                    pm_subject_key: guestbook_pm_subject
+                    pm_text_key: guestbook_pm_text
+    start_time: 01/01/2020 00:00:00 UTC
+    end_time: 12/31/2099 23:59:59 UTC
+    max_eligibility_age: 86400
+    min_eligibility_age: 0
+    event_hooks:
+        iama_after_posts:
+            is_active: True
+            call_when: EventWhen.AFTER
+            caller_controller: SubredditPageController
+            caller_method: archive_subreddit_page
+            callee_module: app.controllers.sticky_comment_experiment_controller
+            callee_controller: StickyCommentMessagingExperimentController
+            callee_method: update_experiment_posts
+        iama_after_modactions:
+            is_active: True
+            call_when: EventWhen.AFTER
+            caller_controller: ModeratorController
+            caller_method: archive_mod_action_page
+            callee_module: app.controllers.sticky_comment_experiment_controller
+            callee_controller: StickyCommentMessagingExperimentController
+            callee_method: update_experiment_mod_actions
+    #
+    # Text messages used for sticky comments
+    # and private messages
+    #
+    guestbook_pm_subject: Guestbook PM Subject
+    guestbook_pm_text: |
+        Hey {username}, this is the guestbook pm text. Here is a link to the guestbook: {guestbook_link}
+    standard_pm_subject:  Standard PM Subject
+    standard_pm_text: |
+            Hey {username}, this is the standard pm text.
+    sticky_text: |
+            This is the sticky text.
+        

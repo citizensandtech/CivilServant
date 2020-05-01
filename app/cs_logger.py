@@ -5,17 +5,19 @@ from time import sleep
 import pathlib
 
 def get_logger(ENV, BASE_DIR):
- 
-  # temporary 
-  is_email_script = pathlib.Path(sys.argv[0]).name == "email_db_report.py"
-
   # use Airbrake in production
-  if(ENV=="production" and not is_email_script):
+  is_email_script = pathlib.Path(sys.argv[0]).name == "email_db_report.py"
+  if ENV == "production" and not is_email_script:
     log = airbrake.getLogger()
     log.setLevel(logging.INFO)
   else:
     log = logging.getLogger(__name__)
     log.setLevel(logging.DEBUG)
+  
+  # Return the logger as-is if it has already been initialized
+  handlers = [h for h in log.handlers if type(h) != airbrake.AirbrakeHandler]
+  if len(handlers) > 0:
+    return log
 
   # print all debug and higher to STDOUT
   # if the environment is development

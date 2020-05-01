@@ -39,7 +39,7 @@ class ExperimentController():
         experiment_file_path = os.path.join(BASE_DIR, "config", "experiments", experiment_name) + ".yml"
         with open(experiment_file_path, 'r') as f:
             try:
-                experiment_config_all = yaml.load(f)
+                experiment_config_all = yaml.full_load(f)
             except yaml.YAMLError as exc:
                 self.log.error("{0}: Failure loading experiment yaml {1}".format(
                     self.__class__.__name__, experiment_file_path), str(exc))
@@ -89,6 +89,7 @@ class ExperimentController():
         
 
         self.experiment_name = experiment_name
+        self.dry_run = experiment_config.get("dry_run", False)
 
         for key in ['subreddit', 'subreddit_id', 'shadow_subreddit', 'shadow_subreddit_id', 
                     'username', 'max_eligibility_age', 'min_eligibility_age']:
@@ -134,9 +135,9 @@ class ExperimentController():
     ###########################
 
     
-    def identify_condition(self, submission):
+    def identify_condition(self, obj):
         for label in self.experiment_settings['conditions'].keys():
             detection_method = getattr(self, "identify_"+label)
-            if(detection_method(submission)):
+            if(detection_method(obj)):
                 return label
         return None

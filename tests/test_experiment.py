@@ -64,7 +64,7 @@ def test_initialize_experiment(mock_reddit):
 
     for experiment_name in experiment_name_to_controller:
         with open(os.path.join(BASE_DIR,"config", "experiments", experiment_name + ".yml"), "r") as f:
-            experiment_config = yaml.load(f)['test']
+            experiment_config = yaml.full_load(f)['test']
 
         assert(len(db_session.query(Experiment).all()) == 0)
 
@@ -111,7 +111,7 @@ def test_identify_condition(mock_subreddit, mock_reddit):
 
     for experiment_name in experiment_name_to_controller:
         with open(os.path.join(BASE_DIR, "config", "experiments") + "/"+ experiment_name + ".yml", "r") as f:
-            experiment_settings = yaml.load(f.read())['test']
+            experiment_settings = yaml.full_load(f.read())['test']
 
         sub_data = []
         with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
@@ -158,10 +158,10 @@ def test_identify_condition(mock_subreddit, mock_reddit):
 
         if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
             objs = controller_instance.set_eligible_objects(instance)
-            eligible_objects = controller_instance.get_eligible_objects(objs)
+            eligible_objects = controller_instance.get_eligible_objects(objs, ThingType.SUBMISSION)
         elif controller_instance.__class__ is AMAStickyCommentExperimentController:
             objs = controller_instance.set_eligible_objects()
-            eligible_objects = controller_instance.get_eligible_objects(objs)            
+            eligible_objects = controller_instance.get_eligible_objects(objs, ThingType.SUBMISSION)            
         #elif controller_instance.__class__ is ModUserExperimentController:
         #    eligible_objects = controller_instance.get_eligible_users_and_archive_mod_actions(instance)
 

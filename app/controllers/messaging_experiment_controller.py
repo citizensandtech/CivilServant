@@ -343,7 +343,7 @@ class NewcomerMessagingExperimentController(MessagingExperimentController):
         previously_enrolled = self.previously_enrolled(newcomer_authors)
         matched_newcomers = list(previously_enrolled.keys())
 
-        self.db_session.execute("Lock Tables experiments WRITE,                                         experiment_things WRITE")
+        self.db_session.execute("Lock Tables experiments WRITE, experiment_things WRITE")
         try:
             newcomer_ets = []
             newcomers_without_randomization = 0

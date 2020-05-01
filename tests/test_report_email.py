@@ -5,7 +5,7 @@ import app.cs_logger
 
 from datetime import datetime, timedelta
 from mock import Mock, patch
-import imp
+import importlib
 import os
 import pytest
 import random
@@ -231,7 +231,7 @@ def init_experiment_actions(init_experiments):
 def test_generate_reddit_front_page(init_front_pages):
     assert len(db_session.query(FrontPage).all()) == DAYS * PAGES_PER_DAY * len(PageType)
     
-    report = imp.reload(utils.email_db_report)
+    report = importlib.reload(utils.email_db_report)
     output = set(report.generate_reddit_front_page(END_DT, DAYS, html=False))
     assert len(output) == DAYS * len(PageType)
 
@@ -244,7 +244,7 @@ def test_generate_reddit_front_page(init_front_pages):
 def test_generate_reddit_subreddit_page(init_subreddit_pages):
     assert len(db_session.query(SubredditPage).all()) == DAYS * PAGES_PER_DAY * len(PageType)
 
-    report = imp.reload(utils.email_db_report)
+    report = importlib.reload(utils.email_db_report)
     output = set(report.generate_reddit_subreddit_page(END_DT, DAYS, html=False))
     assert len(output) == DAYS * len(PageType)
 
@@ -258,7 +258,7 @@ def test_generate_reddit_subreddit_page(init_subreddit_pages):
 def test_generate_reddit_subreddit(init_subreddits):
     assert len(db_session.query(Subreddit).all()) == 1
 
-    report = imp.reload(utils.email_db_report)
+    report = importlib.reload(utils.email_db_report)
     output = report.generate_reddit_subreddit(END_DT, DAYS, html=False)    
     assert len(output) == 1
 
@@ -268,7 +268,7 @@ def test_generate_reddit_subreddit(init_subreddits):
 def test_generate_reddit_post(init_posts):
     assert len(db_session.query(Post).all()) == DAYS * POSTS_PER_DAY
 
-    report = imp.reload(utils.email_db_report)
+    report = importlib.reload(utils.email_db_report)
     output = {tuple(item) for item in report.generate_reddit_post(END_DT, DAYS, html=False)}
     assert len(output) == DAYS
 
@@ -280,7 +280,7 @@ def test_generate_reddit_post(init_posts):
 def test_generate_reddit_comment(init_comments):
     assert len(db_session.query(Comment).all()) == DAYS * POSTS_PER_DAY * COMMENTS_PER_POST
 
-    report = imp.reload(utils.email_db_report)
+    report = importlib.reload(utils.email_db_report)
     output = {tuple(item) for item in report.generate_reddit_comment(END_DT, DAYS, html=False)}
     assert len(output) == DAYS
     
@@ -292,7 +292,7 @@ def test_generate_reddit_comment(init_comments):
 def test_generate_reddit_user(init_users):
     assert len(db_session.query(User).all()) == DAYS * USERS_PER_DAY
 
-    report = imp.reload(utils.email_db_report)
+    report = importlib.reload(utils.email_db_report)
     output = {tuple(item)[1:] for item in report.generate_reddit_user(END_DT, DAYS, html=False)}
     assert len(output) == DAYS
     
@@ -304,7 +304,7 @@ def test_generate_reddit_user(init_users):
 def test_generate_reddit_mod_action(init_mod_actions):
     assert len(db_session.query(ModAction).all()) == DAYS * MOD_ACTIONS_PER_DAY
 
-    report = imp.reload(utils.email_db_report)
+    report = importlib.reload(utils.email_db_report)
     output = {tuple(item) for item in report.generate_reddit_mod_action(END_DT, DAYS, html=False)}
     assert len(output) == DAYS
 
@@ -316,7 +316,7 @@ def test_generate_reddit_mod_action(init_mod_actions):
 def test_generate_experiment_new(init_experiments):
     assert len(db_session.query(Experiment).all()) == DAYS * EXPERIMENTS_PER_DAY
 
-    report = imp.reload(utils.email_db_report)
+    report = importlib.reload(utils.email_db_report)
     output = {tuple(item)[1:] for item in report.generate_experiment_new(END_DT, DAYS, html=False)}
     assert len(output) == DAYS
 
@@ -328,7 +328,7 @@ def test_generate_experiment_new(init_experiments):
 def test_generate_experiment_active(init_experiments):
     assert len(db_session.query(Experiment).all()) == DAYS * EXPERIMENTS_PER_DAY
 
-    report = imp.reload(utils.email_db_report)
+    report = importlib.reload(utils.email_db_report)
     output = list(report.generate_experiment_active(END_DT, DAYS, html=False)['total count'].values())
     assert len(output) == DAYS
 
@@ -339,7 +339,7 @@ def test_generate_experiment_thing(init_experiment_things):
     count = DAYS * EXPERIMENTS_PER_DAY * THINGS_PER_EXPERIMENT
     assert len(db_session.query(ExperimentThing).all()) == count
 
-    report = imp.reload(utils.email_db_report)
+    report = importlib.reload(utils.email_db_report)
     output = set(report.generate_experiment_thing(END_DT, DAYS, html=False))
     assert len(output) == DAYS * EXPERIMENTS_PER_DAY
 
@@ -355,7 +355,7 @@ def test_generate_experiment_thing_snapshot(init_experiment_thing_snapshots):
     count = DAYS * EXPERIMENTS_PER_DAY * THINGS_PER_EXPERIMENT * SNAPSHOTS_PER_THING
     assert len(db_session.query(ExperimentThingSnapshot).all()) == count
 
-    report = imp.reload(utils.email_db_report)
+    report = importlib.reload(utils.email_db_report)
     output = set(report.generate_experiment_thing_snapshot(END_DT, DAYS, html=False))
     assert len(output) == DAYS * EXPERIMENTS_PER_DAY
 
@@ -371,7 +371,7 @@ def test_generate_experiment_action(init_experiment_actions):
     count = DAYS * EXPERIMENTS_PER_DAY * ACTIONS_PER_EXPERIMENT
     assert len(db_session.query(ExperimentAction).all()) == count
 
-    report = imp.reload(utils.email_db_report)
+    report = importlib.reload(utils.email_db_report)
     output = set(report.generate_experiment_action(END_DT, DAYS, html=False))
     assert len(output) == DAYS * EXPERIMENTS_PER_DAY
 

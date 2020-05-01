@@ -76,3 +76,7 @@ target/
 
 #Ipython Notebook
 .ipynb_checkpoints
+
+#VSCode
+.vscode
+CivilServant.code-workspace

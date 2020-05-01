@@ -1,5 +1,6 @@
 import pytest
 import os, yaml
+from pathlib import Path
 
 ## SET UP THE DATABASE ENGINE
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -12,14 +13,17 @@ import simplejson as json
 import sqlalchemy
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, not_
 import glob, datetime, time, pytz
 from app.controllers.sticky_comment_experiment_controller import *
 from app.controllers.front_page_controller import FrontPageController
+from app.controllers.moderator_controller import ModeratorController
+from app.controllers.subreddit_controller import SubredditPageController
 
 from utils.common import *
 from dateutil import parser
-import praw, csv, random, string
+import praw, praw.objects
+import csv, random, string
 from collections import Counter
 
 ### LOAD THE CLASSES TO TEST
@@ -42,6 +46,8 @@ def clear_all_tables():
     db_session.query(ExperimentAction).delete()
     db_session.query(ExperimentThingSnapshot).delete()
     db_session.query(EventHook).delete()
+    db_session.query(ModAction).delete()
+    db_session.query(ResourceLock).delete()
     db_session.commit()    
 
 def setup_function(function):
@@ -64,7 +70,7 @@ def test_initialize_experiment(mock_reddit):
 
     for experiment_name in experiment_name_to_controller:
         with open(os.path.join(BASE_DIR,"config", "experiments", experiment_name + ".yml"), "r") as f:
-            experiment_config = yaml.load(f)['test']
+            experiment_config = yaml.full_load(f)['test']
 
         assert(len(db_session.query(Experiment).all()) == 0)
 
@@ -115,7 +121,7 @@ def test_get_eligible_objects(mock_subreddit, mock_reddit):
 
     for experiment_name in experiment_name_to_controller:
         with open(os.path.join(BASE_DIR, "config", "experiments") + "/"+ experiment_name + ".yml", "r") as f:
-            experiment_settings = yaml.load(f.read())['test']
+            experiment_settings = yaml.full_load(f.read())['test']
 
         sub_data = []
         with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
@@ -156,7 +162,7 @@ def test_get_eligible_objects(mock_subreddit, mock_reddit):
             objs = controller_instance.set_eligible_objects()
             for obj in objs[::10]:
                 obj.json_dict["link_flair_css_class"] = ""
-        eligible_objects = controller_instance.get_eligible_objects(objs)
+        eligible_objects = controller_instance.get_eligible_objects(objs, ThingType.SUBMISSION)
         if controller_instance.__class__ is AMA2020StickyCommentExperimentController:
             expected_eligible_count = 90
         else:
@@ -189,7 +195,7 @@ def test_get_eligible_objects(mock_subreddit, mock_reddit):
             objs = controller_instance.set_eligible_objects()
         elif controller_instance.__class__ is AMA2020StickyCommentExperimentController:
             objs = controller_instance.set_eligible_objects()
-        eligible_objects = controller_instance.get_eligible_objects(objs)
+        eligible_objects = controller_instance.get_eligible_objects(objs, ThingType.SUBMISSION)
         if controller_instance.__class__ is AMA2020StickyCommentExperimentController:
             expected_eligible_count = 40
         else:
@@ -209,7 +215,7 @@ def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
 
     for experiment_name in experiment_name_to_controller:
         with open(os.path.join(BASE_DIR, "config", "experiments") + "/"+ experiment_name + ".yml", "r") as f:
-            experiment_settings = yaml.load(f.read())['test']
+            experiment_settings = yaml.full_load(f.read())['test']
 
         sub_data = []
         with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
@@ -240,7 +246,7 @@ def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
             objs = controller_instance.set_eligible_objects(instance)
         elif controller_instance.__class__ is AMAStickyCommentExperimentController:
             objs = controller_instance.set_eligible_objects()            
-        eligible_objects = controller_instance.get_eligible_objects(objs)
+        eligible_objects = controller_instance.get_eligible_objects(objs, ThingType.SUBMISSION)
         assert len(eligible_objects) == 100 ####
 
 
@@ -250,7 +256,7 @@ def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
             assert experiment_settings['conditions'][condition_name]['next_randomization']    == 0            
         assert db_session.query(ExperimentThing).count()    == 0
 
-        controller_instance.assign_randomized_conditions(eligible_objects)
+        controller_instance.assign_randomized_conditions(eligible_objects, ThingType.SUBMISSION)
         assert db_session.query(ExperimentThing).count() == 100 
         assert len(db_session.query(Experiment).all()) == 1
         experiment = db_session.query(Experiment).first()
@@ -297,16 +303,17 @@ def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
 
         # Only 1 randomization left for each condition, while there are >1 new_posts
         assert len(new_posts) == 4
-        experiment_things = controller_instance.assign_randomized_conditions(new_posts)
+        assignments = controller_instance.assign_randomized_conditions(new_posts, ThingType.SUBMISSION)
         ## assert that only 1 item from each condition went through
-        assert len(experiment_things) == len(experiment_settings['conditions'])
-        for thing in experiment_things:
+        assert len(assignments) == len(experiment_settings['conditions'])
+        for thing, obj in assignments:
+            assert thing.id == obj.id
             assert thing.id in [x.id for x in new_posts]
         
         ## CHECK THE EMPTY CASE
         ## make sure that no actions are taken if the list is empty
         experiment_action_count = db_session.query(ExperimentAction).count()
-        controller_instance.assign_randomized_conditions([])
+        controller_instance.assign_randomized_conditions([], ThingType.SUBMISSION)
         assert db_session.query(ExperimentAction).count() == experiment_action_count
 
         clear_all_tables()
@@ -334,7 +341,7 @@ def test_update_experiment(intervene_ama_arm_1, intervene_ama_arm_0,
     for experiment_name in experiment_name_to_controller:
 
         with open(os.path.join(BASE_DIR, "config", "experiments") + "/"+ experiment_name + ".yml", "r") as f:
-            experiment_settings = yaml.load(f.read())['test']
+            experiment_settings = yaml.full_load(f.read())['test']
 
         sub_data = []
         with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
@@ -363,7 +370,7 @@ def test_update_experiment(intervene_ama_arm_1, intervene_ama_arm_0,
 
         ## GET RANDOMIZATIONS
         #objs = scec.set_eligible_objects()
-        #eligible_objects = scec.get_eligible_objects(objs)
+        #eligible_objects = scec.get_eligible_objects(objs, ThingType.SUBMISSION)
         #experiment_things = scec.assign_randomized_conditions(eligible_objects)
         assert db_session.query(ExperimentThing).count() == 0
 
@@ -448,7 +455,7 @@ def test_submission_acceptable(mock_comment, mock_submission, mock_reddit):
 
     for experiment_name in experiment_name_to_controller:
         with open(os.path.join(BASE_DIR, "config", "experiments") + "/"+ experiment_name + ".yml", "r") as f:
-            experiment_settings = yaml.load(f.read())['test']
+            experiment_settings = yaml.full_load(f.read())['test']
 
         controller = experiment_name_to_controller[experiment_name]
         controller_instance = controller(experiment_name, db_session, r, log)
@@ -529,7 +536,7 @@ def test_make_sticky_post(mock_comment, mock_submission, mock_reddit):
 
     for experiment_name in experiment_name_to_controller:
         with open(os.path.join(BASE_DIR, "config", "experiments") + "/"+ experiment_name + ".yml", "r") as f:
-            experiment_settings = yaml.load(f.read())['test']
+            experiment_settings = yaml.full_load(f.read())['test']
 
         controller = experiment_name_to_controller[experiment_name]
         controller_instance = controller(experiment_name, db_session, r, log)
@@ -593,7 +600,7 @@ def test_make_control_nonaction(mock_comment, mock_submission, mock_reddit):
 
 
         with open(os.path.join(BASE_DIR, "config", "experiments") + "/"+ experiment_name + ".yml", "r") as f:
-            experiment_settings = yaml.load(f.read())['test']
+            experiment_settings = yaml.full_load(f.read())['test']
 
         controller = experiment_name_to_controller[experiment_name]
         controller_instance = controller(experiment_name, db_session, r, log)
@@ -648,7 +655,7 @@ def test_find_treatment_replies(mock_reddit):
         controller_instance = controller(experiment_name, db_session, r, log)
 
         with open(os.path.join(BASE_DIR, "config", "experiments") + "/"+ experiment_name + ".yml", "r") as f:
-            experiment_settings = yaml.load(f.read())['test']
+            experiment_settings = yaml.full_load(f.read())['test']
 
         experiment_start = parser.parse(experiment_settings['start_time'])
 
@@ -776,7 +783,7 @@ def test_identify_condition(mock_subreddit, mock_reddit):
     for experiment_name in experiment_name_to_controller:
 
         with open(os.path.join(BASE_DIR, "config", "experiments") + "/"+ experiment_name + ".yml", "r") as f:
-            experiment_settings = yaml.load(f.read())['test']
+            experiment_settings = yaml.full_load(f.read())['test']
 
         sub_data = []
         with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
@@ -811,7 +818,7 @@ def test_identify_condition(mock_subreddit, mock_reddit):
             objs = controller_instance.set_eligible_objects()
             
 
-        eligible_objects = controller_instance.get_eligible_objects(objs)
+        eligible_objects = controller_instance.get_eligible_objects(objs, ThingType.SUBMISSION)
 
         condition_list = []
         for obj in eligible_objects:
@@ -844,7 +851,7 @@ def test_frontpage_get_eligible_objects(mock_reddit):
             mock_post = json2obj(json.dumps(post['data']), now=True, offset=-1*min_age)
             mock_fp_posts.append(mock_post)
 
-    eligible_objects = controller_instance.get_eligible_objects(mock_fp_posts)
+    eligible_objects = controller_instance.get_eligible_objects(mock_fp_posts, ThingType.SUBMISSION)
     assert len(eligible_objects) == 6
     for obj in eligible_objects:
         assert "t5_" + controller_instance.subreddit_id == obj.subreddit_id
@@ -864,7 +871,7 @@ def test_archive_experiment_submission_metadata(mock_comment, mock_submission, m
 
     
         with open(os.path.join(BASE_DIR, "config", "experiments") + "/"+ experiment_name + ".yml", "r") as f:
-            experiment_settings = yaml.load(f.read())['test']
+            experiment_settings = yaml.full_load(f.read())['test']
 
         with open("{script_dir}/fixture_data/submission_0.json".format(script_dir=TEST_DIR)) as f:
             submission_json = json.loads(f.read())
@@ -935,3 +942,203 @@ def test_archive_experiment_submission_metadata(mock_comment, mock_submission, m
         assert ets.object_type          == ThingType.SUBMISSION.value
 
         clear_all_tables()
+
+
+@patch('praw.Reddit', autospec=True)
+@patch('praw.objects.Submission', autospec=True)
+@patch('praw.objects.ModAction', autospec=True)
+def test_sticky_comment_messaging_controller(mock_mod_action, mock_submission, mock_reddit):
+    controller_class = StickyCommentMessagingExperimentController
+    experiment_name = 'sticky_comment_messaging_experiment_test'
+    experiment_configs_path = Path(BASE_DIR, 'config', 'experiments')
+    fixtures_path = Path(TEST_DIR, 'fixture_data')
+
+    r = mock_reddit.return_value
+    patch('praw.')
+
+    with open(str(Path(experiment_configs_path, experiment_name + '.yml'))) as f:
+        experiment_settings = yaml.full_load(f.read())['test']
+    controller = controller_class(experiment_name, db_session, r, log)
+    assert controller.dry_run
+    
+    expected_submissions_count = 10
+    with open(str(Path(fixtures_path, 'submissions_iama.json'))) as f:
+        submissions = json2obj(f.read(), now=True)
+    submissions_count = len(submissions)
+    assert submissions_count == expected_submissions_count
+    assert all(controller.identify_ama_post(s) for s in submissions)
+
+    subreddit_page_controller = SubredditPageController('iama', db_session, r, log)
+    subreddit_page_controller.fetched_posts = submissions
+    subreddit_page_controller.fetched_subreddit_id = experiment_settings['subreddit_id']
+    controller.update_experiment_posts(subreddit_page_controller)
+
+    post_exp_actions = db_session.query(ExperimentAction).filter(
+        ExperimentAction.experiment_id == controller.experiment.id,
+        ExperimentAction.action_object_type == ThingType.SUBMISSION.value
+    ).all()
+    assert len(post_exp_actions) == submissions_count
+
+    post_randomizations_fn = experiment_settings['conditions']['ama_post']['randomizations']
+    with open(str(Path(experiment_configs_path, post_randomizations_fn))) as f:
+        post_randomizations = list(csv.DictReader(f))
+
+    post_randomization_pairs = zip(post_exp_actions, post_randomizations[:len(post_exp_actions)])
+    for post_exp_action, randomization in post_randomization_pairs:
+        exp_action_metadata = json.loads(post_exp_action.metadata_json)
+        exp_action_treatment = exp_action_metadata['randomization']['treatment']
+        assert exp_action_treatment == randomization['treatment']
+    
+    post_treatment_counts = Counter(r['treatment'] for r in
+        post_randomizations[:len(post_exp_actions)])
+    post_control_count = post_treatment_counts['0']
+    post_full_guestbook_count = post_treatment_counts['1']
+    post_within_guestbook_count = post_treatment_counts['2']
+    post_treatment_count = post_full_guestbook_count + post_within_guestbook_count
+    
+    control_post_exp_actions = [a for a in post_exp_actions
+        if a.action == 'ControlNoStickyPost' and 'control' in a.metadata_json]
+    assert len(control_post_exp_actions) == post_control_count
+    full_guestbook_post_exp_actions = [a for a in post_exp_actions
+        if a.action == 'MakeStickyPost' and 'full_guestbook' in a.metadata_json]
+    assert len(full_guestbook_post_exp_actions) == post_full_guestbook_count
+    within_guestbook_post_exp_actions = [a for a in post_exp_actions
+        if a.action == 'MakeStickyPost' and 'full_guestbook' in a.metadata_json]
+    assert len(within_guestbook_post_exp_actions) == post_within_guestbook_count
+
+    post_exp_things = db_session.query(ExperimentThing).filter(
+        ExperimentThing.experiment_id == controller.experiment.id,
+        ExperimentThing.object_type == ThingType.SUBMISSION.value
+    ).all()
+    assert len(post_exp_things) == submissions_count
+
+    sticky_comment_exp_things = db_session.query(ExperimentThing).filter(
+        ExperimentThing.experiment_id == controller.experiment.id,
+        ExperimentThing.object_type == ThingType.COMMENT.value
+    ).all()
+    assert len(sticky_comment_exp_things) == post_treatment_count
+
+    expected_mod_actions_count = 97
+    with open(str(Path(fixtures_path, 'mod_actions_iama.json'))) as f:
+        mod_actions = json2obj(f.read(), now=True)
+    mod_actions_count = len(mod_actions)
+    assert mod_actions_count == expected_mod_actions_count
+
+    expected_comment_removal_mod_action_count = 71
+    comment_removal_mod_action_count = sum(controller.is_automod_comment_removal(m) for m in mod_actions)
+    assert comment_removal_mod_action_count == expected_comment_removal_mod_action_count
+
+    expected_comment_removal_mod_action_parent_post_count = 8
+    comment_removal_mod_action_parent_post_count = len(
+        set([controller.extract_post_id(ma) for ma in mod_actions
+            if ma.action =='removecomment']))
+    assert comment_removal_mod_action_parent_post_count == expected_comment_removal_mod_action_parent_post_count
+    
+    expected_nonquestion_comment_removal_mod_action_count = 69
+    nonquestion_comment_removal_mod_action_count = sum(controller.identify_ama_nonquestion_mod_action(m) for m in mod_actions)
+    assert nonquestion_comment_removal_mod_action_count == expected_nonquestion_comment_removal_mod_action_count
+    
+    expected_other_reason_comment_removal_mod_action_count = 2
+    other_reason_comment_removal_mod_action_count = len([m for m in mod_actions if
+        controller.is_automod_comment_removal(m)
+        and not controller.identify_ama_nonquestion_mod_action(m)])
+    assert other_reason_comment_removal_mod_action_count == expected_other_reason_comment_removal_mod_action_count
+
+    mod_controller = ModeratorController('iama', db_session, r, log)
+    mod_controller.fetched_mod_actions = mod_actions
+    mod_controller.fetched_subreddit_id = experiment_settings['subreddit_id']
+    controller.update_experiment_mod_actions(mod_controller)
+
+    expected_user_exp_things_count = 71
+    user_exp_things = db_session.query(ExperimentThing).filter(
+        ExperimentThing.experiment_id == controller.experiment.id,
+        ExperimentThing.object_type == ThingType.USER.value
+    ).all()
+    assert len(user_exp_things) == len(controller.user_things)
+    assert len(user_exp_things) == expected_user_exp_things_count
+
+    expected_included_user_exp_things_count = nonquestion_comment_removal_mod_action_count
+    included_user_exp_things = db_session.query(ExperimentThing).filter(
+        ExperimentThing.experiment_id == controller.experiment.id,
+        ExperimentThing.object_type == ThingType.USER.value,
+        ExperimentThing.metadata_json.contains('source_condition')
+    ).all()
+    assert len(included_user_exp_things) == expected_included_user_exp_things_count
+
+    expected_excluded_user_exp_things_count = other_reason_comment_removal_mod_action_count
+    excluded_user_exp_things = db_session.query(ExperimentThing).filter(
+        ExperimentThing.experiment_id == controller.experiment.id,
+        ExperimentThing.object_type == ThingType.USER.value,
+        not_(ExperimentThing.metadata_json.contains('source_condition'))
+    ).all()
+    assert len(excluded_user_exp_things) == expected_excluded_user_exp_things_count
+
+    assert len(included_user_exp_things) + len(excluded_user_exp_things) \
+        == len(user_exp_things)
+
+    assert len(controller.post_things) == comment_removal_mod_action_parent_post_count
+    expected_comment_removal_mod_action_parent_post_sticky_comment_count = 6
+    assert len(controller.sticky_comment_things) == expected_comment_removal_mod_action_parent_post_sticky_comment_count
+    
+    message_exp_actions = db_session.query(ExperimentAction).filter(
+        ExperimentAction.experiment_id == controller.experiment.id,
+        ExperimentAction.action_object_type == ThingType.USER.value
+    ).order_by(ExperimentAction.id).all()
+    assert len(message_exp_actions) == comment_removal_mod_action_count
+
+    included_message_exp_actions = [action for action in message_exp_actions
+        if json.loads(action.metadata_json)['group'] != 'excluded']
+    assert len(included_message_exp_actions) == nonquestion_comment_removal_mod_action_count
+    
+    excluded_message_exp_actions = [action for action in message_exp_actions
+        if json.loads(action.metadata_json)['group'] == 'excluded']
+    assert len(excluded_message_exp_actions) == other_reason_comment_removal_mod_action_count
+
+    assert len(included_message_exp_actions) + len(excluded_message_exp_actions) == comment_removal_mod_action_count
+    
+    expected_post_control_message_count = 11
+    post_control_messages = [action for action in message_exp_actions
+        if action.action_subject_type == str(ThingType.MODACTION.value)
+        and json.loads(action.metadata_json)['condition'] == 'ama_post'
+        and json.loads(action.metadata_json)['arm'] == 'arm_0']
+    assert len(post_control_messages) == expected_post_control_message_count
+    
+    expected_post_treatment_message_count = 25
+    post_treatment_messages = [action for action in message_exp_actions
+        if action.action_subject_type == str(ThingType.MODACTION.value)
+        and json.loads(action.metadata_json)['condition'] == 'ama_post'
+        and json.loads(action.metadata_json)['arm'] == 'arm_1']
+    assert len(post_treatment_messages) == expected_post_treatment_message_count
+    
+    expected_mod_action_control_message_count = 16
+    mod_action_control_messages = [action for action in message_exp_actions
+        if json.loads(action.metadata_json)['condition'] == 'ama_nonquestion_mod_action'
+        and json.loads(action.metadata_json)['arm'] == 'arm_0'
+        and json.loads(action.metadata_json)['message_status'] == 'sent']
+    assert len(mod_action_control_messages) == expected_mod_action_control_message_count
+    
+    expected_mod_action_treatment_message_count = 17
+    mod_action_treatment_messages = [action for action in message_exp_actions
+        if json.loads(action.metadata_json)['condition'] == 'ama_nonquestion_mod_action'
+        and json.loads(action.metadata_json)['arm'] == 'arm_1'
+        and json.loads(action.metadata_json)['message_status'] == 'sent']
+    assert len(mod_action_treatment_messages) == expected_mod_action_treatment_message_count
+
+    assert sum([
+        len(post_control_messages),
+        len(post_treatment_messages),
+        len(mod_action_control_messages),
+        len(mod_action_treatment_messages)
+    ]) == nonquestion_comment_removal_mod_action_count
+    
+    expected_guestbook_message_count = 42
+    guestbook_messages = [action for action in message_exp_actions
+        if action.action == 'SendGuestbookMessage']
+    assert len(guestbook_messages) == expected_guestbook_message_count
+    
+    expected_standard_message_count = 27
+    standard_messages = [action for action in message_exp_actions
+        if action.action == 'SendStandardMessage']
+    assert len(standard_messages) == expected_standard_message_count
+
+    assert len(guestbook_messages) + len(standard_messages) == nonquestion_comment_removal_mod_action_count

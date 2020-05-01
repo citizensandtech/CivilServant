@@ -73,8 +73,6 @@ def run_callbacks(instance, caller_method, call_when):
     experiment_states = {e.id: (now > e.start_time and now < e.end_time) for e in experiments}
     active_events = [e for e in events if (e.experiment_id and e.experiment_id in experiment_states and experiment_states[e.experiment_id])]
 
-    experiment_info = {e.id: e for e in experiments}
-
     # no guaranteed order that events are run
     for e in active_events:
         callee_instance = instance.experiment_to_controller[e.experiment_id] if e.experiment_id in instance.experiment_to_controller else None 
