@@ -1081,9 +1081,6 @@ class StickyCommentMessagingExperimentController(StickyCommentExperimentControll
         return self.send_experiment_message(mod_action_thing, group='post')
     
     def is_automod_comment_removal(self, mod_action):
-        return self.is_comment_removal(mod_action, mod_name='AutoModerator')
-    
-    def is_comment_removal(self, mod_action, mod_name=None):
         # This is accurate for r/iama as of 2020-05
         if 'mod' not in mod_action.json_dict:
             return False
@@ -1091,7 +1088,7 @@ class StickyCommentMessagingExperimentController(StickyCommentExperimentControll
         action = mod_action.json_dict['action']
         target_author = mod_action.json_dict['target_author']
         return (
-            (not mod_name or mod == mod_name)
+            mod == 'AutoModerator'
             and action == 'removecomment'
             and target_author != '[deleted]')
     
@@ -1178,43 +1175,43 @@ class StickyCommentMessagingExperimentController(StickyCommentExperimentControll
                 instance.fetched_subreddit_id)
             lock_id = '%s::update_experiment_mod_actions' % self.task_id
             with self.db_session.cooplock(lock_id, self.experiment.id):
-                eligible_mod_actions = self.get_eligible_objects(instance.fetched_mod_actions, ThingType.MODACTION)
-                comment_removal_mod_actions = [ma for ma in eligible_mod_actions if self.is_comment_removal(ma)]
-                experiment_mod_actions = [ma for ma in comment_removal_mod_actions
+                nonquestion_mod_actions = [ma for ma in instance.fetched_mod_actions
                     if self.identify_ama_nonquestion_mod_action(ma)]
-                
-                post_ids = [self.extract_post_id(mod_action) for mod_action in experiment_mod_actions]
+                eligible_mod_actions = self.get_eligible_objects(
+                    nonquestion_mod_actions, ThingType.MODACTION)
+
+                post_ids = [self.extract_post_id(mod_action) for mod_action in eligible_mod_actions]
                 self.post_things = {}
                 for post_thing in self.fetch_post_things(post_ids):
                     self.post_things[post_thing.id] = post_thing
-                
+
                 self.sticky_comment_things = {}
                 for sticky_comment_thing in self.fetch_sticky_comment_things(post_ids):
                     post_id = json.loads(sticky_comment_thing.metadata_json)['submission_id']
                     self.sticky_comment_things[post_id] = sticky_comment_thing
 
-                ready_experiment_mod_actions = [ma for ma in experiment_mod_actions
+                included_mod_actions = [ma for ma in eligible_mod_actions
                     if self.extract_post_id(ma) in self.post_things]
                 self.log.info('%s %d of %d eligible mod actions have a parent post included in the experiment.',
                     self.log_prefix,
-                    len(ready_experiment_mod_actions),
+                    len(included_mod_actions),
                     len(eligible_mod_actions))
                 
-                # TODO Fix group parameter for incomplete_interventions
-                #incomplete_interventions = self.fetch_incomplete_interventions()
-                self.user_things = self.archive_mod_action_user_things(ready_experiment_mod_actions)
-                results = self.run_interventions(ready_experiment_mod_actions, ThingType.MODACTION)
-                #for mod_action_thing in incomplete_interventions:
-                #    results.append(self.send_experiment_message(mod_action_thing))
+                excluded_mod_actions = [ma for ma in eligible_mod_actions
+                    if self.extract_post_id(ma) not in self.post_things]
+                self.log.info('%s %d of %d eligible mod actions do not have a parent post included in the experiment.',
+                    self.log_prefix,
+                    len(excluded_mod_actions),
+                    len(eligible_mod_actions))
                 
+                self.user_things = self.archive_mod_action_user_things(included_mod_actions)
+                results = self.run_interventions(included_mod_actions, ThingType.MODACTION)
+
                 # Handle sending private messages for comment removals not included in the study
                 if self.non_study_messaging_enabled:
-                    excluded_comment_removal_mod_actions = [ma for ma in comment_removal_mod_actions if
-                        self.is_automod_comment_removal(ma)
-                        and not self.identify_ama_nonquestion_mod_action(ma)]
                     self.user_things.update(self.archive_mod_action_user_things(
-                        excluded_comment_removal_mod_actions))
-                    for mod_action in excluded_comment_removal_mod_actions:
+                        excluded_mod_actions))
+                    for mod_action in excluded_mod_actions:
                         results.append(self.send_excluded_message(mod_action))
                 
                 self.db_session.commit()

@@ -54,7 +54,8 @@ def setup_function(function):
     clear_all_tables()
 
 def teardown_function(function):
-    clear_all_tables()
+    #clear_all_tables()
+    pass
 
 
 ### TODO: REFACTOR THIS INTO A SUPERCLASS FOR EXPERIMENTS
@@ -967,6 +968,18 @@ def test_sticky_comment_messaging_controller(mock_mod_action, mock_submission, m
     submissions_count = len(submissions)
     assert submissions_count == expected_submissions_count
     assert all(controller.identify_ama_post(s) for s in submissions)
+    
+    # Force one submission to be over the max age allowed. This will allow testing the
+    # sending of control messages for mod actions on posts not included in the study
+    submissions[0] = submissions[0]._replace(created_utc=0)
+    submissions[0].json_dict['created_utc'] = 0
+
+    expected_fresh_post_count = 9
+    max_age = experiment_settings['max_eligibility_age']
+    fresh_posts = [post for post in submissions
+        if datetime.datetime.now().timestamp() - post.created_utc < max_age]
+    fresh_post_count = len(fresh_posts)
+    assert fresh_post_count == expected_fresh_post_count
 
     subreddit_page_controller = SubredditPageController('iama', db_session, r, log)
     subreddit_page_controller.fetched_posts = submissions
@@ -977,7 +990,7 @@ def test_sticky_comment_messaging_controller(mock_mod_action, mock_submission, m
         ExperimentAction.experiment_id == controller.experiment.id,
         ExperimentAction.action_object_type == ThingType.SUBMISSION.value
     ).all()
-    assert len(post_exp_actions) == submissions_count
+    assert len(post_exp_actions) == fresh_post_count
 
     post_randomizations_fn = experiment_settings['conditions']['ama_post']['randomizations']
     with open(str(Path(experiment_configs_path, post_randomizations_fn))) as f:
@@ -1003,14 +1016,14 @@ def test_sticky_comment_messaging_controller(mock_mod_action, mock_submission, m
         if a.action == 'MakeStickyPost' and 'full_guestbook' in a.metadata_json]
     assert len(full_guestbook_post_exp_actions) == post_full_guestbook_count
     within_guestbook_post_exp_actions = [a for a in post_exp_actions
-        if a.action == 'MakeStickyPost' and 'full_guestbook' in a.metadata_json]
+        if a.action == 'MakeStickyPost' and 'within_guestbook' in a.metadata_json]
     assert len(within_guestbook_post_exp_actions) == post_within_guestbook_count
 
     post_exp_things = db_session.query(ExperimentThing).filter(
         ExperimentThing.experiment_id == controller.experiment.id,
         ExperimentThing.object_type == ThingType.SUBMISSION.value
     ).all()
-    assert len(post_exp_things) == submissions_count
+    assert len(post_exp_things) == fresh_post_count
 
     sticky_comment_exp_things = db_session.query(ExperimentThing).filter(
         ExperimentThing.experiment_id == controller.experiment.id,
@@ -1024,32 +1037,22 @@ def test_sticky_comment_messaging_controller(mock_mod_action, mock_submission, m
     mod_actions_count = len(mod_actions)
     assert mod_actions_count == expected_mod_actions_count
 
-    expected_comment_removal_mod_action_count = 71
-    comment_removal_mod_action_count = sum(controller.is_automod_comment_removal(m) for m in mod_actions)
-    assert comment_removal_mod_action_count == expected_comment_removal_mod_action_count
-
-    expected_comment_removal_mod_action_parent_post_count = 8
-    comment_removal_mod_action_parent_post_count = len(
+    expected_nonquestion_comment_mod_action_parent_post_count = 8
+    nonquestion_comment_mod_action_parent_post_count = len(
         set([controller.extract_post_id(ma) for ma in mod_actions
-            if ma.action =='removecomment']))
-    assert comment_removal_mod_action_parent_post_count == expected_comment_removal_mod_action_parent_post_count
+            if controller.identify_ama_nonquestion_mod_action(ma)]))
+    assert nonquestion_comment_mod_action_parent_post_count == expected_nonquestion_comment_mod_action_parent_post_count
     
     expected_nonquestion_comment_removal_mod_action_count = 69
     nonquestion_comment_removal_mod_action_count = sum(controller.identify_ama_nonquestion_mod_action(m) for m in mod_actions)
     assert nonquestion_comment_removal_mod_action_count == expected_nonquestion_comment_removal_mod_action_count
     
-    expected_other_reason_comment_removal_mod_action_count = 2
-    other_reason_comment_removal_mod_action_count = len([m for m in mod_actions if
-        controller.is_automod_comment_removal(m)
-        and not controller.identify_ama_nonquestion_mod_action(m)])
-    assert other_reason_comment_removal_mod_action_count == expected_other_reason_comment_removal_mod_action_count
-
     mod_controller = ModeratorController('iama', db_session, r, log)
     mod_controller.fetched_mod_actions = mod_actions
     mod_controller.fetched_subreddit_id = experiment_settings['subreddit_id']
     controller.update_experiment_mod_actions(mod_controller)
 
-    expected_user_exp_things_count = 71
+    expected_user_exp_things_count = 69
     user_exp_things = db_session.query(ExperimentThing).filter(
         ExperimentThing.experiment_id == controller.experiment.id,
         ExperimentThing.object_type == ThingType.USER.value
@@ -1057,7 +1060,7 @@ def test_sticky_comment_messaging_controller(mock_mod_action, mock_submission, m
     assert len(user_exp_things) == len(controller.user_things)
     assert len(user_exp_things) == expected_user_exp_things_count
 
-    expected_included_user_exp_things_count = nonquestion_comment_removal_mod_action_count
+    expected_included_user_exp_things_count = 68
     included_user_exp_things = db_session.query(ExperimentThing).filter(
         ExperimentThing.experiment_id == controller.experiment.id,
         ExperimentThing.object_type == ThingType.USER.value,
@@ -1065,7 +1068,7 @@ def test_sticky_comment_messaging_controller(mock_mod_action, mock_submission, m
     ).all()
     assert len(included_user_exp_things) == expected_included_user_exp_things_count
 
-    expected_excluded_user_exp_things_count = other_reason_comment_removal_mod_action_count
+    expected_excluded_user_exp_things_count = 1
     excluded_user_exp_things = db_session.query(ExperimentThing).filter(
         ExperimentThing.experiment_id == controller.experiment.id,
         ExperimentThing.object_type == ThingType.USER.value,
@@ -1076,48 +1079,48 @@ def test_sticky_comment_messaging_controller(mock_mod_action, mock_submission, m
     assert len(included_user_exp_things) + len(excluded_user_exp_things) \
         == len(user_exp_things)
 
-    assert len(controller.post_things) == comment_removal_mod_action_parent_post_count
-    expected_comment_removal_mod_action_parent_post_sticky_comment_count = 6
+    assert len(controller.post_things) == nonquestion_comment_mod_action_parent_post_count - 1 # -1 for aged out submission
+    expected_comment_removal_mod_action_parent_post_sticky_comment_count = 5
     assert len(controller.sticky_comment_things) == expected_comment_removal_mod_action_parent_post_sticky_comment_count
     
     message_exp_actions = db_session.query(ExperimentAction).filter(
         ExperimentAction.experiment_id == controller.experiment.id,
         ExperimentAction.action_object_type == ThingType.USER.value
     ).order_by(ExperimentAction.id).all()
-    assert len(message_exp_actions) == comment_removal_mod_action_count
+    assert len(message_exp_actions) == nonquestion_comment_removal_mod_action_count
 
     included_message_exp_actions = [action for action in message_exp_actions
         if json.loads(action.metadata_json)['group'] != 'excluded']
-    assert len(included_message_exp_actions) == nonquestion_comment_removal_mod_action_count
+    assert len(included_message_exp_actions) == nonquestion_comment_removal_mod_action_count - 1 # account for aged out submission
     
     excluded_message_exp_actions = [action for action in message_exp_actions
         if json.loads(action.metadata_json)['group'] == 'excluded']
-    assert len(excluded_message_exp_actions) == other_reason_comment_removal_mod_action_count
+    assert len(excluded_message_exp_actions) == 1
 
-    assert len(included_message_exp_actions) + len(excluded_message_exp_actions) == comment_removal_mod_action_count
+    assert len(included_message_exp_actions) + len(excluded_message_exp_actions) == nonquestion_comment_removal_mod_action_count
     
-    expected_post_control_message_count = 11
+    expected_post_control_message_count = 13
     post_control_messages = [action for action in message_exp_actions
         if action.action_subject_type == str(ThingType.MODACTION.value)
         and json.loads(action.metadata_json)['condition'] == 'ama_post'
         and json.loads(action.metadata_json)['arm'] == 'arm_0']
     assert len(post_control_messages) == expected_post_control_message_count
     
-    expected_post_treatment_message_count = 25
+    expected_post_treatment_message_count = 33
     post_treatment_messages = [action for action in message_exp_actions
         if action.action_subject_type == str(ThingType.MODACTION.value)
         and json.loads(action.metadata_json)['condition'] == 'ama_post'
         and json.loads(action.metadata_json)['arm'] == 'arm_1']
     assert len(post_treatment_messages) == expected_post_treatment_message_count
     
-    expected_mod_action_control_message_count = 16
+    expected_mod_action_control_message_count = 11
     mod_action_control_messages = [action for action in message_exp_actions
         if json.loads(action.metadata_json)['condition'] == 'ama_nonquestion_mod_action'
         and json.loads(action.metadata_json)['arm'] == 'arm_0'
         and json.loads(action.metadata_json)['message_status'] == 'sent']
     assert len(mod_action_control_messages) == expected_mod_action_control_message_count
     
-    expected_mod_action_treatment_message_count = 17
+    expected_mod_action_treatment_message_count = 11
     mod_action_treatment_messages = [action for action in message_exp_actions
         if json.loads(action.metadata_json)['condition'] == 'ama_nonquestion_mod_action'
         and json.loads(action.metadata_json)['arm'] == 'arm_1'
@@ -1129,16 +1132,16 @@ def test_sticky_comment_messaging_controller(mock_mod_action, mock_submission, m
         len(post_treatment_messages),
         len(mod_action_control_messages),
         len(mod_action_treatment_messages)
-    ]) == nonquestion_comment_removal_mod_action_count
+    ]) == nonquestion_comment_removal_mod_action_count - 1 # account for aged out sub
     
-    expected_guestbook_message_count = 42
+    expected_guestbook_message_count = 44
     guestbook_messages = [action for action in message_exp_actions
         if action.action == 'SendGuestbookMessage']
     assert len(guestbook_messages) == expected_guestbook_message_count
     
-    expected_standard_message_count = 27
+    expected_standard_message_count = 24
     standard_messages = [action for action in message_exp_actions
         if action.action == 'SendStandardMessage']
     assert len(standard_messages) == expected_standard_message_count
 
-    assert len(guestbook_messages) + len(standard_messages) == nonquestion_comment_removal_mod_action_count
+    assert len(guestbook_messages) + len(standard_messages) == nonquestion_comment_removal_mod_action_count - 1 # acount for aged out sub
