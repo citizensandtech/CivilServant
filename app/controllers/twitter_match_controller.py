@@ -69,16 +69,18 @@ class TwitterMatchController(TwitterController):
 
         # first do random users
         for ru in random_id_users:
+            # check there's a last status
             has_last_status = ru.last_status_dt is not None
-            if has_last_status:
+            if not has_last_status:
+                invalid_unmatched_users.append(ru)
+            else:
+                # are they recently active and correct language
                 recently_active = ru.last_status_dt >= self.period_ago
                 correct_lang = ru.lang in self.config['match_criteria']['langs']
                 if has_last_status and recently_active and correct_lang:
                     valid_unmatched_users.append(ru)
                 else:
                     invalid_unmatched_users.append(ru)
-            else:
-                invalid_unmatched_users.append(ru)
 
         for du in dmca_users:
             if du.lang in self.config['match_criteria']['langs']:

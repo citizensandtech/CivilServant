@@ -55,7 +55,10 @@ def run_query_for_days(query_str, today, days=7):
     today_str = date_to_str(today, by_day=False)
     last_week = today - datetime.timedelta(days=days)
     last_week_str = date_to_str(last_week, by_day=False)
-    result = db_session.execute(query_str, {"from_date": last_week_str, "to_date": today_str}).fetchall()
+    q_params = {"from_date": last_week_str,
+                "to_date": today_str,
+                "user_rand_frac": DBCONFIG['user_rand_frac']}
+    result = db_session.execute(query_str, q_params).fetchall()
     return result
 
 
@@ -275,11 +278,8 @@ def generate_lumen_notices(today=datetime.datetime.utcnow(), days=7, html=True, 
         FROM lumen_notices WHERE date_received <= :to_date and date_received >= :from_date
         GROUP BY YEAR(date_received), MONTH(date_received), DAY(date_received);"""
     result = run_query_for_days(query_str, today, days=days)
-    if not html:
-        return result
-    return generate_html_table(result,
-                               str_to_date(date_to_str(today)),
-                               label)  # to make everything 00:00:00
+    return generate_html_table(result, str_to_date(date_to_str(today)),
+                               label) if html else result  # to make everything 00:00:00
 
 
 def generate_lumen_notice_to_twitter_user(today=datetime.datetime.utcnow(), days=7, html=True,
@@ -289,25 +289,8 @@ def generate_lumen_notice_to_twitter_user(today=datetime.datetime.utcnow(), days
         FROM lumen_notice_to_twitter_user WHERE record_created_at <= :to_date and record_created_at >= :from_date 
         GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);"""
     result = run_query_for_days(query_str, today, days=days)
-    if not html:
-        return result
-    return generate_html_table(result,
-                               str_to_date(date_to_str(today)),
-                               label)  # to make everything 00:00:00
-
-
-def generate_twitter_users(today=datetime.datetime.utcnow(), days=7, html=True, label="Twitter Users"):
-    query_str = """
-        SELECT 'lumen', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
-        FROM twitter_users WHERE record_created_at <= :to_date and record_created_at >= :from_date
-        AND LANG IN("en", "en-gb", NULL)
-        GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);"""
-    result = run_query_for_days(query_str, today, days=days)
-    if not html:
-        return result
-    return generate_html_table(result,
-                               str_to_date(date_to_str(today)),
-                               label)  # to make everything 00:00:00
+    return generate_html_table(result, str_to_date(date_to_str(today)),
+                               label) if html else result  # to make everything 00:00:00
 
 
 def generate_twitter_fills(today=datetime.datetime.utcnow(), days=7, html=True, fill_type='backfill'):
@@ -341,11 +324,8 @@ def generate_twitter_user_snapshots(today=datetime.datetime.utcnow(), days=7, ht
         FROM twitter_user_snapshots WHERE record_created_at <= :to_date and record_created_at >= :from_date
         GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);"""
     result = run_query_for_days(query_str, today, days=days)
-    if not html:
-        return result
-    return generate_html_table(result,
-                               str_to_date(date_to_str(today)),
-                               label)  # to make everything 00:00:00
+    return generate_html_table(result, str_to_date(date_to_str(today)),
+                               label) if html else result  # to make everything 00:00:00
 
 
 ##### TOO EXPENSIVE....
@@ -355,11 +335,276 @@ def generate_tweets(today=datetime.datetime.utcnow(), days=7, html=True, label="
         FROM twitter_statuses WHERE record_created_at <= :to_date and record_created_at >= :from_date
         GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);"""
     result = run_query_for_days(query_str, today, days=days)
+    return generate_html_table(result, str_to_date(date_to_str(today)),
+                               label) if html else result  # to make everything 00:00:00
+
+
+def generate_guessed(today=datetime.datetime.utcnow(), days=7, html=True, label="Guessed IDs"):
+    query_str = """
+        SELECT 'All random users', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
+        FROM twitter_users 
+        WHERE record_created_at <= :to_date and record_created_at >= :from_date
+              and created_type=2
+        GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);"""
+    result = run_query_for_days(query_str, today, days=days)
+    return generate_html_table(result, str_to_date(date_to_str(today)), label) if html else result
+
+
+def generate_noticed_users_including_non_existing(today=datetime.datetime.utcnow(), days=7, html=True,
+                                                  label="Notice Users Language Twitter"):
+    query_str = """
+        SELECT 'lumen', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
+        FROM twitter_users 
+        WHERE record_created_at <= :to_date and record_created_at >= :from_date
+        and created_type = 1
+        GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);"""
+    result = run_query_for_days(query_str, today, days=days)
+    return generate_html_table(result, str_to_date(date_to_str(today)), label) if html else result
+
+
+def generate_noticed_users(today=datetime.datetime.utcnow(), days=7, html=True,
+                           label="Existing Notice Users Language Twitter "):
+    query_str = """
+        SELECT 'lumen', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
+        FROM twitter_users 
+        WHERE record_created_at <= :to_date and record_created_at >= :from_date
+        and created_type = 1
+        and user_state = 1
+        GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);"""
+    result = run_query_for_days(query_str, today, days=days)
+    return generate_html_table(result, str_to_date(date_to_str(today)), label) if html else result
+
+
+def generate_noticed_users_en(today=datetime.datetime.utcnow(), days=7, html=True,
+                              label="Correct Language Twitter Users"):
+    query_str = """
+        SELECT 'lumen', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
+        FROM twitter_users 
+        WHERE record_created_at <= :to_date and record_created_at >= :from_date
+        and created_type = 1
+        and user_state = 1
+        AND LANG IN("en", "en-gb")
+        GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);"""
+    result = run_query_for_days(query_str, today, days=days)
+    return generate_html_table(result, str_to_date(date_to_str(today)), label) if html else result
+
+
+def generate_noticed_users_en_subsampled(today=datetime.datetime.utcnow(), days=7, html=True, label=None):
+    label = "Correct Language Twitter Users random subsample {}".format(DBCONFIG['user_rand_frac'])
+    query_str = """
+        SELECT 'lumen', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
+        FROM twitter_users 
+        WHERE record_created_at <= :to_date and record_created_at >= :from_date
+        and created_type = 1
+        and user_state = 1
+        AND LANG IN("en", "en-gb")
+        and user_rand < :user_rand_frac
+        GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);"""
+    result = run_query_for_days(query_str, today, days=days)
+    return generate_html_table(result, str_to_date(date_to_str(today)), label) if html else result
+
+
+def generate_guessed_existed(today=datetime.datetime.utcnow(), days=7, html=True, label="Guessed and Existed"):
+    query_str = """
+        SELECT '', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
+        FROM twitter_users 
+        WHERE record_created_at <= :to_date and record_created_at >= :from_date
+              and created_type=2 # randomly generated
+              and user_state = 1 # found
+        GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);"""
+    result = run_query_for_days(query_str, today, days=days)
+    return generate_html_table(result, str_to_date(date_to_str(today)), label) if html else result
+
+
+def generate_guessed_existed_active(today=datetime.datetime.utcnow(), days=7, html=True,
+                                    label="Guessed and Existed and Tweeted Once"):
+    query_str = """
+        SELECT '', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
+        FROM twitter_users 
+        WHERE record_created_at <= :to_date and record_created_at >= :from_date
+              and created_type=2 # randomly generated
+              and user_state = 1 # found
+              and last_status_dt is not null 
+        GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);"""
+    result = run_query_for_days(query_str, today, days=days)
+    return generate_html_table(result, str_to_date(date_to_str(today)), label) if html else result
+
+
+def generate_guessed_existed_active_10day(today=datetime.datetime.utcnow(), days=7, html=True,
+                                          label="Guessed and Existed and Tweeted Last 10 days"):
+    query_str = """
+        SELECT '', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
+        FROM twitter_users 
+        WHERE record_created_at <= :to_date and record_created_at >= :from_date
+              and created_type=2 # randomly generated
+              and user_state = 1 # found
+              and last_status_dt > date_sub(record_created_at, interval 7 day) 
+        GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);"""
+    result = run_query_for_days(query_str, today, days=days)
+    return generate_html_table(result, str_to_date(date_to_str(today)), label) if html else result
+
+
+def generate_guessed_existed_active_2day(today=datetime.datetime.utcnow(), days=7, html=True,
+                                         label="Guessed and Existed and Tweeted 2 days ago or less"):
+    query_str = """
+        SELECT '', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
+        FROM twitter_users 
+        WHERE record_created_at <= :to_date and record_created_at >= :from_date
+              and created_type=2 # randomly generated
+              and user_state = 1 # found
+              and last_status_dt > date_sub(record_created_at, interval 2 day) 
+        GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);"""
+    result = run_query_for_days(query_str, today, days=days)
+    return generate_html_table(result, str_to_date(date_to_str(today)), label) if html else result
+
+
+def generate_guessed_existed_active_2day_en(today=datetime.datetime.utcnow(), days=7, html=True,
+                                            label="Guessed and Existed and Tweeted 2 days ago or less in English"):
+    query_str = """
+        SELECT '', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
+        FROM twitter_users 
+        WHERE record_created_at <= :to_date and record_created_at >= :from_date
+              and created_type=2 # randomly generated
+              and user_state = 1 # found
+              and last_status_dt > date_sub(record_created_at, interval 2 day)
+              and lang = 'en' 
+        GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);"""
+    result = run_query_for_days(query_str, today, days=days)
+    return generate_html_table(result, str_to_date(date_to_str(today)), label) if html else result
+
+
+def generate_matchable(today=datetime.datetime.utcnow(), days=7, html=True,
+                       label="Matchability. Notice and Random Users meeting match criteria"):
+    query_str = """select 'matchable, notice - rand', notice_match.`YEAR(record_created_at)`, notice_match.`MONTH(record_created_at)`, notice_match.`DAY(record_created_at)`,  num_notice_matchable - num_rand_matchable from
+  (SELECT 'match' as matchable, YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) as num_rand_matchable
+FROM twitter_users
+WHERE record_created_at <= :to_date and record_created_at >= :from_date
+      and created_type=2 # randomly generated
+      and user_state = 1 # found
+      and last_status_dt > date_sub(record_created_at, interval 2 day)
+      and lang = 'en'
+GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at)) rand_match
+join
+  (SELECT 'match' as matchable, YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) as num_notice_matchable
+        FROM twitter_users
+        WHERE record_created_at <= :to_date and record_created_at >= :from_date
+        and created_type = 1
+        and user_state = 1
+        AND LANG IN("en", "en-gb")
+        and user_rand < :user_rand_frac
+        GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at)) notice_match
+on notice_match.matchable = rand_match.matchable;"""
+    result = run_query_for_days(query_str, today, days=days)
+    return generate_html_table(result, str_to_date(date_to_str(today)), label) if html else result
+
+
+def generate_randomization_ratio_recent(today=datetime.datetime.utcnow(), days=7, html=True,
+                                        label="Ratio of matched users by day, recent"):
+    query_str = """select 'matched, rand/noticed', notice_match.`YEAR(created_at)`, notice_match.`MONTH(created_at)`, notice_match.`DAY(created_at)`,  num_rand_matched/num_notice_matched
+from
+(SELECT 'match' as matchable, YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) num_rand_matched
+ FROM experiment_things
+ WHERE created_at <= :to_date and created_at >= :from_date
+       and object_type = 2
+ GROUP BY YEAR(created_at), MONTH(created_at), DAY(created_at)) rand_match
+  join
+(SELECT 'match' as matchable, YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) num_notice_matched
+ FROM experiment_things
+ WHERE created_at <= :to_date and created_at >= :from_date
+       and object_type = 1
+ GROUP BY YEAR(created_at), MONTH(created_at), DAY(created_at)) notice_match
+on notice_match.matchable = rand_match.matchable;"""
+    result = run_query_for_days(query_str, today, days=days)
     if not html:
         return result
-    return generate_html_table(result,
-                               str_to_date(date_to_str(today)),
-                               label)  # to make everything 00:00:00
+    return generate_html_table(result, str_to_date(date_to_str(today)), label)
+
+
+def generate_randomization_ratio_all(today=datetime.datetime.utcnow(), days=7, html=True,
+                                     label="Ratio of matched users by day, all experiment"):
+    query_str = """select 'matched, rand/noticed', notice_match.`YEAR(created_at)`, notice_match.`MONTH(created_at)`, notice_match.`DAY(created_at)`,  num_rand_matched/num_notice_matched
+from
+(SELECT 'match' as matchable, YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) num_rand_matched
+ FROM experiment_things
+ WHERE object_type = 2
+ GROUP BY YEAR(created_at), MONTH(created_at), DAY(created_at)) rand_match
+  join
+(SELECT 'match' as matchable, YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) num_notice_matched
+ FROM experiment_things
+ WHERE object_type = 1
+ GROUP BY YEAR(created_at), MONTH(created_at), DAY(created_at)) notice_match
+on notice_match.matchable = rand_match.matchable;"""
+    result = run_query_for_days(query_str, today, days=days)
+    if not html:
+        return result
+    return generate_html_table(result, str_to_date(date_to_str(today)), label)
+
+
+def generate_randomization_total_rand_recent(today=datetime.datetime.utcnow(), days=7, html=True,
+                                             label="total_rand of matched users by day, recent"):
+    query_str = """SELECT 'random_id_user included', YEAR(created_at), MONTH(created_at), DAY(created_at), count(*)
+ FROM experiment_things
+ WHERE created_at <= :to_date and created_at >= :from_date
+       and object_type = 2
+ GROUP BY YEAR(created_at), MONTH(created_at), DAY(created_at);"""
+    result = run_query_for_days(query_str, today, days=days)
+    if not html:
+        return result
+    return generate_html_table(result, str_to_date(date_to_str(today)), label)
+
+
+def generate_randomization_total_rand_all(today=datetime.datetime.utcnow(), days=7, html=True,
+                                          label="total_rand of matched users by day, all experiment"):
+    query_str = """SELECT 'random_id_user included', YEAR(created_at), MONTH(created_at), DAY(created_at), count(*)
+ FROM experiment_things
+ WHERE object_type = 2
+ GROUP BY YEAR(created_at), MONTH(created_at), DAY(created_at)"""
+    result = run_query_for_days(query_str, today, days=days)
+    if not html:
+        return result
+    return generate_html_table(result, str_to_date(date_to_str(today)), label)
+
+
+def generate_randomization_total_notice_recent(today=datetime.datetime.utcnow(), days=7, html=True,
+                                               label="total_notice of matched users by day, recent"):
+    query_str = """SELECT 'notice included', YEAR(created_at), MONTH(created_at), DAY(created_at), count(*)
+ FROM experiment_things
+ WHERE created_at <= :to_date and created_at >= :from_date
+       and object_type = 1
+ GROUP BY YEAR(created_at), MONTH(created_at), DAY(created_at);"""
+    result = run_query_for_days(query_str, today, days=days)
+    if not html:
+        return result
+    return generate_html_table(result, str_to_date(date_to_str(today)), label)
+
+
+def generate_randomization_total_notice_all(today=datetime.datetime.utcnow(), days=7, html=True,
+                                            label="total_notice of matched users by day, all experiment"):
+    query_str = """SELECT 'notice included', YEAR(created_at), MONTH(created_at), DAY(created_at), count(*)
+ FROM experiment_things
+ WHERE object_type = 1
+ GROUP BY YEAR(created_at), MONTH(created_at), DAY(created_at)"""
+    result = run_query_for_days(query_str, today, days=days)
+    if not html:
+        return result
+    return generate_html_table(result, str_to_date(date_to_str(today)), label)
+
+
+######################################################################
+######### RATESTATE ###########################################
+######################################################################
+
+def generate_ratestate_users_lookup_exhausted(today=datetime.datetime.utcnow(), days=7, html=True,
+                                            label="number of users_lookup exhausted endpoints"):
+    query_str = """SELECT 'num_exhausted', YEAR(checkin_due), MONTH(checkin_due), DAY(checkin_due), count(*)
+ FROM twitter_ratestate
+ WHERE endpoint= '/users/lookup'
+      and checkin_due <= :to_date and checkin_due >= :from_date
+ GROUP BY YEAR(checkin_due), MONTH(checkin_due), DAY(checkin_due)"""
+    result = run_query_for_days(query_str, today, days=days)
+    if not html:
+        return result
+    return generate_html_table(result, str_to_date(date_to_str(today)), label)
 
 
 ######################################################################
@@ -436,11 +681,7 @@ def generate_experiment_action(today=datetime.datetime.utcnow(), days=7, html=Tr
         GROUP BY experiment_id, action, YEAR(created_at), MONTH(created_at), DAY(created_at)"""
     result = run_query_for_days(query_str, today, days=days)
     result = [("({0}, {1})".format(a, b), c, d, e, f) for (a, b, c, d, e, f) in result]
-    if not html:
-        return result
-    return generate_html_table(result,
-                               str_to_date(date_to_str(today)),
-                               "ExperimentAction count, by (experiment, action)")  # to make everything 00:00:00
+    return generate_html_table(result, str_to_date(date_to_str(today)), "Experiment Action") if html else result
 
 
 ######################################################################
@@ -472,19 +713,36 @@ td.highlight {
 """
 
 
-def generate_report(today=datetime.datetime.utcnow(), days=7):
+def generate_report(today=datetime.datetime.utcnow(), days=1):
     html = "<html><head>" + css + "</head><body>"
     html += "<h2>Number of records stored per day</h2>"
     # html += "<h3>Reddit:</h3>"
     html += "<table>"
     html += "<h3>Lumen Twitter Data Collection</h3>"
-    html += generate_lumen_notices(today, days)
-    html += generate_lumen_notice_to_twitter_user(today, days)
-    html += generate_twitter_users(today, days)
-    html += generate_twitter_user_snapshots(today, days)
-    html += generate_tweets(today, days)
-    html += generate_twitter_backfills(today, days)
-    html += generate_twitter_frontfills(today, days)
+    # html += generate_lumen_notices(today, days)
+    # html += generate_lumen_notice_to_twitter_user(today, days)
+    # html += generate_twitter_user_snapshots(today, days)
+    # html += generate_tweets(today, days)
+    # html += generate_twitter_backfills(today, days)
+    # html += generate_twitter_frontfills(today, days)
+    html += generate_noticed_users_including_non_existing(today, days)
+    html += generate_noticed_users(today, days)
+    html += generate_noticed_users_en(today, days)
+    html += generate_noticed_users_en_subsampled(today, days)
+    html += generate_guessed(today, days)
+    html += generate_guessed_existed(today, days)
+    html += generate_guessed_existed_active(today, days)
+    html += generate_guessed_existed_active_10day(today, days)
+    html += generate_guessed_existed_active_2day(today, days)
+    html += generate_guessed_existed_active_2day_en(today, days)
+    html += generate_matchable(today, days)
+    html += generate_randomization_ratio_recent(today, days)
+    html += generate_randomization_ratio_all(today, days)
+    html += generate_randomization_total_rand_recent(today, days)
+    html += generate_randomization_total_rand_all(today, days)
+    html += generate_randomization_total_notice_recent(today, days)
+    html += generate_randomization_total_notice_all(today, days)
+    html += generate_ratestate_users_lookup_exhausted(today, days)
     # html += generate_reddit_front_page(today, days)
     # html += generate_reddit_subreddit_page(today, days)
     # html += generate_reddit_subreddit(today, days)
@@ -492,12 +750,12 @@ def generate_report(today=datetime.datetime.utcnow(), days=7):
     # html += generate_reddit_comment(today, days)
     # html += generate_reddit_user(today, days)
     # html += generate_reddit_mod_action(today, days)
-    html += "<h3>Experiment:</h3>"
-    html += generate_experiment_new(today, days)
-    html += generate_experiment_active(today, days)
-    html += generate_experiment_thing(today, days)
-    html += generate_experiment_thing_snapshot(today, days)
-    html += generate_experiment_action(today, days)
+    # html += "<h3>Experiment:</h3>"
+    # html += generate_experiment_new(today, days)
+    # html += generate_experiment_active(today, days)
+    # html += generate_experiment_thing(today, days)
+    # html += generate_experiment_thing_snapshot(today, days)
+    # html += generate_experiment_action(today, days)
     html += "</table>"
     html += "</body></html>"
     return html
@@ -510,7 +768,8 @@ def generate_report(today=datetime.datetime.utcnow(), days=7):
 if __name__ == "__main__":
     now = datetime.datetime.utcnow()
     end = datetime.datetime.combine(now, datetime.time())
-    today = end - datetime.timedelta(seconds=1)
+    # today = end - datetime.timedelta(seconds=1) # this won't allow todays partial day
+    today = end - datetime.timedelta(seconds=1) + datetime.timedelta(days=1)  # this will include the very day executed
     html = generate_report(today, days=7)
     subject = "CivilServant Database Report: {0}".format(date_to_str(today))
     send_report(subject, html)
