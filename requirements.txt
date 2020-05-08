@@ -6,7 +6,7 @@ redis
 rq
 rq-scheduler==0.7.0
 rq-dashboard
-mysqlclient
+mysqlclient==1.3.12
 sqlalchemy
 alembic
 airbrake==1.3.3
@@ -19,3 +19,4 @@ retrying
 requests
 requests_futures
 pandas
+tldextract
