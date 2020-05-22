@@ -52,7 +52,8 @@ def main():
                         required=True,
                         choices=["fetch_lumen_notices", "parse_lumen_notices_for_twitter_accounts",
                                  "fetch_twitter_users", "fetch_twitter_snapshot_and_tweets", "fetch_twitter_tweets",
-                                 "report_calculations",
+                                 "report_calculations", "twitter_generate_random_id_users",
+                                 "twitter_match_comparison_groups"
                                  ],
                         help="The controller function to call.")
 
@@ -118,6 +119,8 @@ def main():
         experiment_collection_days = int(config["experiment_collection_days"])
         experiment_start_date = datetime.strptime(config["experiment_start_date"], '%Y-%m-%d')
         user_rand_frac = config["user_rand_frac"]
+        random_users_daily_limit = config["random_users_daily_limit"]
+        random_users_target_additions = config["random_users_target_additions"]
         today = datetime.utcnow()
         log.info('Loaded experiment start date: {}. Today is :{}'.format(experiment_start_date, today))
         time_til_experiment = experiment_start_date - today
@@ -203,10 +206,27 @@ def main():
             repeat=repeats,
             result_ttl=ttl,
             timeout=timeout)
-    elif args.function == "report_calculations":
-        calc_str = str(('onboarding_repeats',onboarding_repeats,
-                        "total_experiment_repeats",total_experiment_repeats))
-        sys.stdout.write(calc_str)
+    elif args.function == "twitter_generate_random_id_users":
+        scheduler.schedule(
+            scheduled_time=datetime.utcnow(),
+            func=app.controller.fetch_twitter_random_id_users,
+            args=[random_users_daily_limit, random_users_target_additions],
+            interval=int(args.interval),
+            repeat=None,
+            result_ttl=ttl,
+            timeout=timeout)
+    elif args.function == "twitter_match_comparison_groups":
+        scheduler.schedule(
+            scheduled_time=datetime.utcnow(),
+            func=app.controller.twitter_match_comparison_groups,
+            args=[],
+            interval=int(args.interval),
+            repeat=None,
+            result_ttl=ttl,
+            timeout=timeout)
+    else:
+        raise NotImplementedError("Unimplimented function: {}".format(args.function))
+
 
 
 def schedule_fetch_tweets(args, ttl, timeout, queue_name, repeats, collection_seconds, user_rand_frac):

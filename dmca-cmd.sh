@@ -62,6 +62,14 @@ killall rqworker
 killall rqscheduler
 }
 
+if [ -z ${1} ];
+    then
+    echo "no verb specified, exiting..."
+    exit
+    else
+    echo "verb is $1"
+fi
+
 if [ -z $CS_ENV ]
     then
     echo "trying to source environment variables."
