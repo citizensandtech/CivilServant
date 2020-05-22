@@ -150,7 +150,7 @@ class LumenController():
                         else:
                             self.log.info('There was no url for url_obj: {0}'.format(url_obj))
 
-                    if len(work["copyrighted_urls"]) > 0:  # I've only seen this empty
+                    if work["copyrighted_urls"] != [{'url': 'No URL submitted'}]:  # I've only seen this empty
                         self.log.error("method helper_parse_notices_archive_users: maybe missed something in notice_json['works']['copyrighted_urls']; notice id = {0}".format(notice_json["id"]))
                         job_state = CS_JobState.NEEDS_RETRY
                     if work["description"]:  # I've only seen this null
