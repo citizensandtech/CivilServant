@@ -127,7 +127,9 @@ class LumenController():
 
                     with warnings.catch_warnings():
                         warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed.*<ssl.SSLSocket.*>")
-                        unshortened_urls = self.bulk_unshorten(notice.id, [x['url'] for x in work['infringing_urls']])
+                        urls_to_unshorten = [x['url'] for x in work['infringing_urls']]
+                        valid_urls_to_unshorten = [u for u in urls_to_unshorten if u.startswith('http')]
+                        unshortened_urls = self.bulk_unshorten(notice.id, valid_urls_to_unshorten)
                     infringing_urls = []
                     for url_dict in unshortened_urls.values():
                         if(url_dict['final_url'] is not None):

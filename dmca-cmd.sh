@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 start_standard(){
-### Fetch lumen notices every 3 hours
 echo "starting with $1 threads"
 echo "launch workers"
 
@@ -11,6 +10,7 @@ rqscheduler &
 # the unadorned-queuename queue has just one worker
 rqworker $CS_ENV &
 
+# the tweet filling needs mutliprocessing
 for i in $(seq $1 $END)
     do
     echo "Launching concurrent worker $i "
