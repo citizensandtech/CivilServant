@@ -38,24 +38,27 @@ class TwitterRandomUserController(TwitterController):
 
     def save_random_id_users(self, random_users_dict):
         """
-        there should be a user id for every user that was guessed, if they existed they have a non-None user-detail dict.
+        to save on space, only saving existing users.
         :param random_users_dict:
         :return:
         """
         twitter_users_to_add = []
-        for user_id, user_details in random_users_dict.items():
-            user_state = utils.common.TwitterUserState.FOUND.value \
-                if user_details else utils.common.TwitterUserState.NOT_FOUND.value
-            not_found_id = None if user_details else '{0}_{1}'.format(utils.common.NOT_FOUND_TWITTER_USER_STR, user_id)
-            screen_name = user_details.screen_name if user_details else None
-            created_at = datetime.datetime.strptime(user_details.created_at, utils.common.TWITTER_STRPTIME) \
-                if user_details else None
-            lang = user_details.status.lang if hasattr(user_details, 'status') and hasattr(user_details.status,
-                                                                                           'lang') else None
-            last_status_dt = datetime.datetime.strptime(user_details.status.created_at, utils.common.TWITTER_STRPTIME) \
-                if user_details and hasattr(user_details.status, 'created_at') \
-                else None
-            metadata_json = user_details._json if user_details else None
+        # subest to just users who had responses
+        existing_users = {user_id: user_details for user_id, user_details in random_users_dict.items() if user_details}
+        for user_id, user_details in existing_users.items():
+            user_state = utils.common.TwitterUserState.FOUND.value
+            not_found_id = None
+            screen_name = user_details.screen_name
+            created_at = datetime.datetime.strptime(user_details.created_at, utils.common.TWITTER_STRPTIME)
+            lang = user_details.status.lang if hasattr(user_details, 'status') \
+                                               and hasattr(user_details.status, 'lang') \
+                                           else None
+            last_status_dt = datetime.datetime.strptime(user_details.status.created_at,
+                                                        utils.common.TWITTER_STRPTIME) \
+                                                if hasattr(user_details.status, 'created_at') \
+                                            else None
+            metadata_json = user_details._json
+
             rand_twitter_user = dict(
                 id=user_id,
                 not_found_id=not_found_id,
@@ -67,7 +70,7 @@ class TwitterRandomUserController(TwitterController):
                 metadata_json=metadata_json,
                 created_type=utils.common.TwitterUserCreateType.RANDOMLY_GENERATED.value,
                 CS_oldest_tweets_archived=utils.common.CS_JobState.NOT_PROCESSED.value
-            )
+                )
             twitter_users_to_add.append(rand_twitter_user)
 
         try:
@@ -116,7 +119,7 @@ class TwitterRandomUserController(TwitterController):
         self.log.info("New existing users target met...."
                       "Persisted {num_generated} random ID users. {num_exist} actually existed."
                       "Proportion existing={prop}".format(
-            num_generated=num_generated, num_exist=num_exist, prop='{0:.2f}'.format(num_exist/num_generated) ))
+            num_generated=num_generated, num_exist=num_exist, prop='{0:.2f}'.format(num_exist / num_generated)))
         return num_exist
 
     def _generate_single_round_of_random_users(self):

@@ -606,6 +606,19 @@ def generate_ratestate_users_lookup_exhausted(today=datetime.datetime.utcnow(), 
         return result
     return generate_html_table(result, str_to_date(date_to_str(today)), label)
 
+def generate_ratestate_users_lookup_exhausted_recency(today=datetime.datetime.utcnow(), days=7, html=True,
+                                            label="averagetime until checkin due"):
+    query_str = """SELECT 'num_exhausted', YEAR(checkin_due), MONTH(checkin_due), DAY(checkin_due), 
+avg(timestampdiff(MINUTE, now(), checkin_due ))
+ FROM twitter_ratestate
+ WHERE endpoint= '/users/lookup'
+      and checkin_due <= :to_date and checkin_due >= :from_date
+ GROUP BY YEAR(checkin_due), MONTH(checkin_due), DAY(checkin_due)"""
+    result = run_query_for_days(query_str, today, days=days)
+    if not html:
+        return result
+    return generate_html_table(result, str_to_date(date_to_str(today)), label)
+
 
 ######################################################################
 ######### EXPERIMENT ###########################################
@@ -743,6 +756,7 @@ def generate_report(today=datetime.datetime.utcnow(), days=1):
     html += generate_randomization_total_notice_recent(today, days)
     html += generate_randomization_total_notice_all(today, days)
     html += generate_ratestate_users_lookup_exhausted(today, days)
+    html += generate_ratestate_users_lookup_exhausted_recency(today, days)
     # html += generate_reddit_front_page(today, days)
     # html += generate_reddit_subreddit_page(today, days)
     # html += generate_reddit_subreddit(today, days)
