@@ -78,9 +78,10 @@ class TwitterRandomUserController(TwitterController):
                 warnings.filterwarnings("ignore", r"\(1062, \"Duplicate entry")
                 self.db_session.execute(TwitterUser.__table__.insert().prefix_with("IGNORE"), twitter_users_to_add)
                 self.db_session.commit()
-        except sqlalchemy.exc.SQLAlchemyError:
-            self.log.error("Error while saving random id twitter users for user ids: {}.".format(
-                [u['id'] for u in twitter_users_to_add]), exc_info=True)
+        except sqlalchemy.exc.SQLAlchemyError as e:
+            self.log.error("Error {} while saving random id twitter users for user ids: {}.".format(
+                e, [u['id'] for u in twitter_users_to_add]), exc_info=True)
+
 
         return len(twitter_users_to_add)
 
