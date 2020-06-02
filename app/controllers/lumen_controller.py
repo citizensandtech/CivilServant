@@ -156,8 +156,9 @@ class LumenController():
                         self.log.error("method helper_parse_notices_archive_users: maybe missed something in notice_json['works']['copyrighted_urls']; notice id = {0}".format(notice_json["id"]))
                         job_state = CS_JobState.NEEDS_RETRY
                     if work["description"]:  # I've only seen this null
-                        self.log.error("method helper_parse_notices_archive_users: maybe missed something in notice_json['works']['description']; notice id = {0}".format(notice_json["id"]))
-                        job_state = CS_JobState.NEEDS_RETRY
+                        self.log.info("method helper_parse_notices_archive_users: maybe missed something in notice_json['works']['description']; notice id = {0}; description is {1}".format(notice_json["id"], work['description']))
+                        # I don't believe there's a need to retry just becaus there is a description added.
+                        # job_state = CS_JobState.NEEDS_RETRY
                 if notice_json["body"]:  # I've only seen this null
                     self.log.error("method helper_parse_notices_archive_users: maybe missed something in notice_json['body']; notice id = {0}".format(notice_json["id"]))
                     job_state = CS_JobState.NEEDS_RETRY
