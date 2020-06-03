@@ -643,7 +643,7 @@ class TwitterController():
             last_attempted_process = datetime.datetime.utcnow()
             for unarchived_user in unarchived_users:
                 unarchived_user.last_attempted_process = last_attempted_process
-                self.db_session.add(unarchived_user)
+                self.db_session.add_retryable(unarchived_user)
             self.db_session.commit()
             self.log.info(
                 "About to query and archive tweets {0} users; backfill={1}".format(len(unarchived_users), backfill))

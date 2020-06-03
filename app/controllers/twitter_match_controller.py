@@ -43,6 +43,7 @@ class TwitterMatchController(TwitterController):
         return num_matched
 
     def get_unmatched_users(self):
+        ### needs to get a lot more efficient
         join_clause = and_(TwitterUser.id == ExperimentThing.id)
         filter_clause = and_(ExperimentThing.id == None,
                              TwitterUser.user_state == utils.common.TwitterUserState.FOUND.value)  # want to find the users that have not been matched and eligible

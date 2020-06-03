@@ -229,6 +229,7 @@ def fetch_twitter_tweets(backfill=False, collection_seconds=None, user_rand_frac
     """
     For all TwitterUsers with CS_most_tweets_queried=False, fetch tweets
     """
+    fill_start_time = datetime.datetime.utcnow() if not fill_start_time else fill_start_time
     log.info("Calling fetch_twitter_tweets, backfill={0}. PID={1}".format(backfill, str(os.getpid())))
     t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
     t.query_and_archive_tweets(backfill=backfill, fill_start_time=fill_start_time,
