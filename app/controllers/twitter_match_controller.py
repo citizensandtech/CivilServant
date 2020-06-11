@@ -21,6 +21,7 @@ class TwitterMatchController(TwitterController):
         self.period_ago = self.now - datetime.timedelta(
             days=self.config['match_criteria']['random_user_active_within_days'])
         self.match_id = self.now.strftime('%Y%m%d%H%M%S')
+        self.batch_size = batch_size
 
         # DMCA notice offense was issued
         # doesn't need to do direct pair matching, can be around
@@ -44,14 +45,19 @@ class TwitterMatchController(TwitterController):
 
     def get_unmatched_users(self):
         ### needs to get a lot more efficient
+        ## ways to optimize: determine the last match_id, and only look for users generated more recently than that.
+        most_recent_et_dt = self.db_session.query(func.max(ExperimentThing.created_at)).one()
+
         join_clause = and_(TwitterUser.id == ExperimentThing.id)
         filter_clause = and_(ExperimentThing.id == None,
-                             TwitterUser.user_state == utils.common.TwitterUserState.FOUND.value)  # want to find the users that have not been matched and eligible
+                             TwitterUser.user_state == utils.common.TwitterUserState.FOUND.value,
+                             TwitterUser.record_created_at >= most_recent_et_dt)  # want to find the users that have not been matched and eligible
 
-        unmatched_users_ret = self.db_session.query(TwitterUser, ExperimentThing) \
+        unmatched_users_q = self.db_session.query(TwitterUser, ExperimentThing) \
             .outerjoin(ExperimentThing, join_clause) \
-            .filter(filter_clause) \
-            .all()
+            .filter(filter_clause)
+        # TODO batch here
+        unmatched_users_ret = unmatched_users_q.all()
 
         # since the experimenthing ought to be null, don't return it
         unmatched_users = [unmatched_user_tup[0] for unmatched_user_tup in unmatched_users_ret]
@@ -176,14 +182,16 @@ class TwitterMatchController(TwitterController):
             .group_by(ExperimentThing.object_type)
         created_type_count_r = created_type_count_q.all()
 
-        random_id_row =  [c for c in created_type_count_r if c[0] == utils.common.TwitterUserCreateType.RANDOMLY_GENERATED.value]
-        lumen_id_row =    [c for c in created_type_count_r if c[0] == utils.common.TwitterUserCreateType.LUMEN_NOTICE.value]
+        random_id_row = [c for c in created_type_count_r if
+                         c[0] == utils.common.TwitterUserCreateType.RANDOMLY_GENERATED.value]
+        lumen_id_row = [c for c in created_type_count_r if
+                        c[0] == utils.common.TwitterUserCreateType.LUMEN_NOTICE.value]
         random_id_count = random_id_row[0][1] if random_id_row else 0
         lumen_id_count = lumen_id_row[0][1] if lumen_id_row else 0
 
         created_type_ratio = random_id_count / lumen_id_count
         self.log.info('{RLS}: The overall random to group ratio is {created_type_ratio}'.format(RLS=REPORT_LOG_STR,
-                                                                                           created_type_ratio=created_type_ratio))
+                                                                                                created_type_ratio=created_type_ratio))
 
         # over all ratio of ratio of items in this match
         recent_created_type_count_q = self.db_session.query(ExperimentThing.object_type,
@@ -192,8 +200,10 @@ class TwitterMatchController(TwitterController):
             .group_by(ExperimentThing.object_type)
         recent_created_type_count_r = recent_created_type_count_q.all()
 
-        recent_random_id_row =  [c for c in recent_created_type_count_r if c[0] == utils.common.TwitterUserCreateType.RANDOMLY_GENERATED.value]
-        recent_lumen_id_row =    [c for c in recent_created_type_count_r if c[0] == utils.common.TwitterUserCreateType.LUMEN_NOTICE.value]
+        recent_random_id_row = [c for c in recent_created_type_count_r if
+                                c[0] == utils.common.TwitterUserCreateType.RANDOMLY_GENERATED.value]
+        recent_lumen_id_row = [c for c in recent_created_type_count_r if
+                               c[0] == utils.common.TwitterUserCreateType.LUMEN_NOTICE.value]
         random_id_count = random_id_row[0][1] if recent_random_id_row else 0
         lumen_id_count = lumen_id_row[0][1] if recent_lumen_id_row else 0
 
@@ -210,4 +220,3 @@ class TwitterMatchController(TwitterController):
                 match_id=self.match_id))
 
         return recent_created_type_ratio
-
