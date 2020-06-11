@@ -47,20 +47,22 @@ class TwitterMatchController(TwitterController):
         ### needs to get a lot more efficient
         ## ways to optimize: determine the last match_id, and only look for users generated more recently than that.
         most_recent_et_dt = self.db_session.query(func.max(ExperimentThing.created_at)).one()
-
+        most_recent_et_dt = most_recent_et_dt if most_recent_et_dt[0] else datetime.datetime(2020,1,1,0,0,0)
+        self.log.info('Most recent et was: {}'.format(most_recent_et_dt))
         join_clause = and_(TwitterUser.id == ExperimentThing.id)
-        filter_clause = and_(ExperimentThing.id == None,
+        filter_clause = and_(TwitterUser.record_created_at >= most_recent_et_dt,
                              TwitterUser.user_state == utils.common.TwitterUserState.FOUND.value,
-                             TwitterUser.record_created_at >= most_recent_et_dt)  # want to find the users that have not been matched and eligible
+                             ExperimentThing.id == None,
+                             )  # want to find the users that have not been matched and eligible
 
-        unmatched_users_q = self.db_session.query(TwitterUser, ExperimentThing) \
+        unmatched_users_q = self.db_session.query(TwitterUser.id, TwitterUser.created_type, TwitterUser.last_status_dt, TwitterUser.lang) \
             .outerjoin(ExperimentThing, join_clause) \
             .filter(filter_clause)
-        # TODO batch here
         unmatched_users_ret = unmatched_users_q.all()
 
         # since the experimenthing ought to be null, don't return it
-        unmatched_users = [unmatched_user_tup[0] for unmatched_user_tup in unmatched_users_ret]
+        # unmatched_users = [unmatched_user_tup[0] for unmatched_user_tup in unmatched_users_ret]
+        unmatched_users = unmatched_users_ret
 
         return unmatched_users
 
