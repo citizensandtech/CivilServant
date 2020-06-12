@@ -1,5 +1,7 @@
 import datetime
 
+import sqlalchemy
+
 from app.controllers.twitter_controller import TwitterController
 from app.models import Base, TwitterUser, TwitterStatus, LumenNoticeToTwitterUser, TwitterUserSnapshot, TwitterFill, \
     TwitterUnshortenedUrls, TwitterStatusUrls, ExperimentThing
@@ -44,25 +46,28 @@ class TwitterMatchController(TwitterController):
         return num_matched
 
     def get_unmatched_users(self):
-        ### needs to get a lot more efficient
-        ## ways to optimize: determine the last match_id, and only look for users generated more recently than that.
         most_recent_et_dt = self.db_session.query(func.max(ExperimentThing.created_at)).one()
-        most_recent_et_dt = most_recent_et_dt if most_recent_et_dt[0] else datetime.datetime(2020,1,1,0,0,0)
-        self.log.info('Most recent et was: {}'.format(most_recent_et_dt))
-        join_clause = and_(TwitterUser.id == ExperimentThing.id)
-        filter_clause = and_(TwitterUser.record_created_at >= most_recent_et_dt,
-                             TwitterUser.user_state == utils.common.TwitterUserState.FOUND.value,
-                             ExperimentThing.id == None,
-                             )  # want to find the users that have not been matched and eligible
-
-        unmatched_users_q = self.db_session.query(TwitterUser.id, TwitterUser.created_type, TwitterUser.last_status_dt, TwitterUser.lang) \
-            .outerjoin(ExperimentThing, join_clause) \
-            .filter(filter_clause)
-        unmatched_users_ret = unmatched_users_q.all()
-
+        most_recent_et_dt = most_recent_et_dt if most_recent_et_dt[0] else datetime.datetime(2020, 1, 1, 0, 0, 0)
+        self.log.debug('Most recent et was: {}'.format(most_recent_et_dt))
+        recent_tu_clause = and_(TwitterUser.record_created_at >= most_recent_et_dt,
+                                TwitterUser.user_state == utils.common.TwitterUserState.FOUND.value)
+        # #To inefficient for now, going to try and use a gaurantee instead
+        # join_clause = and_(TwitterUser.id == ExperimentThing.id)
+        # et_none_clause = ExperimentThing.id == None # want to find the users that have not been matched and eligible
+        # unmatched_users_q = self.db_session.query(TwitterUser, ExperimentThing) \
+        #     .outerjoin(ExperimentThing, join_clause) \
+        #     .filter(recent_tu_clause).filter(et_none_clause)
+        # unmatched_users_ret = unmatched_users_q.all()
+        #
         # since the experimenthing ought to be null, don't return it
         # unmatched_users = [unmatched_user_tup[0] for unmatched_user_tup in unmatched_users_ret]
-        unmatched_users = unmatched_users_ret
+
+        # #In this version, we rely on the assumption, that we need to match all the users that whose record
+        # #was created since the last match
+        recent_tu_q = self.db_session.query(TwitterUser.id, TwitterUser.created_type, TwitterUser.last_status_dt,
+                                            TwitterUser.lang, TwitterUser.record_created_at)\
+                            .filter(recent_tu_clause)
+        unmatched_users = recent_tu_q.all()
 
         return unmatched_users
 
@@ -115,13 +120,16 @@ class TwitterMatchController(TwitterController):
             # metadata keep randomization-block-id and block sizes other match data here
             metadata = {'block_id': block_id, 'randomization_arm': randomization_arm}
             id = tu.id
-            et = ExperimentThing(id=id,
+            et = dict(id=id,
                                  object_type=randomization_arm,
                                  metadata_json=metadata,
                                  query_index=block_id)
             ETs_to_add.append(et)
-        self.db_session.add_all(ETs_to_add)
-        self.db_session.commit()
+        try:
+            self.db_session.insert_retryable(ExperimentThing, ETs_to_add)
+        except sqlalchemy.exc.SQLAlchemyError as e:
+            self.log.error("Error {} while saving random id twitter users for user ids: {}.".format(
+                e, [u['id'] for u in ETs_to_add]), exc_info=True)
 
     def make_matches(self, valid_unmatched_users):
         """
@@ -220,5 +228,15 @@ class TwitterMatchController(TwitterController):
                 random_id_count=random_id_count,
                 lumen_id_count=lumen_id_count,
                 match_id=self.match_id))
+
+        # check that no user is in two blocks
+        # # do i need to do this, since the id is the twitter user id and is also a unique primary.
+
+        # check that the number of found users and randomized users are close
+        found_users = self.db_session.query(TwitterUser).filter(
+            TwitterUser.user_state==utils.common.TwitterUserState.FOUND.value).count()
+        et_users = self.db_session.query(ExperimentThing).count()
+        self.log.info(
+            '{RLS}: There were found_users?=et_users: {found_users}?={et_users}'.format(RLS=REPORT_LOG_STR, found_users=found_users, et_users=et_users))
 
         return recent_created_type_ratio

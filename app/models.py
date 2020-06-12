@@ -237,12 +237,12 @@ class LumenNoticeToTwitterUser(Base):
 # most up to date knowledge about a user at a current time
 class TwitterUser(Base):
     __tablename__ = 'twitter_users'
-    id                  = Column(String(64), primary_key = True)  # should be lowercase; if not found, # if not found, NOT_FOUND_TWITTER_USER_STR_[date]
-    not_found_id        = Column(String(64), index = True, default=None)    # if a user ever goes between e.g. FOUND and NOT_FOUND (either direction),
+    id                  = Column(String(64), primary_key=True)  # should be lowercase; if not found, # if not found, NOT_FOUND_TWITTER_USER_STR_[date]
+    not_found_id        = Column(String(64), index=True, default=None)    # if a user ever goes between e.g. FOUND and NOT_FOUND (either direction),
                                                                             # we want to be able to map between the actual id and the <NOT_FOUND>... id
-    screen_name         = Column(String(256), index = True) # if not found, # if not found, NOT_FOUND_TWITTER_USER_STR
+    screen_name         = Column(String(256), index=True) # if not found, # if not found, NOT_FOUND_TWITTER_USER_STR
     created_at          = Column(DateTime)
-    record_created_at   = Column(DateTime, default=datetime.datetime.utcnow)
+    record_created_at   = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     created_type        = Column(Integer, default=1)
     lang                = Column(String(32))
     user_state          = Column(Integer) # utils/common.py
