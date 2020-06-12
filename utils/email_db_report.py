@@ -474,8 +474,8 @@ def generate_guessed_existed_active_2day_en(today=datetime.datetime.utcnow(), da
 
 
 def generate_matchable(today=datetime.datetime.utcnow(), days=7, html=True,
-                       label="Random user surplus, in twitter_users table. "
-                             "random users minus notice users, meeting match criteria."
+                       label="Random user surplus, in twitter_users table.<br /> "
+                             "random users minus notice users, meeting match criteria.<br />"
                              "Should be positive."):
     query_str = """select '[num_rand_users] - [num_notice_users_subsampled]', notice_match.`YEAR(record_created_at)`, notice_match.`MONTH(record_created_at)`, notice_match.`DAY(record_created_at)`,  num_notice_matchable - num_rand_matchable from
   (SELECT 'match' as matchable, YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) as num_rand_matchable
@@ -622,9 +622,9 @@ def generate_ratestate_users_lookup(today=datetime.datetime.utcnow(), days=7, ht
 
 
 def generate_ratestate_users_lookup_exhausted_recency(today=datetime.datetime.utcnow(), days=7, html=True,
-                                                      label="average time in minutes that checkins are compared to now. "
-                                                            "negative indicates most of the checkin times existed in past (not used)."
-                                                            " should be highly negative if we have token overhead"):
+                                                      label="average time in minutes that checkins are compared to now.<br /> "
+                                                            "negative indicates most of the checkin times existed in past (not used).<br /> "
+                                                            "should be highly negative if we have token overhead"):
     query_str = """SELECT 'num_exhausted', YEAR(checkin_due), MONTH(checkin_due), DAY(checkin_due), 
 avg(timestampdiff(MINUTE, now(), checkin_due ))
  FROM twitter_ratestate
