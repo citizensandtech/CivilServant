@@ -341,7 +341,7 @@ def generate_tweets(today=datetime.datetime.utcnow(), days=7, html=True, label="
 
 def generate_guessed(today=datetime.datetime.utcnow(), days=7, html=True, label="Guessed IDs"):
     query_str = """
-        SELECT 'All random users', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
+        SELECT 'Random users that were saved.', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
         FROM twitter_users 
         WHERE record_created_at <= :to_date and record_created_at >= :from_date
               and created_type=2
@@ -392,7 +392,7 @@ def generate_noticed_users_en(today=datetime.datetime.utcnow(), days=7, html=Tru
 def generate_noticed_users_en_subsampled(today=datetime.datetime.utcnow(), days=7, html=True, label=None):
     label = "Correct Language Twitter Users random subsample {}".format(DBCONFIG['user_rand_frac'])
     query_str = """
-        SELECT 'lumen', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
+        SELECT 'Twitter users', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
         FROM twitter_users 
         WHERE record_created_at <= :to_date and record_created_at >= :from_date
         and created_type = 1
@@ -406,7 +406,7 @@ def generate_noticed_users_en_subsampled(today=datetime.datetime.utcnow(), days=
 
 def generate_guessed_existed(today=datetime.datetime.utcnow(), days=7, html=True, label="Guessed and Existed"):
     query_str = """
-        SELECT '', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
+        SELECT 'User is found', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) 
         FROM twitter_users 
         WHERE record_created_at <= :to_date and record_created_at >= :from_date
               and created_type=2 # randomly generated
@@ -467,15 +467,17 @@ def generate_guessed_existed_active_2day_en(today=datetime.datetime.utcnow(), da
               and created_type=2 # randomly generated
               and user_state = 1 # found
               and last_status_dt > date_sub(record_created_at, interval 2 day)
-              and lang = 'en' 
+              and lang in ('en', 'en-gb') 
         GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);"""
     result = run_query_for_days(query_str, today, days=days)
     return generate_html_table(result, str_to_date(date_to_str(today)), label) if html else result
 
 
 def generate_matchable(today=datetime.datetime.utcnow(), days=7, html=True,
-                       label="Matchability. Notice and Random Users meeting match criteria"):
-    query_str = """select 'matchable, notice - rand', notice_match.`YEAR(record_created_at)`, notice_match.`MONTH(record_created_at)`, notice_match.`DAY(record_created_at)`,  num_notice_matchable - num_rand_matchable from
+                       label="Random user surplus, in twitter_users table. "
+                             "random users minus notice users, meeting match criteria."
+                             "Should be positive."):
+    query_str = """select '[num_rand_users] - [num_notice_users_subsampled]', notice_match.`YEAR(record_created_at)`, notice_match.`MONTH(record_created_at)`, notice_match.`DAY(record_created_at)`,  num_notice_matchable - num_rand_matchable from
   (SELECT 'match' as matchable, YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) as num_rand_matchable
 FROM twitter_users
 WHERE record_created_at <= :to_date and record_created_at >= :from_date
@@ -499,7 +501,8 @@ on notice_match.matchable = rand_match.matchable;"""
 
 
 def generate_randomization_ratio_recent(today=datetime.datetime.utcnow(), days=7, html=True,
-                                        label="Ratio of matched users by day, recent"):
+                                        label="Ratio of matched users, daily. ExperimentThings table."
+                                              "Should be 1.5x or higher"):
     query_str = """select 'matched, rand/noticed', notice_match.`YEAR(created_at)`, notice_match.`MONTH(created_at)`, notice_match.`DAY(created_at)`,  num_rand_matched/num_notice_matched
 from
 (SELECT 'match' as matchable, YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) num_rand_matched
@@ -595,7 +598,7 @@ def generate_randomization_total_notice_all(today=datetime.datetime.utcnow(), da
 ######################################################################
 
 def generate_ratestate_users_lookup_exhausted(today=datetime.datetime.utcnow(), days=7, html=True,
-                                            label="number of users_lookup exhausted endpoints"):
+                                              label="number of users_lookup endpoints used checked out in the last day"):
     query_str = """SELECT 'num_exhausted', YEAR(checkin_due), MONTH(checkin_due), DAY(checkin_due), count(*)
  FROM twitter_ratestate
  WHERE endpoint= '/users/lookup'
@@ -606,8 +609,22 @@ def generate_ratestate_users_lookup_exhausted(today=datetime.datetime.utcnow(), 
         return result
     return generate_html_table(result, str_to_date(date_to_str(today)), label)
 
+def generate_ratestate_users_lookup(today=datetime.datetime.utcnow(), days=7, html=True,
+                                              label="number of users_lookup total endpoints"):
+    query_str = """SELECT 'num_exhausted', YEAR(checkin_due), MONTH(checkin_due), DAY(checkin_due), count(*)
+ FROM twitter_ratestate
+ WHERE endpoint= '/users/lookup'
+ GROUP BY YEAR(checkin_due), MONTH(checkin_due), DAY(checkin_due)"""
+    result = run_query_for_days(query_str, today, days=days)
+    if not html:
+        return result
+    return generate_html_table(result, str_to_date(date_to_str(today)), label)
+
+
 def generate_ratestate_users_lookup_exhausted_recency(today=datetime.datetime.utcnow(), days=7, html=True,
-                                            label="averagetime until checkin due"):
+                                                      label="average time in minutes that checkins are compared to now. "
+                                                            "negative indicates most of the checkin times existed in past (not used)."
+                                                            " should be highly negative if we have token overhead"):
     query_str = """SELECT 'num_exhausted', YEAR(checkin_due), MONTH(checkin_due), DAY(checkin_due), 
 avg(timestampdiff(MINUTE, now(), checkin_due ))
  FROM twitter_ratestate
@@ -755,6 +772,7 @@ def generate_report(today=datetime.datetime.utcnow(), days=1):
     html += generate_randomization_total_rand_all(today, days)
     html += generate_randomization_total_notice_recent(today, days)
     html += generate_randomization_total_notice_all(today, days)
+    html += generate_ratestate_users_lookup(today, days)
     html += generate_ratestate_users_lookup_exhausted(today, days)
     html += generate_ratestate_users_lookup_exhausted_recency(today, days)
     # html += generate_reddit_front_page(today, days)

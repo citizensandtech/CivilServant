@@ -48,7 +48,7 @@ class TwitterMatchController(TwitterController):
     def get_unmatched_users(self):
         most_recent_et_dt = self.db_session.query(func.max(ExperimentThing.created_at)).one()
         most_recent_et_dt = most_recent_et_dt if most_recent_et_dt[0] else datetime.datetime(2020, 1, 1, 0, 0, 0)
-        self.log.debug('Most recent et was: {}'.format(most_recent_et_dt))
+        self.log.info('Most recent et was: {}'.format(most_recent_et_dt))
         recent_tu_clause = and_(TwitterUser.record_created_at >= most_recent_et_dt,
                                 TwitterUser.user_state == utils.common.TwitterUserState.FOUND.value)
         # #To inefficient for now, going to try and use a gaurantee instead
@@ -82,6 +82,7 @@ class TwitterMatchController(TwitterController):
                       u.created_type == utils.common.TwitterUserCreateType.LUMEN_NOTICE.value]
 
         # first do random users
+        self.log.info('Period ago, last statuses should be after {}'.format(self.period_ago))
         for ru in random_id_users:
             # check there's a last status
             has_last_status = ru.last_status_dt is not None
@@ -109,8 +110,8 @@ class TwitterMatchController(TwitterController):
         set the user states on these random-id users to TwitterUserState.not-qualifying so they don't show in queries any more.
         """
         # invalidate by creating a negative-1 randomization arm
-
-        self.insert_ETs(invalid_unmatched_users, randomization_arm=-1, block_id=-1)
+        if len(invalid_unmatched_users)>0:
+            self.insert_ETs(invalid_unmatched_users, randomization_arm=-1, block_id=-1)
 
     def insert_ETs(self, twitter_users, randomization_arm, block_id):
         ETs_to_add = []
@@ -173,6 +174,7 @@ class TwitterMatchController(TwitterController):
                                             func.count(ExperimentThing.query_index)) \
             .group_by(ExperimentThing.query_index)
         num_block_r = num_block_q.all()
+        num_block_r = [(block_id, block_count) for (block_id, block_count) in num_block_r if block_id] # strange thing with a null block
         total_blocks = len(num_block_r)
         invalid_users = [b for b in num_block_r if b[0] == '-1'][0][1]
         most_recent_block = sorted(num_block_r, reverse=True)[0]
