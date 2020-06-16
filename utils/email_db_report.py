@@ -477,7 +477,7 @@ def generate_matchable(today=datetime.datetime.utcnow(), days=7, html=True,
                        label="Random user surplus, in twitter_users table.<br /> "
                              "random users minus notice users, meeting match criteria.<br />"
                              "Should be positive."):
-    query_str = """select '[num_rand_users] - [num_notice_users_subsampled]', notice_match.`YEAR(record_created_at)`, notice_match.`MONTH(record_created_at)`, notice_match.`DAY(record_created_at)`,  num_notice_matchable - num_rand_matchable from
+    query_str = """select '[num_rand_users] - [num_notice_users_subsampled]', notice_match.`YEAR(record_created_at)`, notice_match.`MONTH(record_created_at)`, notice_match.`DAY(record_created_at)`,  num_rand_matchable - num_notice_matchable from
   (SELECT 'match' as matchable, YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*) as num_rand_matchable
 FROM twitter_users
 WHERE record_created_at <= :to_date and record_created_at >= :from_date
@@ -523,28 +523,9 @@ on notice_match.matchable = rand_match.matchable;"""
     return generate_html_table(result, str_to_date(date_to_str(today)), label)
 
 
-def generate_randomization_ratio_all(today=datetime.datetime.utcnow(), days=7, html=True,
-                                     label="Ratio of matched users by day, all experiment"):
-    query_str = """select 'matched, rand/noticed', notice_match.`YEAR(created_at)`, notice_match.`MONTH(created_at)`, notice_match.`DAY(created_at)`,  num_rand_matched/num_notice_matched
-from
-(SELECT 'match' as matchable, YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) num_rand_matched
- FROM experiment_things
- WHERE object_type = 2
- GROUP BY YEAR(created_at), MONTH(created_at), DAY(created_at)) rand_match
-  join
-(SELECT 'match' as matchable, YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) num_notice_matched
- FROM experiment_things
- WHERE object_type = 1
- GROUP BY YEAR(created_at), MONTH(created_at), DAY(created_at)) notice_match
-on notice_match.matchable = rand_match.matchable;"""
-    result = run_query_for_days(query_str, today, days=days)
-    if not html:
-        return result
-    return generate_html_table(result, str_to_date(date_to_str(today)), label)
-
 
 def generate_randomization_total_rand_recent(today=datetime.datetime.utcnow(), days=7, html=True,
-                                             label="total_rand of matched users by day, recent"):
+                                             label="total rand of matched users"):
     query_str = """SELECT 'random_id_user included', YEAR(created_at), MONTH(created_at), DAY(created_at), count(*)
  FROM experiment_things
  WHERE created_at <= :to_date and created_at >= :from_date
@@ -556,37 +537,13 @@ def generate_randomization_total_rand_recent(today=datetime.datetime.utcnow(), d
     return generate_html_table(result, str_to_date(date_to_str(today)), label)
 
 
-def generate_randomization_total_rand_all(today=datetime.datetime.utcnow(), days=7, html=True,
-                                          label="total_rand of matched users by day, all experiment"):
-    query_str = """SELECT 'random_id_user included', YEAR(created_at), MONTH(created_at), DAY(created_at), count(*)
- FROM experiment_things
- WHERE object_type = 2
- GROUP BY YEAR(created_at), MONTH(created_at), DAY(created_at)"""
-    result = run_query_for_days(query_str, today, days=days)
-    if not html:
-        return result
-    return generate_html_table(result, str_to_date(date_to_str(today)), label)
-
-
 def generate_randomization_total_notice_recent(today=datetime.datetime.utcnow(), days=7, html=True,
-                                               label="total_notice of matched users by day, recent"):
+                                               label="total notice matched users"):
     query_str = """SELECT 'notice included', YEAR(created_at), MONTH(created_at), DAY(created_at), count(*)
  FROM experiment_things
  WHERE created_at <= :to_date and created_at >= :from_date
        and object_type = 1
  GROUP BY YEAR(created_at), MONTH(created_at), DAY(created_at);"""
-    result = run_query_for_days(query_str, today, days=days)
-    if not html:
-        return result
-    return generate_html_table(result, str_to_date(date_to_str(today)), label)
-
-
-def generate_randomization_total_notice_all(today=datetime.datetime.utcnow(), days=7, html=True,
-                                            label="total_notice of matched users by day, all experiment"):
-    query_str = """SELECT 'notice included', YEAR(created_at), MONTH(created_at), DAY(created_at), count(*)
- FROM experiment_things
- WHERE object_type = 1
- GROUP BY YEAR(created_at), MONTH(created_at), DAY(created_at)"""
     result = run_query_for_days(query_str, today, days=days)
     if not html:
         return result
@@ -609,8 +566,9 @@ def generate_ratestate_users_lookup_exhausted(today=datetime.datetime.utcnow(), 
         return result
     return generate_html_table(result, str_to_date(date_to_str(today)), label)
 
+
 def generate_ratestate_users_lookup(today=datetime.datetime.utcnow(), days=7, html=True,
-                                              label="number of users_lookup total endpoints"):
+                                    label="number of users_lookup total endpoints"):
     query_str = """SELECT 'num_exhausted', YEAR(checkin_due), MONTH(checkin_due), DAY(checkin_due), count(*)
  FROM twitter_ratestate
  WHERE endpoint= '/users/lookup'
@@ -767,11 +725,8 @@ def generate_report(today=datetime.datetime.utcnow(), days=1):
     html += generate_guessed_existed_active_2day_en(today, days)
     html += generate_matchable(today, days)
     html += generate_randomization_ratio_recent(today, days)
-    html += generate_randomization_ratio_all(today, days)
     html += generate_randomization_total_rand_recent(today, days)
-    html += generate_randomization_total_rand_all(today, days)
     html += generate_randomization_total_notice_recent(today, days)
-    html += generate_randomization_total_notice_all(today, days)
     html += generate_ratestate_users_lookup(today, days)
     html += generate_ratestate_users_lookup_exhausted(today, days)
     html += generate_ratestate_users_lookup_exhausted_recency(today, days)

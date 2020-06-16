@@ -47,8 +47,8 @@ echo "Fetch Twitter Account Snapshots & Tweet Counts: every 24 hours, get new sn
 echo "Generate random ID users every half and ten minutes"
 python schedule_twitter_jobs.py --function twitter_generate_random_id_users --interval  600 2> $logfile
 
-echo "Match ID groups twice per day"
-python schedule_twitter_jobs.py --function twitter_match_comparison_groups --interval 43200 2> $logfile
+echo "Match ID groups twice every three hours, like notice onboarding"
+python schedule_twitter_jobs.py --function twitter_match_comparison_groups --interval 10800 2> $logfile
 
 python manage_scheduled_jobs.py show all 2> $logfile
 
