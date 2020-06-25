@@ -1,6 +1,8 @@
 import os, sys
 import datetime
 import simplejson as json
+from redis import Redis
+from rq import Queue
 
 if __name__ == "__main__" and len(sys.argv) > 1:
     os.environ["CS_ENV"] = sys.argv[1]
@@ -523,7 +525,6 @@ on notice_match.matchable = rand_match.matchable;"""
     return generate_html_table(result, str_to_date(date_to_str(today)), label)
 
 
-
 def generate_randomization_total_rand_recent(today=datetime.datetime.utcnow(), days=7, html=True,
                                              label="total rand of matched users"):
     query_str = """SELECT 'random_id_user included', YEAR(created_at), MONTH(created_at), DAY(created_at), count(*)
@@ -672,6 +673,14 @@ def generate_experiment_action(today=datetime.datetime.utcnow(), days=7, html=Tr
     return generate_html_table(result, str_to_date(date_to_str(today)), "Experiment Action") if html else result
 
 
+def generate_failed_queue_count(today, days):
+    q = Queue(connection=Redis(), name='failed')
+    failed_job_ids = q.get_job_ids()
+    num_failed_jobs = len(failed_job_ids)
+    failed_queue_d = {'Num failed jobs': {today: num_failed_jobs}}
+    return generate_html_table_from_dict(failed_queue_d, str_to_date(date_to_str(today)), 'Failed Queue Count')
+
+
 ######################################################################
 ######### GENERATE REPORT  ###########################################
 ######################################################################
@@ -730,6 +739,7 @@ def generate_report(today=datetime.datetime.utcnow(), days=1):
     html += generate_ratestate_users_lookup(today, days)
     html += generate_ratestate_users_lookup_exhausted(today, days)
     html += generate_ratestate_users_lookup_exhausted_recency(today, days)
+    html += generate_failed_queue_count(today, days)
     # html += generate_reddit_front_page(today, days)
     # html += generate_reddit_subreddit_page(today, days)
     # html += generate_reddit_subreddit(today, days)
