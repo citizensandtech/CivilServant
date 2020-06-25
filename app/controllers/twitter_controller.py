@@ -238,8 +238,12 @@ class TwitterController():
                                 # is UTC; expected string format: "Mon Nov 29 21:18:15 +0000 2010"
                                 created_type=utils.common.TwitterUserCreateType.LUMEN_NOTICE.value,
                                 record_created_at=now,
-                                lang=user_json["status"]["lang"] if 'status' in user_json.keys() and 'lang' in user_json['status'].keys() else None,
-                                last_status_dt=datetime.datetime.strptime(user_json["status"]["created_at"], utils.common.TWITTER_STRPTIME) if 'status' in user_json.keys() and 'created_at' in user_json['status'].keys() else None,
+                                lang=user_json["status"]["lang"] if 'status' in user_json.keys() and 'lang' in
+                                                                    user_json['status'].keys() else None,
+                                last_status_dt=datetime.datetime.strptime(user_json["status"]["created_at"],
+                                                                          utils.common.TWITTER_STRPTIME) if 'status' in user_json.keys() and 'created_at' in
+                                                                                                            user_json[
+                                                                                                                'status'].keys() else None,
                                 metadata_json=user_json if user_json else None,
                                 user_state=user_state.value,
                                 CS_oldest_tweets_archived=CS_JobState.NOT_PROCESSED.value)
@@ -503,7 +507,8 @@ class TwitterController():
                             user.screen_name = screen_name
                             user.created_at = created_at
                             # user.record_updated_at = now    # THIS SHOULDN'T BE UPDATED. old TwitterUser records probably have wrong record_updated_at
-                            user.lang = user_json["status"]["lang"] if 'status' in user_json.keys() and 'lang' in user_json['status'].keys() else None
+                            user.lang = user_json["status"]["lang"] if 'status' in user_json.keys() and 'lang' in \
+                                                                       user_json['status'].keys() else None
                             user.user_state = user_state.value
 
                             # create TwitterUserSnapshot record
@@ -728,12 +733,15 @@ class TwitterController():
             self.t.try_counter = 0  ## this line prevents the retry code from looping
             self.log.info(e)
             # TODO: un-jankify this error handling/parsing code. might not get much better though
-            if e.message == "Not authorized.":
-                # Account is either protected or suspended
-                self.log.info(user_state is TwitterUserState.PROTECTED)
-                if user_state is not TwitterUserState.PROTECTED:
-                    user_state = TwitterUserState.SUSPENDED
-            elif e.message[0]['code'] == 34:  # message = "Sorry, that page does not exist."
+            if isinstance(e.message, str):
+                if e.message == "Not authorized.":
+                    # Account is either protected or suspended
+                    self.log.info(user_state is TwitterUserState.PROTECTED)
+                    if user_state is not TwitterUserState.PROTECTED:
+                        user_state = TwitterUserState.SUSPENDED
+            elif isinstance(e.messaege, list) and e.message[0]['code'] == 34:  # message = "Sorry, that page does not exist."
+                user_state = TwitterUserState.NOT_FOUND
+            elif isinstance(e.message, dict) and e.message['code'] == 34:
                 user_state = TwitterUserState.NOT_FOUND
             else:
                 self.log.error(
