@@ -28,10 +28,22 @@ import datetime
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), "..")
 ENV = os.environ['CS_ENV']
 
+config_path = os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV)
+with open(config_path, 'r') as config_f:
+    json_config = json.load(config_f)
+
+experiment_file_path = os.path.join(BASE_DIR, "config", "experiments", 'dmca_experiment.yml')
+try:
+    with open(experiment_file_path) as f:
+        experiment_config = yaml.safe_load(f)
+except FileNotFoundError:
+    experiment_config = None
+
+
 ### LOAD SQLALCHEMY SESSION
-db_session = DbEngine(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV)).new_session()
-db_session_write = DbEngine(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV)).new_session()
-db_session_twit_conn = DbEngine(os.path.join(BASE_DIR, "config") + "/{env}.json".format(env=ENV)).new_session()
+db_session = DbEngine(config_path).new_session()
+db_session_write = DbEngine(config_path).new_session()
+db_session_twit_conn = DbEngine(config_path).new_session()
 
 # LOAD LOGGER
 log = app.cs_logger.get_logger(ENV, BASE_DIR)
@@ -238,12 +250,13 @@ def fetch_twitter_tweets(backfill=False, collection_seconds=None, user_rand_frac
     log.info("Finished fetch_twitter_tweets, backfill={0}. PID={1}".format(backfill, str(os.getpid())))
 
 
-def fetch_twitter_random_id_users(daily_limit=500000, target_additions=500):
+def fetch_twitter_random_id_users(daily_limit=None, target_additions=None):
     """
     Create users for comparison making sure
     """
     log.info("Starting to generate users from random IDs, PID={0}".format(str(os.getpid())))
-    t = app.controllers.twitter_random_user_controller.TwitterRandomUserController(db_session, twitter_conn, log)
+    t = app.controllers.twitter_random_user_controller.TwitterRandomUserController(db_session, twitter_conn, log,
+                                                                                   experiment_config, json_config)
     t.generate_random_id_users(daily_limit=daily_limit, target_additions=target_additions)
     twitter_conn.checkin_endpoint()
     log.info("Finished generating users from random IDs, PID={0}".format(str(os.getpid())))
@@ -254,9 +267,6 @@ def twitter_match_comparison_groups():
     Match dmca-receiving and randomly generated users.
     """
     log.info("Starting to match comparison group, PID={0}".format(str(os.getpid())))
-    experiment_file_path = os.path.join(BASE_DIR, "config", "experiments", 'dmca_experiment.yml')
-    with open(experiment_file_path) as f:
-        experiment_config = yaml.safe_load(f)
     t = app.controllers.twitter_match_controller.TwitterMatchController(db_session, twitter_conn, log,
                                                                         experiment_config)
     t.match_lumen_and_random_id_users()

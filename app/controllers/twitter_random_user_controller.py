@@ -1,3 +1,4 @@
+import inspect
 import math
 import random
 import datetime
@@ -12,14 +13,14 @@ import utils.common
 from utils.common import TwitterUserState, NOT_FOUND_TWITTER_USER_STR, CS_JobState, neq, EXPERIMENT_LANGUAGES, \
     TwitterUrlKey
 import sys, warnings, os
-from collections import defaultdict
-
-from utils.url_unshortener import bulkUnshorten
-
-TWITTER_DATETIME_STR_FORMAT = "%a %b %d %H:%M:%S %z %Y"
 
 
 class TwitterRandomUserController(TwitterController):
+    def __init__(self, db_session, twitter_conn, log, experiment_config, json_config):
+        super().__init__(db_session, twitter_conn, log, experiment_config, json_config)
+        self.now = datetime.datetime.utcnow()
+        self.yesterday = self.now - datetime.timedelta(days=1)
+
     def make_random_integers(self, num_to_make=100):
         # valid ranges are in beginning,end tups
         VALID_RANGES = ((10008932, 3308208032),
@@ -82,16 +83,24 @@ class TwitterRandomUserController(TwitterController):
         return len(twitter_users_to_add)
 
     def num_random_id_generated_so_far_today(self):
-        now = datetime.datetime.utcnow()
-        yesterday = now - datetime.timedelta(days=1)
         today_guessed_existed_q = self.db_session.query(TwitterUser).filter(
             TwitterUser.created_type == utils.common.TwitterUserCreateType.RANDOMLY_GENERATED.value) \
             .filter(TwitterUser.user_state == utils.common.TwitterUserState.FOUND.value) \
-            .filter(TwitterUser.record_created_at > yesterday)
+            .filter(TwitterUser.record_created_at > self.yesterday)
         num_guessed_existed_today = today_guessed_existed_q.count()
         return num_guessed_existed_today
 
-    def generate_random_id_users(self, daily_limit=500000, target_additions=500):
+    def num_notice_users_found_so_far_today(self):
+        today_notice_users_q = self.db_session.query(TwitterUser).filter(
+            TwitterUser.created_type == utils.common.TwitterUserCreateType.LUMEN_NOTICE.value) \
+            .filter(TwitterUser.user_state == utils.common.TwitterUserState.FOUND.value) \
+            .filter(TwitterUser.record_created_at > self.yesterday) \
+            .filter(TwitterUser.lang.in_(self.config['match_criteria']['langs'])) \
+            .filter(TwitterUser.user_rand<1)
+        num_noticed_today = today_notice_users_q.count()
+        return num_noticed_today
+
+    def generate_random_id_users(self, daily_limit=None, target_additions=None):
         '''
         https://github.com/SMAPPNYU/smapputil/blob/master/py/query_twitter/old_queries/generate_random_twitter_potential_ids.py
         from twitter :  These IDs are unique 64-bit unsigned integers, which are based on time, instead of being sequential. The full ID is composed of a timestamp, a worker number, and a sequence number.  When consuming the API using JSON, it is important to always use the field id_str instead of id.
@@ -103,7 +112,18 @@ class TwitterRandomUserController(TwitterController):
         num_exist = 0
         num_generated = 0
         # Get the number guessed today.
+        num_noticed_today = self.num_notice_users_found_so_far_today()
+        num_generated_today = self.num_random_id_generated_so_far_today()
+        self.log.debug('Number of users noticed last day: {num_noticed_today}.'
+                       'Number of users generated last day: {num_generated_today}.'
+                       'Daily limit set to: {dl}'.format(num_noticed_today=num_noticed_today,
+                                                                         num_generated_today=num_generated_today,
+                                                         dl=daily_limit))
+        if daily_limit == -1 or daily_limit:
+            # if the flag is set to match use this.
+            daily_limit = num_noticed_today
         if self.num_random_id_generated_so_far_today() >= daily_limit:
+            self.log.debug('reached daily limit')
             return num_exist  # zero made in this batch
         else:
             round = 0
@@ -136,7 +156,8 @@ class TwitterRandomUserController(TwitterController):
         for random_exist_user in users_lookup_result:
             random_users_dict[random_exist_user.id] = random_exist_user
 
-        num_generated_round = self.save_random_id_users(random_users_dict)
+        num_generated_round = self.save_random_id_users(random_users_dict) #not actually the numebr that existed any more
+        num_generated_round = len(random_users_dict)
         num_exist_round = len(users_lookup_result)
         self.log.info("Persisted {num_generated} random ID users. {num_exist} actually existed.".format(
             num_generated=num_generated_round,

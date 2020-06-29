@@ -72,11 +72,12 @@ Note that if a username changes for an account that we don't have the id for, we
 
 
 class TwitterController():
-    def __init__(self, db_session, t, log, config=None):
+    def __init__(self, db_session, t, log, config=None, json_config=None):
         self.t = t
         self.db_session = db_session
         self.log = log
-        self.config = config
+        self.config = config # this is the yaml one we want to switch to.
+        self.json_config = json_config
 
     #########################################################
     ################### ARCHIVE NEW USERS CODE
