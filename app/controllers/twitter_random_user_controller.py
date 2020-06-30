@@ -119,12 +119,19 @@ class TwitterRandomUserController(TwitterController):
                        'Daily limit set to: {dl}'.format(num_noticed_today=num_noticed_today,
                                                                          num_generated_today=num_generated_today,
                                                          dl=daily_limit))
-        if daily_limit == -1 or daily_limit:
+
+        # think about what the daily limit ought to be
+        if daily_limit < 0:
             # if the flag is set to match use this.
-            daily_limit = num_noticed_today
+            random_to_notice_ratio = 1.1
+            if 'random_to_notice_ratio' in self.json_config:
+                random_to_notice_ratio = self.json_config['random_to_notice_ratio']
+            daily_limit = num_noticed_today * random_to_notice_ratio
+        # check if we've reached the daily limit
         if self.num_random_id_generated_so_far_today() >= daily_limit:
             self.log.debug('reached daily limit')
             return num_exist  # zero made in this batch
+        # we need to make random id users
         else:
             round = 0
             while num_exist < target_additions:
