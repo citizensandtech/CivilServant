@@ -704,7 +704,7 @@ class TwitterController():
             # users's  user_state can change by executing the next line.
             job_state = self.archive_user_tweets(user, backfill=backfill, is_test=is_test)
             user.CS_oldest_tweets_archived = job_state.value
-            self.db_session.add(user)
+            self.db_session.add_retryable(user)
             self.db_session.commit()
 
             fill_record = TwitterFill(user_id=user.id,
@@ -712,7 +712,7 @@ class TwitterController():
                                       fill_type='backfill' if backfill else 'frontfill',
                                       job_state=job_state.value,
                                       user_state=user.user_state)
-            self.db_session.add(fill_record)
+            self.db_session.add_retryable(fill_record)
             self.db_session.commit()
 
             if test_exception:
