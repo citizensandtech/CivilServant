@@ -740,7 +740,7 @@ class TwitterController():
                     self.log.info(user_state is TwitterUserState.PROTECTED)
                     if user_state is not TwitterUserState.PROTECTED:
                         user_state = TwitterUserState.SUSPENDED
-            elif isinstance(e.messaege, list) and e.message[0]['code'] == 34:  # message = "Sorry, that page does not exist."
+            elif isinstance(e.message, list) and e.message[0]['code'] == 34:  # message = "Sorry, that page does not exist."
                 user_state = TwitterUserState.NOT_FOUND
             elif isinstance(e.message, dict) and e.message['code'] == 34:
                 user_state = TwitterUserState.NOT_FOUND
