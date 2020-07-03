@@ -243,7 +243,7 @@ def fetch_twitter_tweets(backfill=False, collection_seconds=None, user_rand_frac
     """
     fill_start_time = datetime.datetime.utcnow() if not fill_start_time else fill_start_time
     log.info("Calling fetch_twitter_tweets, backfill={0}. PID={1}".format(backfill, str(os.getpid())))
-    t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log)
+    t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log, experiment_config, json_config)
     t.query_and_archive_tweets(backfill=backfill, fill_start_time=fill_start_time,
                                collection_seconds=collection_seconds, user_rand_frac=user_rand_frac)
     twitter_conn.checkin_endpoint()

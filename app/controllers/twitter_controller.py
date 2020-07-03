@@ -625,7 +625,10 @@ class TwitterController():
         # fill_start_time, lets us know if that user has been attempted *this round*. The CS_JobState state let's us
         # know if every item was either processed successfully or failed
         batch_attempt_counter = 0
-        while not all_filled:
+        users_per_run = self.json_config['users_per_fill_run']
+        max_batches = users_per_run / batch_size
+        self.log.debug('users per run are {}, batch size is {} = max batches {}'.format(users_per_run, batch_size, max_batches))
+        while not all_filled and batch_attempt_counter <= max_batches:
             fill_query = self.db_session.query(TwitterUser). \
                 filter(
                 and_(
