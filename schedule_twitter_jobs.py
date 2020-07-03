@@ -1,9 +1,10 @@
 import inspect
+import random
 import sys
 
 from redis import Redis
 from rq_scheduler import Scheduler
-from datetime import datetime
+from datetime import datetime, timedelta
 import app.controller
 import os, argparse
 import schedule_twitter_jobs
@@ -121,6 +122,7 @@ def main():
         user_rand_frac = config["user_rand_frac"]
         random_users_daily_limit = config["random_users_daily_limit"]
         random_users_target_additions = config["random_users_target_additions"]
+        fetch_tweets_schedule_random_offset = config["fetch_tweets_schedule_random_offset"]
         today = datetime.utcnow()
         log.info('Loaded experiment start date: {}. Today is :{}'.format(experiment_start_date, today))
         time_til_experiment = experiment_start_date - today
@@ -201,7 +203,7 @@ def main():
         scheduler.schedule(
             scheduled_time=datetime.utcnow(),
             func=schedule_twitter_jobs.schedule_fetch_tweets,
-            args=(args, ttl, timeout, queue_name, repeats, collection_seconds, user_rand_frac),
+            args=(args, ttl, timeout, queue_name, repeats, collection_seconds, user_rand_frac, fetch_tweets_schedule_random_offset),
             interval=int(args.interval),
             repeat=repeats,
             result_ttl=ttl,
@@ -229,13 +231,14 @@ def main():
 
 
 
-def schedule_fetch_tweets(args, ttl, timeout, queue_name, repeats, collection_seconds, user_rand_frac):
+def schedule_fetch_tweets(args, ttl, timeout, queue_name, repeats, collection_seconds, user_rand_frac, random_offset):
     fill_start_time = datetime.utcnow()
     scheduler_concurrent = Scheduler(queue_name=queue_name+'_concurrent', connection=Redis())
     log.info('FILLTASKS: n_tasks is {}'.format(args.n_tasks))
     for task in range(args.n_tasks):
+        random_offset_seconds = random.randint(1, random_offset)
         scheduler_concurrent.schedule(
-            scheduled_time=datetime.utcnow(),
+            scheduled_time=datetime.utcnow() + timedelta(random_offset_seconds),
             func=app.controller.fetch_twitter_tweets,
             args=[args.statuses_backfill, collection_seconds, user_rand_frac, fill_start_time],
             interval=int(args.interval),
