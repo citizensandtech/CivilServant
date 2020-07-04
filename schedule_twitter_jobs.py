@@ -238,7 +238,7 @@ def schedule_fetch_tweets(args, ttl, timeout, queue_name, repeats, collection_se
     for task in range(args.n_tasks):
         random_offset_seconds = random.randint(1, random_offset)
         scheduler_concurrent.schedule(
-            scheduled_time=datetime.utcnow() + timedelta(random_offset_seconds),
+            scheduled_time=datetime.utcnow() + timedelta(seconds=random_offset_seconds),
             func=app.controller.fetch_twitter_tweets,
             args=[args.statuses_backfill, collection_seconds, user_rand_frac, fill_start_time],
             interval=int(args.interval),
