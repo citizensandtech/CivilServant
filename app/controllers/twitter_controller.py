@@ -21,7 +21,7 @@ import sys, warnings, os
 from collections import defaultdict
 
 from utils.url_unshortener import bulkUnshorten
-
+from utils.retry import retryable
 """
 
 Some notes about twitter users:
@@ -646,7 +646,11 @@ class TwitterController():
                 limit(batch_size)
 
             # self.log.info('Fill query is: {}'.format(str(fill_query.statement.compile())))
-            unarchived_users = fill_query.all()
+            @retryable(backoff=False, rollback=True, session=self.db_session)
+            def _execute_fill_query():
+                return fill_query.all()
+
+            unarchived_users = _execute_fill_query()
 
             # mark in the database that we're claiming these items
             last_attempted_process = datetime.datetime.utcnow()
@@ -672,6 +676,8 @@ class TwitterController():
             except sqlalchemy.orm.exc.DetachedInstanceError:
                 self.log.error("Encountered deatched instance error.")
             # finally reset in_progress and log
+            except:
+                self.db_session.rollback()
             finally:
                 self.log.info('RESET CS_oldest_tweets_archived attempting.')
                 utils.common.reset_CS_JobState_In_Progress(unarchived_users, "CS_oldest_tweets_archived",
@@ -743,9 +749,9 @@ class TwitterController():
                     self.log.info(user_state is TwitterUserState.PROTECTED)
                     if user_state is not TwitterUserState.PROTECTED:
                         user_state = TwitterUserState.SUSPENDED
-            elif isinstance(e.message, list) and e.message[0]['code'] == 34:  # message = "Sorry, that page does not exist."
+            elif isinstance(e.message, list) and 'code' in e.message[0] and e.message[0]['code'] == 34:  # message = "Sorry, that page does not exist."
                 user_state = TwitterUserState.NOT_FOUND
-            elif isinstance(e.message, dict) and e.message['code'] == 34:
+            elif isinstance(e.message, dict) and 'code' in e.message and e.message['code'] == 34:
                 user_state = TwitterUserState.NOT_FOUND
             else:
                 self.log.error(

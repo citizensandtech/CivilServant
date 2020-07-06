@@ -22,7 +22,6 @@ db_session = DbEngine(os.path.join(BASE_DIR, "config") + "/{env}.json".format(en
 # LOAD LOGGER
 log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
-
 # documentation at
 # https://github.com/ui/rq-scheduler
 
@@ -109,7 +108,7 @@ def main():
 
     SECONDS_IN_DAY = 60 * 60 * 24
 
-    ttl = max(2*SECONDS_IN_DAY, int(args.interval) + 3600)  # max of (2days in seconds, args.interval + 1 hr)
+    ttl = max(2 * SECONDS_IN_DAY, int(args.interval) + 3600)  # max of (2days in seconds, args.interval + 1 hr)
     timeout = max(SECONDS_IN_DAY, int(args.interval) + 300)  # max of (3hrs in seconds, args.interval + 50min)
 
     # LOAD Experiment details
@@ -161,7 +160,6 @@ def main():
         log.error(e)
         sys.exit(1)
 
-
     if args.function == "fetch_lumen_notices":
         scheduler.schedule(
             scheduled_time=datetime.utcnow(),
@@ -203,7 +201,8 @@ def main():
         scheduler.schedule(
             scheduled_time=datetime.utcnow(),
             func=schedule_twitter_jobs.schedule_fetch_tweets,
-            args=(args, ttl, timeout, queue_name, repeats, collection_seconds, user_rand_frac, fetch_tweets_schedule_random_offset),
+            args=(args, ttl, timeout, queue_name, repeats, collection_seconds, user_rand_frac,
+                  fetch_tweets_schedule_random_offset),
             interval=int(args.interval),
             repeat=repeats,
             result_ttl=ttl,
@@ -230,22 +229,23 @@ def main():
         raise NotImplementedError("Unimplimented function: {}".format(args.function))
 
 
-
 def schedule_fetch_tweets(args, ttl, timeout, queue_name, repeats, collection_seconds, user_rand_frac, random_offset):
     fill_start_time = datetime.utcnow()
-    scheduler_concurrent = Scheduler(queue_name=queue_name+'_concurrent', connection=Redis())
+    scheduler_concurrent = Scheduler(queue_name=queue_name + '_concurrent', connection=Redis())
     log.info('FILLTASKS: n_tasks is {}'.format(args.n_tasks))
     for task in range(args.n_tasks):
         random_offset_seconds = random.randint(1, random_offset)
         scheduler_concurrent.schedule(
             scheduled_time=datetime.utcnow() + timedelta(seconds=random_offset_seconds),
             func=app.controller.fetch_twitter_tweets,
-            args=[args.statuses_backfill, collection_seconds, user_rand_frac, fill_start_time],
+            kwargs={"backfill": args.statuses_backfill,
+                    "fill_start_time": fill_start_time,
+                    "collection_seconds": collection_seconds,
+                    "user_rand_frac": user_rand_frac},
             interval=int(args.interval),
             repeat=0,
             result_ttl=ttl,
             timeout=timeout)
-
 
 
 if __name__ == '__main__':

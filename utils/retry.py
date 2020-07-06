@@ -23,21 +23,25 @@ BACKOFF_BASE = 5
 BACKOFF_MAX_EXP = 4
 BACKOFF_MAX_TIMES = 5
 
+
 def retryable(fn=None, retry=RETRY, backoff=BACKOFF, retry_wait=RETRY_WAIT,
               retry_max_times=RETRY_MAX_TIMES, backoff_base=BACKOFF_BASE,
               backoff_max_exp=BACKOFF_MAX_EXP,
-              backoff_max_times=BACKOFF_MAX_TIMES, _testing=False):
+              backoff_max_times=BACKOFF_MAX_TIMES, rollback=False,
+              session=None, _testing=False):
     if fn is None:
         return functools.partial(retryable, retry=retry, backoff=backoff,
                                  retry_wait=retry_wait,
                                  retry_max_times=retry_max_times,
                                  backoff_base=backoff_base,
                                  backoff_max_exp=backoff_max_exp,
-                                 backoff_max_times=backoff_max_times)
+                                 backoff_max_times=backoff_max_times,
+                                 session=session, rollback=rollback)
 
     def _backoff_exps():
         valid_exp = lambda i: i if i < backoff_max_exp else backoff_max_exp
         yield from (valid_exp(i) for i in range(backoff_max_times))
+
     retryable._backoff_exps = _backoff_exps
 
     def _log_attempt(from_backoff, attempt_num, attempt_max, sleep_time):
@@ -52,14 +56,14 @@ def retryable(fn=None, retry=RETRY, backoff=BACKOFF, retry_wait=RETRY_WAIT,
         if retry:
             for i in range(retry_max_times):
                 yield retry_wait
-                _log_attempt(False, i+1, retry_max_times, retry_wait)
+                _log_attempt(False, i + 1, retry_max_times, retry_wait)
                 time.sleep(retry_wait if not _testing else 0)
-        
+
         if backoff:
             for i, exp in enumerate(_backoff_exps()):
-                wait = backoff_base + random.randrange(0, backoff_base**exp)
+                wait = backoff_base + random.randrange(0, backoff_base ** exp)
                 yield wait
-                _log_attempt(True, i+1, backoff_max_times, wait)
+                _log_attempt(True, i + 1, backoff_max_times, wait)
                 time.sleep(wait if not _testing else 0)
 
     @functools.wraps(fn)
@@ -76,11 +80,16 @@ def retryable(fn=None, retry=RETRY, backoff=BACKOFF, retry_wait=RETRY_WAIT,
             except Exception as e:
                 _retry._retryable_last_exception = e
                 _log.exception("Exception encountered in a retryable function")
+                if session and rollback:
+                    msg = "Calling rollback on retryable session %s."
+                    _log.error(msg, hex(id(session)))
+                    session.rollback()
 
         if _retry._retryable_last_exception:
             raise _retry._retryable_last_exception
 
     return _retry
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -119,9 +128,10 @@ def parse_args():
                         type=int,
                         default=BACKOFF_MAX_TIMES,
                         help="The maximum number of backoff attempts.")
-    
+
     args = parser.parse_args()
     return args
+
 
 def run_subprocess(**kwargs):
     kwargs.setdefault("retry", RETRY)
@@ -140,9 +150,10 @@ def run_subprocess(**kwargs):
         statement = [args.path] + args.arguments
         completed = subprocess.run(statement)
         return completed.returncode
-    
+
     returncode = _exec()
     sys.exit(returncode)
+
 
 if __name__ == "__main__":
     try:
