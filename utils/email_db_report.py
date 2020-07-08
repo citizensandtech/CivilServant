@@ -551,6 +551,33 @@ def generate_randomization_total_notice_recent(today=datetime.datetime.utcnow(),
     return generate_html_table(result, str_to_date(date_to_str(today)), label)
 
 
+def generate_backfills_count(today=datetime.datetime.utcnow(), days=7, html=True,
+                                               label="total notice matched users"):
+    query_str = """SELECT 'backfills count', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*)
+ FROM twitter_fills
+ WHERE record_created_at <= :to_date and record_created_at >= :from_date
+       and job_state = 3
+       and fill_type = 'backfill'
+ GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);"""
+    result = run_query_for_days(query_str, today, days=days)
+    if not html:
+        return result
+    return generate_html_table(result, str_to_date(date_to_str(today)), label)
+
+def generate_frontfills_count(today=datetime.datetime.utcnow(), days=7, html=True,
+                                               label="total notice matched users"):
+    query_str = """SELECT 'frontfills count', YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at), count(*)
+ FROM twitter_fills
+ WHERE record_created_at <= :to_date and record_created_at >= :from_date
+       and job_state = 3
+       and fill_type = 'frontfill'
+ GROUP BY YEAR(record_created_at), MONTH(record_created_at), DAY(record_created_at);"""
+    result = run_query_for_days(query_str, today, days=days)
+    if not html:
+        return result
+    return generate_html_table(result, str_to_date(date_to_str(today)), label)
+
+
 ######################################################################
 ######### RATESTATE ###########################################
 ######################################################################
@@ -736,6 +763,8 @@ def generate_report(today=datetime.datetime.utcnow(), days=1):
     html += generate_randomization_ratio_recent(today, days)
     html += generate_randomization_total_rand_recent(today, days)
     html += generate_randomization_total_notice_recent(today, days)
+    html += generate_backfills_count(today, days)
+    html += generate_frontfills_count(today, days)
     html += generate_ratestate_users_lookup(today, days)
     html += generate_ratestate_users_lookup_exhausted(today, days)
     html += generate_ratestate_users_lookup_exhausted_recency(today, days)
