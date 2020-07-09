@@ -92,8 +92,8 @@ def update_all_CS_JobState(row_to_state, field, db_session, log):
         log.info("Updated {0} {1} {2} fields to new CS_JobState.".format(len(row_to_state),
                                                                          type(list(row_to_state.keys())[0]), field))
     except:
-        log.error("Error while saving DB Session for updating {0} {1} {2} fields to new CS_JobState.".format(
-            len(row_to_state), type(list(row_to_state.keys())[0]), field), extra=sys.exc_info()[0])
+        log.exception("Error while saving DB Session for updating {0} {1} {2} fields to new CS_JobState.".format(
+            len(row_to_state), type(list(row_to_state.keys())[0]), field))
 
 
 def update_CS_JobState(rows, field, to_state, db_session, log):
@@ -107,10 +107,9 @@ def update_CS_JobState(rows, field, to_state, db_session, log):
         db_session.commit()
         log.info("Updated {0} {1} {2} fields to {3}.".format(len(rows), type(rows[0]), field, to_state))
     except:
-        log.error(
+        log.exception(
             "Error while saving DB Session for updating {0} {1} {2} fields to {3}.".format(len(rows), type(rows[0]),
-                                                                                           field, to_state),
-            extra=sys.exc_info()[0])
+                                                                                           field, to_state))
 
 
 def reset_CS_JobState_In_Progress(rows, field, db_session, log):
