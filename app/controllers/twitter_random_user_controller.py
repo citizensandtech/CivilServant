@@ -114,7 +114,7 @@ class TwitterRandomUserController(TwitterController):
         # Get the number guessed today.
         num_noticed_today = self.num_notice_users_found_so_far_today()
         num_generated_today = self.num_random_id_generated_so_far_today()
-        self.log.debug('Number of users noticed last day: {num_noticed_today}.'
+        self.log.info('Number of users noticed last day: {num_noticed_today}.'
                        'Number of users generated last day: {num_generated_today}.'
                        'Daily limit set to: {dl}'.format(num_noticed_today=num_noticed_today,
                                                                          num_generated_today=num_generated_today,
@@ -123,7 +123,7 @@ class TwitterRandomUserController(TwitterController):
         # think about what the daily limit ought to be
         if daily_limit < 0:
             # if the flag is set to match use this.
-            random_to_notice_ratio = 1.1
+            random_to_notice_ratio = 133 # because about 0.0075% of random ids end up being active in english last 2 days
             if 'random_to_notice_ratio' in self.json_config:
                 random_to_notice_ratio = self.json_config['random_to_notice_ratio']
             daily_limit = num_noticed_today * random_to_notice_ratio
