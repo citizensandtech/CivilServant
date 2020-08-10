@@ -18,7 +18,8 @@ import app.controllers.stylesheet_experiment_controller
 import app.controllers.sticky_comment_experiment_controller
 import app.controllers.lumen_controller
 from app.controllers import twitter_controller, twitter_match_controller, twitter_unshorten_controller, \
-    twitter_analysis_controller, twitter_observational_analysis_controller, twitter_random_user_controller
+    twitter_analysis_controller, twitter_observational_analysis_controller, twitter_random_user_controller, \
+    twitter_longitudinal_dataset_controller
 from utils.common import PageType, DbEngine
 import app.cs_logger
 from app.models import Base, SubredditPage, Subreddit, Post, ModAction, Experiment
@@ -38,7 +39,6 @@ try:
         experiment_config = yaml.safe_load(f)
 except FileNotFoundError:
     experiment_config = None
-
 
 ### LOAD SQLALCHEMY SESSION
 db_session = DbEngine(config_path).new_session()
@@ -243,7 +243,8 @@ def fetch_twitter_tweets(backfill=False, collection_seconds=None, user_rand_frac
     """
     fill_start_time = datetime.datetime.utcnow() if not fill_start_time else fill_start_time
     log.info("Calling fetch_twitter_tweets, backfill={0}. PID={1}".format(backfill, str(os.getpid())))
-    t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log, experiment_config, json_config)
+    t = app.controllers.twitter_controller.TwitterController(db_session, twitter_conn, log, experiment_config,
+                                                             json_config)
     t.query_and_archive_tweets(backfill=backfill, fill_start_time=fill_start_time,
                                collection_seconds=collection_seconds, user_rand_frac=user_rand_frac)
     twitter_conn.checkin_endpoint()
@@ -272,6 +273,19 @@ def twitter_match_comparison_groups():
     t.match_lumen_and_random_id_users()
     twitter_conn.checkin_endpoint()
     log.info("Finished matching comparison group, PID={0}".format(str(os.getpid())))
+
+
+def generate_twitter_longitudinal_dataset():
+    """
+    Create JP's longitudinal dataset
+    """
+    log.info("Starting to generate longitudinal dataset, PID={0}".format(str(os.getpid())))
+    t = app.controllers.twitter_longitudinal_dataset_controller.TwitterLongitudinalController(db_session, twitter_conn,
+                                                                                              log, experiment_config,
+                                                                                              json_config)
+    t.run()
+    twitter_conn.checkin_endpoint()
+    log.info("Finished generating longitudinal dataset, PID={0}".format(str(os.getpid())))
 
 
 def unshorten_twitter_urls():
