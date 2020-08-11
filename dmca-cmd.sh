@@ -5,18 +5,23 @@ echo "starting with $1 threads"
 echo "launch workers"
 
 #put the rq scheduler in the background
-rqscheduler &
+# without suprevsiord
+# rqscheduler &
+# with supervisord
+supervisord -c /cs/CivilServant/config/supervisord.conf
 
 # the unadorned-queuename queue has just one worker
-rqworker $CS_ENV &
+# without supervisord
+# rqworker $CS_ENV &
+# with supervisord this is already taken care of by call to supervisord
 
 # the tweet filling needs mutliprocessing
-for i in $(seq $1 $END)
-    do
-    echo "Launching concurrent worker $i "
+# for i in $(seq $1 $END)
+#    do
+#    echo "Launching concurrent worker $i "
 #    important to use `rqworker` and not `rq worker` because the stop command kills `rqworker`.
-    rqworker $CS_ENV"_concurrent" &
-    done
+#    rqworker $CS_ENV"_concurrent" &
+#    done
 
 logfile="logs/CivilServant_"$CS_ENV".log"
 echo "logfile is "$logfile
@@ -57,9 +62,11 @@ stop_all(){
 python manage_scheduled_jobs.py purge all
 rq empty $CS_ENV
 rq empty $CS_ENV"_concurrent"
-killall rqworker
-killall rqscheduler
+#killall rqworker
+#killall rqscheduler
+supervisorctl -c /cs/CivilServant/config/supervisord.conf shutdown
 }
+
 
 if [ -z ${1} ];
     then
@@ -84,10 +91,10 @@ fi
 
 echo "Running with CS_ENV=$CS_ENV"
 
-# the second argument represents the number of threads to use, if unset, default to 4.
+# the second argument represents the number of threads to use, if unset, default to 3.
 if [ -z $2 ]
     then
-    n_tasks=4
+    n_tasks=3
     else
     n_tasks=$2
 fi
