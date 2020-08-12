@@ -20,7 +20,6 @@ from utils.common import TwitterUserState, NOT_FOUND_TWITTER_USER_STR, CS_JobSta
 from collections import defaultdict
 
 
-
 class TwitterLongitudinalController(TwitterController):
     def __init__(self, db_session, twitter_conn, log, experiment_config, json_config, rand_min, rand_max):
         super().__init__(db_session, twitter_conn, log, experiment_config, json_config)
@@ -35,13 +34,17 @@ class TwitterLongitudinalController(TwitterController):
         self.out_fields = ['twitter_user_id', 'twitter_user_created_at', 'notice_date', 'language', 'lumen_notice',
                            'date', 'day_num', 'num_lumen_notices', 'prev_lumen_notices', 'num_tweets', 'num_links',
                            'num_civic_links']
-        self.parse_statuses_for_links = json_config['parse_statuses_for_links'] if 'parse_statuses_for_links' in json_config.keys() else False
+        self.parse_statuses_for_links = json_config[
+            'parse_statuses_for_links'] if 'parse_statuses_for_links' in json_config.keys() else False
 
     def get_done_users(self):
         # TODO switch this to redis or make an output table, but going quickly for now
         csvs = [f for f in os.listdir(self.data_dir) if f.endswith('.csv')]
+        within_range_csvs = [f for f in csvs if
+                             f.split('_')[1] == self.rand_min and f.split('_')[3] == self.rand_max]
+        print('within range csvs', within_range_csvs)
         done_users = set()
-        for csv_f in csvs:
+        for csv_f in within_range_csvs:
             with open(os.path.join(self.data_dir, csv_f), 'r') as duf:
                 lg_reader = csv.reader(duf)
                 for row in lg_reader:
@@ -53,7 +56,8 @@ class TwitterLongitudinalController(TwitterController):
         return datetime.date(date.year, date.month, date.day)
 
     def start_user_records_batch(self, batch_id):
-        batch_csv_f = os.path.join(self.data_dir, 'min_{}_max_{}_part_{}.csv'.format(self.rand_min, self.rand_max, batch_id))
+        batch_csv_f = os.path.join(self.data_dir,
+                                   'min_{}_max_{}_part_{}.csv'.format(self.rand_min, self.rand_max, batch_id))
         csv_already_started = os.path.exists(batch_csv_f)
         write_mode = 'a' if csv_already_started else 'w'
         self.batch_csv = open(batch_csv_f, write_mode)
@@ -67,8 +71,6 @@ class TwitterLongitudinalController(TwitterController):
     def write_user_records(self, user_records):
         for user_record in user_records:
             self.batch_csv_writer.writerow(user_record)
-
-
 
     def process_users_batch(self, users, batch_id):
         done_users = self.get_done_users()
@@ -124,8 +126,9 @@ class TwitterLongitudinalController(TwitterController):
             .filter(TwitterStatus.user_id == user_id) \
             .all()
 
-        tweet_just_urls_by_day = defaultdict(set) # counting unique (tweet id, url)s where url is not null
-        tweet_urls_by_day = defaultdict(set)  # (tweet id, url, whitelist info)s for determining is_civic, where url is not null
+        tweet_just_urls_by_day = defaultdict(set)  # counting unique (tweet id, url)s where url is not null
+        tweet_urls_by_day = defaultdict(
+            set)  # (tweet id, url, whitelist info)s for determining is_civic, where url is not null
         tweets_by_day = defaultdict(set)  # counting unique tweet ids
         for t in tweets:
             this_day = self.to_day(t.created_at)
@@ -170,7 +173,7 @@ class TwitterLongitudinalController(TwitterController):
                 prev_lumen_notices=prev_notices,
                 num_tweets=num_tweets,
                 num_links=num_links,
-                num_civic_links=num_civic_links,)
+                num_civic_links=num_civic_links, )
 
             records.append(record)
         return records
@@ -204,4 +207,3 @@ class TwitterLongitudinalController(TwitterController):
             self.process_users_batch(users=batch_users, batch_id=i)
 
         print("writing complete")
-
