@@ -275,14 +275,15 @@ def twitter_match_comparison_groups():
     log.info("Finished matching comparison group, PID={0}".format(str(os.getpid())))
 
 
-def generate_twitter_longitudinal_dataset():
+def generate_twitter_longitudinal_dataset(rand_min=None, rand_max=None):
     """
     Create JP's longitudinal dataset
     """
     log.info("Starting to generate longitudinal dataset, PID={0}".format(str(os.getpid())))
     t = app.controllers.twitter_longitudinal_dataset_controller.TwitterLongitudinalController(db_session, twitter_conn,
                                                                                               log, experiment_config,
-                                                                                              json_config)
+                                                                                              json_config, rand_min,
+                                                                                              rand_max)
     t.run()
     twitter_conn.checkin_endpoint()
     log.info("Finished generating longitudinal dataset, PID={0}".format(str(os.getpid())))

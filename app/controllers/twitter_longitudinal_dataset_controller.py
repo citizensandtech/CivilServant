@@ -22,15 +22,15 @@ from collections import defaultdict
 
 
 class TwitterLongitudinalController(TwitterController):
-    def __init__(self, db_session, twitter_conn, log, experiment_config, json_config):
+    def __init__(self, db_session, twitter_conn, log, experiment_config, json_config, rand_min, rand_max):
         super().__init__(db_session, twitter_conn, log, experiment_config, json_config)
         self.now = datetime.datetime.utcnow()
         self.yesterday = self.now - datetime.timedelta(days=1)
         self.data_dir = self.json_config['data_dir']
         self.done_users = redis.Redis()
-        self.rand_min = json_config['user_rand_frac_min']
-        self.rand_max = json_config['user_rand_frac_max']
-        print('computing users with rand between ({rand_min},{rand_max})')
+        self.rand_min = json_config['user_rand_frac_min'] if rand_min is None else rand_min
+        self.rand_max = json_config['user_rand_frac_max'] if rand_max is None else rand_max
+        print('computing users with rand between ({rand_min},{rand_max})'.format(rand_min=rand_min, rand_max=rand_max))
         self.users_per_csv = json_config['users_per_output_csv'] if 'user_per_output_csv' in json_config.keys() else 100
         self.out_fields = ['twitter_user_id', 'twitter_user_created_at', 'notice_date', 'language', 'lumen_notice',
                            'date', 'day_num', 'num_lumen_notices', 'prev_lumen_notices', 'num_tweets', 'num_links',
@@ -204,3 +204,4 @@ class TwitterLongitudinalController(TwitterController):
             self.process_users_batch(users=batch_users, batch_id=i)
 
         print("writing complete")
+
