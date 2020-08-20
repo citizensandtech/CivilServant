@@ -390,7 +390,9 @@ class TwitterController():
         """
 
         need_snapshot_users = self.db_session.query(TwitterUser).filter(
-            or_(TwitterUser.lang.in_(EXPERIMENT_LANGUAGES), TwitterUser.lang is None)).all()
+            or_(TwitterUser.lang.in_(EXPERIMENT_LANGUAGES), TwitterUser.lang is None)). \
+            filter(TwitterUser.CS_oldest_tweets_archived == utils.common.CS_JobState.PROCESSED.value). \
+            all()
 
         # querying TwitterUserSnapshot is very expensive
         # need_snapshot_user_snapshots = self.db_session.query(
