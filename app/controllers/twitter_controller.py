@@ -389,6 +389,8 @@ class TwitterController():
             doesn't need to update any CS_JobState fields.
         """
 
+        self.db_session.rollback()
+
         need_snapshot_users = self.db_session.query(TwitterUser).filter(
             or_(TwitterUser.lang.in_(EXPERIMENT_LANGUAGES), TwitterUser.lang is None)). \
             filter(TwitterUser.CS_oldest_tweets_archived == utils.common.CS_JobState.PROCESSED.value). \
@@ -513,7 +515,6 @@ class TwitterController():
                             user.lang = user_json["status"]["lang"] if 'status' in user_json.keys() and 'lang' in \
                                                                        user_json['status'].keys() else None
                             user.user_state = user_state.value
-
                             # create TwitterUserSnapshot record
                             user_snapshot_record = TwitterUserSnapshot(
                                 twitter_user_id=uid,
@@ -522,9 +523,9 @@ class TwitterController():
                                 record_created_at=now,
                                 user_state=user_state.value,
                                 user_json=json.dumps(user_json))  # already encoded
-                            self.db_session.add(user_snapshot_record)
+                            self.db_session.add_retryable(user_snapshot_record)
 
-                    except:
+                    except sqlalchemy.exc.InvalidRequestError:
                         self.log.error(
                             "Error while updating TwitterUser, creating TwitterUserSnapshot object for user {0}".format(
                                 user_json["id"]), exc_info=True)
@@ -566,7 +567,7 @@ class TwitterController():
                     twitter_not_found_id=user.not_found_id,
                     record_created_at=now,
                     user_state=user_state.value)
-                self.db_session.add(user_snapshot_record)
+                self.db_session.add_retryable(user_snapshot_record)
 
             except:
                 self.log.error(
