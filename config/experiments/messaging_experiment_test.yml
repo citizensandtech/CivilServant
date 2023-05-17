@@ -17,7 +17,7 @@ test:
               pm_text: Hello, this is the message for arm 2 of the 1st condition.
   controller: MessagingExperimentController
   start_time: 08/16/2015 00:00:00 UTC
-  end_time: 12/30/2020 23:59:59 UTC
+  end_time: 08/16/3015 23:59:59 UTC
   event_hooks:
     test_after_comments:
       is_active: True

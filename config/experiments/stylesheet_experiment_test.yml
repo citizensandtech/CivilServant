@@ -19,7 +19,7 @@ test:
             arm_1: .commentarea .down {visibility:hidden !important;}
   controller: StylesheetExperimentController
   start_time: 06/25/2016 00:00:00 UTC
-  end_time: 12/30/2020 23:59:59 UTC
+  end_time: 06/25/3016 23:59:59 UTC
   intervention_interval_seconds: 86400
   intervention_window_seconds: 3600
   first_n_comments: 5
