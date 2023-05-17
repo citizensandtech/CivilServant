@@ -1,5 +1,5 @@
 import airbrake
-from cloghandler import ConcurrentRotatingFileHandler
+from concurrent_log_handler import ConcurrentRotatingFileHandler
 import os, sys, random, logging
 from time import sleep
 import pathlib

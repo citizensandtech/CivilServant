@@ -9,7 +9,7 @@ rq-dashboard
 mysqlclient
 sqlalchemy
 alembic
-ConcurrentLogHandler
+concurrent-log-handler
 airbrake==1.3.3
 pyyaml
 pytz
