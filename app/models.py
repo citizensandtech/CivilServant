@@ -132,7 +132,7 @@ class PrawKey(Base):
     #   hannahmore:development:FrontPageController
     id                  = Column(String(256), primary_key = True)
     created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)
-    access_token        = Column(String(256))
+    access_token        = Column(String(2048))
     scope               = Column(String(256)) #json
     refresh_token       = Column(String(256))
     authorized_username = Column(String(256), index=True)
