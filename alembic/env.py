@@ -80,7 +80,7 @@ def run_migrations_offline():
         with open(file_, 'w') as buffer:
             context.configure(url=rec['url'], output_buffer=buffer,
                               target_metadata=target_metadata.get(name),
-                              literal_binds=True)
+                              literal_binds=True, compare_type=True)
             with context.begin_transaction():
                 context.run_migrations(engine_name=name)
 
@@ -120,7 +120,8 @@ def run_migrations_online():
                 connection=rec['connection'],
                 upgrade_token="%s_upgrades" % name,
                 downgrade_token="%s_downgrades" % name,
-                target_metadata=target_metadata.get(name)
+                target_metadata=target_metadata.get(name),
+                compare_type=True
             )
             context.run_migrations(engine_name=name)
 
