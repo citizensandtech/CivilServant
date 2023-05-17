@@ -12,6 +12,19 @@ CONFIG_PATH = str(CONFIG_PATH.resolve())
 LOCK_TIMEOUT = 2
 
 
+def acquire_locked_resource(resource, experiment_id):
+    # This function should only be called inside validate_resource_is_locked.
+    # It purposefully uses its own database session rather than the one
+    # provided by the session fixture since this function will be run inside a
+    # child process and RetryableDbSession as an argument isn't picklable.
+    session = DbEngine(CONFIG_PATH).new_session()
+    session.query(ResourceLock).with_for_update().filter_by(
+        resource=resource,
+        experiment_id=experiment_id
+    ).all()
+    session.close()
+
+
 def cleanup_session(session):
     session.query(Experiment).delete()
     session.query(ResourceLock).delete()
@@ -42,12 +55,10 @@ def validate_resource_is_locked(session, resource, experiment_id):
     # the exception won't work since nowait is ignored in MySQL 5.7. This will
     # work fine so long as two different test cases don't attempt to use the
     # same resource name.
-    def acquire_locked_resource():
-        query = session.query(ResourceLock).with_for_update().filter_by(
-            resource=resource,
-            experiment_id=experiment_id
-        ).all()
-    worker = Process(target=acquire_locked_resource)
+    worker = Process(
+        target = acquire_locked_resource,
+        args = (resource, experiment_id)
+    )
     worker.start()
     worker.join(LOCK_TIMEOUT)
     assert worker.is_alive()
