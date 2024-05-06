@@ -3,6 +3,7 @@ import os
 from mock import Mock, patch
 #import simplejson as json
 import json
+import praw
 import sqlalchemy
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -44,7 +45,7 @@ def teardown_function(function):
     clear_all_tables()
 
 @patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Subreddit', autospec=True)    
+@patch('praw.models.Subreddit', autospec=True)    
 def test_archive_reddit_front_page(mock_subreddit, mock_reddit):
     ### TEST THE MOCK SETUP AND MAKE SURE IT WORKS
     ## TODO: I should not be mocking SQLAlchemy
@@ -54,14 +55,15 @@ def test_archive_reddit_front_page(mock_subreddit, mock_reddit):
     log = app.cs_logger.get_logger(ENV, BASE_DIR)
 
     with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
-        sub_data = json.loads(f.read())['data']['children']
-    mock_subreddit.get_top.return_value = sub_data
-    mock_subreddit.get_controversial.return_value = sub_data
-    mock_subreddit.get_new.return_value = sub_data
-    mock_subreddit.get_hot.return_value = sub_data  
+        sub_data = [child['data'] for child in json.loads(f.read())['data']['children']]
+    mock_subreddit.top.return_value = sub_data
+    mock_subreddit.controversial.return_value = sub_data
+    mock_subreddit.new.return_value = sub_data
+    mock_subreddit.hot.return_value = sub_data  
     patch('praw.')
 
-    r.get_subreddit.return_value = mock_subreddit   
+    r.subreddit = Mock(praw.models.helpers.SubredditHelper)
+    r.subreddit.return_value = mock_subreddit   
 
     
     assert len(db_session.query(FrontPage).all()) == 0
@@ -88,14 +90,12 @@ def test_archive_reddit_front_page(mock_subreddit, mock_reddit):
     new_pages = db_session.query(FrontPage).filter(FrontPage.page_type == PageType.HOT.value)
     assert new_pages.count() == 1  
 
-
-
 """
   basic test for method archive_subreddit_page to insert timestamped pages to subreddit_pages table.
   analogous to test_archive_reddit_front_page.
 """
 @patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Subreddit', autospec=True)    
+@patch('praw.models.Subreddit', autospec=True)    
 def test_archive_subreddit_page(mock_subreddit, mock_reddit):
     ### TODO: TEST THE MOCK SETUP WITH AN ACTUAL QUERY
 
@@ -116,10 +116,10 @@ def test_archive_subreddit_page(mock_subreddit, mock_reddit):
             postobj = json2obj(json_dump)
             sub_data.append(postobj)
 
-    mock_subreddit.get_top.return_value = sub_data
-    mock_subreddit.get_controversial.return_value = sub_data
-    mock_subreddit.get_new.return_value = sub_data
-    mock_subreddit.get_hot.return_value = sub_data  
+    mock_subreddit.top.return_value = sub_data
+    mock_subreddit.controversial.return_value = sub_data
+    mock_subreddit.new.return_value = sub_data
+    mock_subreddit.hot.return_value = sub_data  
     patch('praw.')
 
     mock_subreddit.display_name = test_subreddit_name
@@ -154,7 +154,7 @@ def test_archive_subreddit_page(mock_subreddit, mock_reddit):
 
 
 @patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Subreddit', autospec=True)    
+@patch('praw.models.Subreddit', autospec=True)    
 def test_archive_subreddit(mock_subreddit, mock_reddit):
     test_subreddit_name = "science"
     test_subreddit_id = "mouw"
@@ -218,7 +218,7 @@ def test_archive_post(mock_reddit):
     assert len(all_posts) == 1
 
 @patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Submission', autospec=True)    
+@patch('praw.models.Submission', autospec=True)    
 def test_fetch_post_comments(mock_submission, mock_reddit):
     with open("{script_dir}/fixture_data/post2.json".format(script_dir=TEST_DIR)) as f:
         post = json.loads(f.read())
@@ -257,7 +257,7 @@ def test_fetch_post_comments(mock_submission, mock_reddit):
 
 
 @patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Submission', autospec=True)    
+@patch('praw.models.Submission', autospec=True)    
 def test_archive_all_missing_subreddit_post_comments(mock_submission, mock_reddit):
 
     ## SET UP MOCKS 
@@ -378,7 +378,7 @@ def test_archive_mod_action_page(mock_reddit):
     assert last_action_id == mod_action_fixtures[1][-1]['id']
 
 @patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Submission', autospec=True)    
+@patch('praw.models.Submission', autospec=True)    
 def test_fetch_post_comments(mock_submission, mock_reddit):
     with open("{script_dir}/fixture_data/post2.json".format(script_dir=TEST_DIR)) as f:
         post = json.loads(f.read())
@@ -416,7 +416,7 @@ def test_fetch_post_comments(mock_submission, mock_reddit):
 
 
 @patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Submission', autospec=True)    
+@patch('praw.models.Submission', autospec=True)    
 def test_archive_all_missing_subreddit_post_comments(mock_submission, mock_reddit):
 
     ## SET UP MOCKS 

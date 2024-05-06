@@ -19,9 +19,6 @@ class PrawPatch:
         self.path = Path(PRAW_DIFFS_DIR, self.version)
         
         self.diffs = list(self.path.rglob("*.diff"))
-        if not self.diffs:
-            raise PrawPatchException("no patch created for praw " + self.version)
-        
         self.diffs_unapplied = [d for d in self.diffs if not self._diff_applied(d)]
 
     def __repr__(self):

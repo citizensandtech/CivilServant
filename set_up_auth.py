@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 ## THIS SCRIPT GATHERS ACCESS INFORMATION
 ## INCLUDING A REFRESH KEY FROM REDDIT
 
@@ -5,25 +7,30 @@
 # http://praw.readthedocs.io/en/stable/pages/oauth.html
 
 import praw
-import webbrowser
 import pickle
-import sys
-import simplejson as json
 import os
 
 env =  os.environ['CS_ENV']
 
 r = praw.Reddit(user_agent="Test version of CivilServant by u/natematias")
+scopes = ["identity", "read", "modlog", "modposts", "submit", "modconfig", "flair", "privatemessages"]
+url = r.auth.url(scopes=scopes, state="uniqueKey", duration="permanent")
 
-url = r.get_authorize_url('uniqueKey', 'identity read modlog modposts submit modconfig flair privatemessages', True)
+print("Please visit the following URL and click Allow:")
 print(url)
-print("After you accept permission, please enter the code from the redirect_url")
-code = input("Enter the text after 'code='\n")
-access_information = r.get_access_information(code)
-pickle.dump(access_information, open("config/access_information_{environment}.pickle".format(environment=env), "wb"))
-#r.set_access_credentials(**access_information)
-#print code
-#print access_information
+print("After you give your permission, please enter the code from the redirect_url.")
+access_token = input("Enter the text after 'code=':\n")
+access_token = access_token.replace("#_", "")
+refresh_token = r.auth.authorize(access_token)
 
-print( "config/access_information_{environment}.pickle created".format(environment=env) )
-print
+import code; code.interact(local=locals())
+
+with open("config/access_information_{environment}.pickle".format(environment=env), "wb") as f:
+    access_information = {
+        'access_token': access_token,
+        'refresh_token': refresh_token,
+        'scope': r.auth.scopes()
+    }
+    pickle.dump(access_information, f)
+
+print("config/access_information_{environment}.pickle created\n".format(environment=env))

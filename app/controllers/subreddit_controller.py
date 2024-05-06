@@ -7,7 +7,7 @@ import reddit.praw_utils as praw_utils
 import reddit.queries
 import sqlalchemy
 import app.event_handler
-from utils.common import PageType
+from utils.common import PageType, thing2dict
 from app.models import Base, SubredditPage, Subreddit, Post, User
 
 class SubredditPageController:
@@ -20,19 +20,19 @@ class SubredditPageController:
         self.fetched_subreddit_id = None
   
     def fetch_subreddit_page(self, pg_type, limit=300, return_praw_object=False):
-        sub = self.r.get_subreddit(self.subname)
+        sub = self.r.subreddit(self.subname)
         self.fetched_subreddit_id = sub.id
 
         # fetch subreddit posts from reddit
         try:
             if pg_type==PageType.TOP:
-                self.fetched_posts = sub.get_top(limit=limit)
+                self.fetched_posts = sub.top(limit=limit)
             elif pg_type==PageType.CONTR:
-                self.fetched_posts = sub.get_controversial(limit=limit)
+                self.fetched_posts = sub.controversial(limit=limit)
             elif pg_type==PageType.NEW:
-                self.fetched_posts = sub.get_new(limit=limit)   
+                self.fetched_posts = sub.new(limit=limit)   
             elif pg_type==PageType.HOT:
-                self.fetched_posts = sub.get_hot(limit=limit)   
+                self.fetched_posts = sub.hot(limit=limit)   
         except:
             self.log.error("Error querying /r/{0} {1} page: {2}".format(self.subname, pg_type.name, str(e)))
             return []         
@@ -49,7 +49,8 @@ class SubredditPageController:
         json_posts = []
         try:
             for post in self.fetched_posts:
-                new_post = post.json_dict #if("json_dict" in dir(post)) else post['data'] ### TO HANDLE TEST FIXTURES
+                #new_post = post.json_dict #if("json_dict" in dir(post)) else post['data'] ### TO HANDLE TEST FIXTURES
+                new_post = thing2dict(post)
                 pruned_post = {
                     'id': new_post['id'],
                     'author': new_post['author'],
@@ -62,8 +63,9 @@ class SubredditPageController:
                     'created_utc':new_post['created_utc']
                 }
                 json_posts.append(pruned_post)
-                is_new_post = self.archive_post(post.json_dict)
-                is_new_user = self.archive_user(pruned_post['author'], datetime.datetime.fromtimestamp(post.created))
+                #is_new_post = self.archive_post(post.json_dict)
+                is_new_post = self.archive_post(new_post)
+                is_new_user = self.archive_user(pruned_post['author']['name'], datetime.datetime.fromtimestamp(post.created))
             self.log.info("Saved posts from /r/{0} {1} page.".format(self.subname, pg_type.name))
         except sqlalchemy.exc.IntegrityError as e:
             self.log.info("Error Saving posts from /r/{0} {1} page: {2}".format(self.subname, pg_type.name, str(e)))

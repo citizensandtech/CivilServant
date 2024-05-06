@@ -5,7 +5,7 @@ import datetime
 import reddit.connection
 import reddit.praw_utils as praw_utils
 import reddit.queries
-from utils.common import PageType
+from utils.common import PageType, thing2dict
 from app.models import Base, FrontPage
 from app.event_handler import event_handler, initialize_callee_controllers
 import app.event_handler
@@ -17,7 +17,7 @@ class FrontPageController:
     self.db_session = db_session
     self.log = log
     self.r = r
-    self.all_sub = self.r.get_subreddit(ALL_SUBREDDIT_NAME)
+    self.all_sub = self.r.subreddit(ALL_SUBREDDIT_NAME)
 
     # for event_handler, a list of praw post submission objects, set in fetch_reddit_front_page
     self.posts = []
@@ -34,20 +34,21 @@ class FrontPageController:
 
       try:
         if pg_type==PageType.TOP:
-            fetched = self.all_sub.get_top(limit=limit)
+            fetched = self.all_sub.top(limit=limit)
         elif pg_type==PageType.CONTR:
-            fetched = self.all_sub.get_controversial(limit=limit)
+            fetched = self.all_sub.controversial(limit=limit)
         elif pg_type==PageType.NEW:
-            fetched = self.all_sub.get_new(limit=limit)
+            fetched = self.all_sub.new(limit=limit)
         elif pg_type==PageType.HOT:
-            fetched = self.all_sub.get_hot(limit=limit)            
+            fetched = self.all_sub.hot(limit=limit)            
       except:
         self.log.error("Error querying reddit {0} page".format(pg_type.name), extra=sys.exc_info()[0] )
         print(sys.exc.info()[0])
         return []
 
       for post in fetched:
-          new_post = post.json_dict if("json_dict" in dir(post)) else post['data'] ### TO HANDLE TEST FIXTURES
+          #new_post = post.json_dict if("json_dict" in dir(post)) else post['data'] ### TO HANDLE TEST FIXTURES
+          new_post = thing2dict(post)
           self.posts.append(post)
           pruned_post = {
             'id': new_post['id'],

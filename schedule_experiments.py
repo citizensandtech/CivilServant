@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from redis import Redis
 from rq_scheduler import Scheduler
 from datetime import datetime

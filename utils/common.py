@@ -136,6 +136,25 @@ def json2obj(data, now=False, offset=0):
     object_hook = lambda dobj: _json_object_hook(dobj, now, offset)
     return json.loads(data, object_hook=object_hook)
 
+def thing2dict(thing, recursive=True):
+    # Newer versions of praw no longer store any form of their raw JSON on the
+    # individual objects, so this is a workaround to retroactively produce a
+    # field akin to how "data" and  "json_dict" were used previously. This
+    # presumes a deep conversion is needed since individual properties may
+    # themselves be praw objects.
+    # e.g. when type(submission_dict['author']) == Redditor, etc.
+    if not hasattr(thing, '__dict__'):
+         return thing
+    d = vars(thing)
+    if recursive:
+        from praw.models.reddit.base import RedditBase
+        for k, v in d.items():
+            if isinstance(v, RedditBase):
+                d[k] = thing2dict(v, recursive)
+    if '_reddit' in d:
+        del d['_reddit']
+    return d
+
 class CommentNode:
 	def __init__(self, id, data, link_id = None, toplevel = False, parent=None):
 		self.id = id

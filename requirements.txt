@@ -1,4 +1,4 @@
-praw==3.5.0
+praw==7.7.1
 pytest
 mock
 simplejson

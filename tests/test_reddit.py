@@ -33,32 +33,34 @@ def teardown_function(function):
 
 ### TEST THE MOCK SETUP AND MAKE SURE IT WORKS
 @patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Subreddit', autospec=True)
+@patch('praw.models.Subreddit', autospec=True)
 def test_mock_setup(mock_subreddit, mock_reddit):
     r = mock_reddit.return_value
     mock_subreddit.display_name = "science"
     with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
-        mock_subreddit.get_new.return_value = json.loads(f.read())['data']['children']
-    r.get_subreddit.return_value = mock_subreddit    
+        mock_subreddit.new.return_value = json.loads(f.read())['data']['children']
+    r.subreddit = Mock(praw.models.helpers.SubredditHelper)
+    r.subreddit.return_value = mock_subreddit    
     patch('praw.')
 
     ## NOW START THE TEST
-    sub = r.get_subreddit("science")
+    sub = r.subreddit("science")
  
     assert sub.display_name == "science"
-    assert len(sub.get_new(limit=100)) == 100
+    assert len(sub.new(limit=100)) == 100
 
 ### TEST THE MOCK SETUP WITH AN ACTUAL QUERY
 ### IN A WAY THAT BYPASSES THE FUNCTIONALITY
 ### OF THE app.reddit.Connect CLASS
 @patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Subreddit', autospec=True)    
+@patch('praw.models.Subreddit', autospec=True)    
 def test_get_new_as_dict(mock_subreddit, mock_reddit):
     r = mock_reddit.return_value
     mock_subreddit.display_name = "science"
     with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
-        mock_subreddit.get_new.return_value = json.loads(f.read())['data']['children']
-    r.get_subreddit.return_value = mock_subreddit    
+        mock_subreddit.new.return_value = json.loads(f.read())['data']['children']
+    r.subreddit = Mock(praw.models.helpers.SubredditHelper)
+    r.subreddit.return_value = mock_subreddit    
     patch('praw.')
 
     ## NOW START THE TEST
