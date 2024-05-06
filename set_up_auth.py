@@ -23,8 +23,6 @@ access_token = input("Enter the text after 'code=':\n")
 access_token = access_token.replace("#_", "")
 refresh_token = r.auth.authorize(access_token)
 
-import code; code.interact(local=locals())
-
 with open("config/access_information_{environment}.pickle".format(environment=env), "wb") as f:
     access_information = {
         'access_token': access_token,
