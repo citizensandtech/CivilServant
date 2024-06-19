@@ -6,10 +6,11 @@ Make commands for development!
 config - copy config files for development
 
 docker-build - rebuild civilservant Docker image
-docker-up - start Docker containers
-docker-logs - tail Docker container logs
-docker-down - stop Docker containers
+docker-shell - open a Bash shell
 docker-test - run tests in Docker environment
+docker-logs - tail Docker container logs
+docker-up - start Docker containers
+docker-down - stop Docker containers
 endef
 export HELP_TEXT
 	
@@ -40,6 +41,9 @@ docker-down:
 
 docker-logs:
 	docker compose logs -f
+
+docker-shell: docker-up
+	docker compose exec app bash
 
 docker-test: docker-up
 	docker compose exec app py.test tests

@@ -18,9 +18,13 @@ services:
       MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
       MYSQL_ROOT_PASSWORD: ""
     volumes:
+      - mysql-data:/var/data/mysql
       - ./docker/create_databases.sql:/docker-entrypoint-initdb.d/create_databases.sql
     healthcheck:
       test:
         ["CMD", "mysql", "-u", "root", "-e", "USE civilservant_development;"]
       start_period: 20s
       interval: 5s
+
+volumes:
+  mysql-data:
