@@ -46,8 +46,7 @@ docker-shell: docker-up
 	docker compose exec app bash
 
 docker-test: docker-up
-	docker compose exec app py.test tests
+	docker compose exec app bash -c 'CS_ENV=test py.test tests'
 
 docker-up:
 	docker compose up -d --wait
-
