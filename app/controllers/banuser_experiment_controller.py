@@ -17,33 +17,17 @@ from app.controllers.experiment_controller import *
 from collections import defaultdict
 
 ### DESCRIPTION OF THIS EXPERIMENT CONTROLLER
-# This experiment controller should observe commenters identified by
-# A set of criteria and should randomly assign those commenters to
-# receive a private message. Then, survey_followup_in_days later,
-# accounts that were in the experiment should receive a further
-# private message that includes a followup survey.
+# This experiment controller should ..
 
 #### CALLBACK BEHAVIOR: enroll_new_participants
-## 1. enroll new participants
-## 2. check eligibility from newcomer perspective (r/feminism only)
-## 3. check eligibility based on previous participation in the experiment (r/feminism and r/iama)
-## 4. assign a participant to a condition in the experiment
-##    and label the participant as not having yet received an intervention
+## 1. ....
 
 #### REGULARLY SCHEDULED JOB BEHAVIOR (intervention): update_experiment
-## 1. find participants that haven't received a condition action (including control group)
-## 2. take the appropriate condition action
-## 3. record the condition action and flag them as having received the condition
-## 4. If the account is nonexistent, record that they were ineligible
+## 1....
 
 #### REGULARLY SCHEDULED POST-STUDY SURVEY BEHAVIOR (followup): (run from update_experiment)
-## 1. Identify participants who are eligible to receive a survey and who haven't
-## 2. Send them a survey, or if that fails, record that they couldn't receive it
+## 1. ...
 
-## NOTE: The Message Controller stores a MessageLog whenever we *attempt* to send a message
-##       ExperimentActions should only be stored when we take an action we do not intend to retry
-##       If we intend to retry an action, do not store an ExperimentAction about it and it will be
-##       tried again
 
 ### LOAD ENVIRONMENT VARIABLES
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), "..","..")
@@ -106,15 +90,16 @@ class BanuserExperimentController(ExperimentController):
             self: an instance of callee class
             instance: an instance of caller class
     """
-    ## ENROLL_NEW_PARTICIPANTS:
-    # Listen to callback and process new comments acquired.
-    # Identify commenters in those comments, and start the
+    ## FIND_BANNED_USERS:
+    # Listen to callback and process new mod actions acquired.
+    # Identify banned users in those mod actions, and start the
     # process of determining if they are eligible to be enrolled
     # in the study
-    ## Called from CommentController.fetch_last_thousand_comments
-    def enroll_new_participants(self, instance):
-        if(instance.last_subreddit_id != self.experiment_settings['subreddit_id']):
+    ## Called after ModeratorController.archive_mod_action_page
+
+    def find_banned_users(self, instance):
+        if(instance.fetched_subreddit_id != self.experiment_settings['subreddit_id']):
             return
-        self.log.info("Successfully Ran Event Hook to BanuserExperimentController::enroll_new_participants. Caller: {0}".format(str(instance)))
+        self.log.info("Successfully Ran Event Hook to BanuserExperimentController::find_banned_users. Caller: {0}".format(str(instance)))
 
 

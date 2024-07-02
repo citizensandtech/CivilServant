@@ -1,6 +1,6 @@
 test:
   subreddit: CivilServantBot2
-  subreddit_id: 3n1tq
+  subreddit_id: mouw
   username: CivilServantBot
   conditions: 
     main:
@@ -16,14 +16,14 @@ test:
               pm_subject: PM Subject Line (Arm 2)
               pm_text: Hello, this is the message for arm 2 of the 1st condition.
   controller: BanuserExperimentController
-  start_time: 08/16/2015 00:00:00 UTC
-  end_time: 08/16/3015 23:59:59 UTC
+  start_time: 07/02/2024 00:00:00 UTC
+  end_time: 07/02/3024 23:59:59 UTC
   event_hooks:
     test_after_comments:
       is_active: True
       call_when: EventWhen.AFTER
-      caller_controller: CommentController
-      caller_method: archive_last_thousand_comments
+      caller_controller: ModeratorController
+      caller_method: archive_mod_action_page
       callee_module: app.controllers.banuser_experiment_controller
       callee_controller: BanuserExperimentController
-      callee_method: enroll_new_participants
+      callee_method: find_banned_users 
