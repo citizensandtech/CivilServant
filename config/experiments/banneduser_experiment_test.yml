@@ -15,7 +15,7 @@ test:
               reason_text: This is arm 2 of the 1st condition
               pm_subject: PM Subject Line (Arm 2)
               pm_text: Hello, this is the message for arm 2 of the 1st condition.
-  controller: BanuserExperimentController
+  controller: BanneduserExperimentController
   start_time: 07/02/2024 00:00:00 UTC
   end_time: 07/02/3024 23:59:59 UTC
   event_hooks:
@@ -24,6 +24,6 @@ test:
       call_when: EventWhen.AFTER
       caller_controller: ModeratorController
       caller_method: archive_mod_action_page
-      callee_module: app.controllers.banuser_experiment_controller
-      callee_controller: BanuserExperimentController
+      callee_module: app.controllers.banneduser_experiment_controller
+      callee_controller: BanneduserExperimentController
       callee_method: find_banned_users 

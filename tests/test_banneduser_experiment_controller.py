@@ -14,7 +14,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import and_, or_
 import glob, datetime, time, pytz, math, random, copy
-from app.controllers.banuser_experiment_controller import *
+from app.controllers.banneduser_experiment_controller import *
 import app.controllers.comment_controller
 import app.controllers.moderator_controller
 
@@ -60,7 +60,7 @@ def test_initialize_experiment(mock_reddit):
     ## NOTE: The callback will create a new instance of 
     ##       MessagingExperimentController, so you should
     ##       not examine the state of this object for tests
-    mec = BanuserExperimentController("banuser_experiment_test", db_session, r, log)
+    mec = BanneduserExperimentController("banneduser_experiment_test", db_session, r, log)
     subreddit_name = mec.experiment_settings['subreddit']
     subreddit_id = mec.experiment_settings['subreddit_id']
 
@@ -120,7 +120,7 @@ def test_initialize_experiment(mock_reddit):
         with open(log_filename, "r") as f:
             for line in f:
                 last_log_line = line
-        assert last_log_line.find("BanuserExperimentController::find_banned_users") > -1
+        assert last_log_line.find("BanneduserExperimentController::find_banned_users") > -1
     else:
         ## IF THERE'S NO CONCURRENT ROTATING FILE HANDLER
         ## RETURN FALSE
