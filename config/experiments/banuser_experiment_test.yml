@@ -1,0 +1,29 @@
+test:
+  subreddit: CivilServantBot2
+  subreddit_id: 3n1tq
+  username: CivilServantBot
+  conditions: 
+    main:
+        randomizations: messaging_experiment_test_main.conditions.csv
+        next_randomization: 0
+        arms:
+            arm_0: null
+            arm_1: 
+              pm_subject: PM Subject Line (Arm 1)
+              pm_text: Hello, this is the message for arm 1 of the 1st condition.
+            arm_2: 
+              reason_text: This is arm 2 of the 1st condition
+              pm_subject: PM Subject Line (Arm 2)
+              pm_text: Hello, this is the message for arm 2 of the 1st condition.
+  controller: BanuserExperimentController
+  start_time: 08/16/2015 00:00:00 UTC
+  end_time: 08/16/3015 23:59:59 UTC
+  event_hooks:
+    test_after_comments:
+      is_active: True
+      call_when: EventWhen.AFTER
+      caller_controller: CommentController
+      caller_method: archive_last_thousand_comments
+      callee_module: app.controllers.banuser_experiment_controller
+      callee_controller: BanuserExperimentController
+      callee_method: enroll_new_participants
