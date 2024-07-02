@@ -79,10 +79,8 @@ def test_initialize_experiment(mock_reddit):
         modaction_fixtures.append(json.loads(f.read()))
         f.close()
 
-    print(len(modaction_fixtures))
-    print(len(modaction_fixtures[0]))
-
     m = Mock()
+    # Fixture data is broken up like this to allow testing of API 'pagination'
     m.side_effect = [modaction_fixtures[0][0:100],
                      modaction_fixtures[0][100:200],
                      modaction_fixtures[0][200:300],
