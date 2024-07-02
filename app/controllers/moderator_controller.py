@@ -23,6 +23,7 @@ class ModeratorController:
     # returns the last action id, for paging purposes
     @app.event_handler.event_handler
     def archive_mod_action_page(self, after_id=None):
+
         if(after_id):
             self.log.info("Querying moderation log for {subreddit}, after_id = {after_id}".format(
                 subreddit=self.subreddit, after_id = after_id))
@@ -34,6 +35,7 @@ class ModeratorController:
             first_ma = self.fetched_mod_actions[0]
             src_dict = getattr(first_ma, 'json_dict', first_ma)
             self.fetched_subreddit_id = src_dict['sr_id36']
+
         action_dicts = []
         for action in self.fetched_mod_actions:
             if("json_dict" in dir(action)):

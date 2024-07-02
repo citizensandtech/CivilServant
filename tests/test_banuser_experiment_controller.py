@@ -16,6 +16,7 @@ from sqlalchemy import and_, or_
 import glob, datetime, time, pytz, math, random, copy
 from app.controllers.banuser_experiment_controller import *
 import app.controllers.comment_controller
+import app.controllers.moderator_controller
 
 from utils.common import *
 from dateutil import parser
@@ -37,6 +38,7 @@ def clear_all_tables():
     db_session.query(Subreddit).delete()
     db_session.query(Post).delete()
     db_session.query(User).delete()
+    db_session.query(ModAction).delete()
     db_session.query(Comment).delete()
     db_session.query(Experiment).delete()
     db_session.query(ExperimentThing).delete()
@@ -71,34 +73,37 @@ def test_initialize_experiment(mock_reddit):
         name = subreddit_name))
     db_session.commit()
 
-    comment_fixtures = []
-    for filename in sorted(glob.glob("{script_dir}/fixture_data/comments*".format(script_dir=TEST_DIR))):
+    modaction_fixtures = []
+    for filename in sorted(glob.glob("{script_dir}/fixture_data/mod_actions*".format(script_dir=TEST_DIR))):
         f = open(filename, "r")
-        comment_fixtures.append(json.loads(f.read()))
+        modaction_fixtures.append(json.loads(f.read()))
         f.close()
 
+    print(len(modaction_fixtures))
+    print(len(modaction_fixtures[0]))
+
     m = Mock()
-    m.side_effect = [comment_fixtures[0][0:100],
-                     comment_fixtures[0][100:200],
-                     comment_fixtures[0][200:300],
-                     comment_fixtures[0][300:400],
-                     comment_fixtures[0][400:500],
-                     comment_fixtures[0][500:600],
-                     comment_fixtures[0][600:700],
-                     comment_fixtures[0][700:800],
-                     comment_fixtures[0][800:900],
-                     comment_fixtures[0][900:], 
+    m.side_effect = [modaction_fixtures[0][0:100],
+                     modaction_fixtures[0][100:200],
+                     modaction_fixtures[0][200:300],
+                     modaction_fixtures[0][300:400],
+                     modaction_fixtures[0][400:500],
+                     modaction_fixtures[0][500:600],
+                     modaction_fixtures[0][600:700],
+                     modaction_fixtures[0][700:800],
+                     modaction_fixtures[0][800:900],
+                     modaction_fixtures[0][900:], 
                      []]
 
-    r.get_comments = m
+    r.get_mod_log = m
     patch('praw.')
     ##### END SETUP
-
-    ## RECEIVE INCOMING COMMENTS (SUBREDDIT MATCH)
-    cc = app.controllers.comment_controller.CommentController(db_session, r, log)
-    assert db_session.query(Comment).count() == 0
-    cc.archive_last_thousand_comments(subreddit_name)
-    assert db_session.query(Comment).count() == len(comment_fixtures[0])
+        
+    ## RECEIVE INCOMING MODACTIONS (SUBREDDIT MATCH)
+    cc = app.controllers.moderator_controller.ModeratorController(subreddit_name, db_session, r, log)
+    assert db_session.query(ModAction).count() == 0
+    cc.archive_mod_action_page()
+    assert db_session.query(ModAction).count() == len(modaction_fixtures[0])
     
     ## NOW CHECK WHETHER THE EVENT HOOK WAS CALLED
     ## BY EXAMINING THE LOG
