@@ -26,17 +26,19 @@ import app.cs_logger
 
 
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
-BASE_DIR  = os.path.join(TEST_DIR, "../")
+BASE_DIR = os.path.join(TEST_DIR, "../")
 
 
 @pytest.fixture
 def db_session():
-    config_file = os.path.join(BASE_DIR, "config", f"{ENV}.json") 
+    config_file = os.path.join(BASE_DIR, "config", f"{ENV}.json")
     return DbEngine(config_file).new_session()
+
 
 @pytest.fixture
 def logger():
     return app.cs_logger.get_logger(ENV, BASE_DIR)
+
 
 def _clear_all_tables(db_session):
     db_session.execute("UNLOCK TABLES")
@@ -52,13 +54,15 @@ def _clear_all_tables(db_session):
     db_session.query(ExperimentAction).delete()
     db_session.query(ExperimentThingSnapshot).delete()
     db_session.query(EventHook).delete()
-    db_session.commit()    
+    db_session.commit()
+
 
 @pytest.fixture(autouse=True)
 def with_setup_and_teardown(db_session):
     _clear_all_tables(db_session)
     yield
     _clear_all_tables(db_session)
+
 
 @pytest.fixture
 def modaction_fixtures():
@@ -68,48 +72,65 @@ def modaction_fixtures():
             fixtures.append(json.load(f))
     return fixtures
 
+
 @pytest.fixture
 def reddit_return_value(modaction_fixtures):
-    with patch('praw.Reddit', autospec=True) as mock_reddit:
+    with patch("praw.Reddit", autospec=True) as mock_reddit:
         r = mock_reddit.return_value
-        
+
         m = Mock()
         # Fixture data is broken up like this to allow testing of API 'pagination'
-        m.side_effect = [modaction_fixtures[0][0:100],
-                         modaction_fixtures[0][100:200],
-                         modaction_fixtures[0][200:300],
-                         modaction_fixtures[0][300:400],
-                         modaction_fixtures[0][400:500],
-                         modaction_fixtures[0][500:600],
-                         modaction_fixtures[0][600:700],
-                         modaction_fixtures[0][700:800],
-                         modaction_fixtures[0][800:900],
-                         modaction_fixtures[0][900:], 
-                         []]
+        m.side_effect = [
+            modaction_fixtures[0][0:100],
+            modaction_fixtures[0][100:200],
+            modaction_fixtures[0][200:300],
+            modaction_fixtures[0][300:400],
+            modaction_fixtures[0][400:500],
+            modaction_fixtures[0][500:600],
+            modaction_fixtures[0][600:700],
+            modaction_fixtures[0][700:800],
+            modaction_fixtures[0][800:900],
+            modaction_fixtures[0][900:],
+            [],
+        ]
         r.get_mod_log = m
 
         return r
 
+
 @pytest.fixture
 def experiment_controller(db_session, reddit_return_value, logger):
-    c = BanneduserExperimentController("banneduser_experiment_test", db_session, reddit_return_value, logger)
+    c = BanneduserExperimentController(
+        "banneduser_experiment_test", db_session, reddit_return_value, logger
+    )
 
-    db_session.add(Subreddit( id = c.experiment_settings['subreddit_id'], name = c.experiment_settings['subreddit']))
+    db_session.add(
+        Subreddit(
+            id=c.experiment_settings["subreddit_id"],
+            name=c.experiment_settings["subreddit"],
+        )
+    )
     db_session.commit()
 
     return c
 
+
 @pytest.fixture
 def moderator_controller(subreddit_name, db_session, reddit_return_value, logger):
-    return app.controllers.moderator_controller.ModeratorController(subreddit_name, db_session, reddit_return_value, logger)
+    return app.controllers.moderator_controller.ModeratorController(
+        subreddit_name, db_session, reddit_return_value, logger
+    )
+
 
 @pytest.fixture
 def subreddit_name(experiment_controller):
-    return experiment_controller.experiment_settings['subreddit']
+    return experiment_controller.experiment_settings["subreddit"]
+
 
 @pytest.fixture
 def subreddit_id(experiment_controller):
-    return experiment_controller.experiment_settings['subreddit_id']
+    return experiment_controller.experiment_settings["subreddit_id"]
+
 
 @pytest.fixture
 def log_filename(logger):
@@ -122,6 +143,7 @@ def log_filename(logger):
         assert False
     return handler.baseFilename
 
+
 def _assert_logged(log_filename, text):
     last_log_line = ""
     with open(log_filename, "r") as f:
@@ -130,13 +152,16 @@ def _assert_logged(log_filename, text):
         last_log_line = line
     assert text in last_log_line
 
-def test_modaction_archive(moderator_controller, db_session, modaction_fixtures, log_filename):
+
+def test_modaction_archive(
+    moderator_controller, db_session, modaction_fixtures, log_filename
+):
     assert db_session.query(ModAction).count() == 0
 
     moderator_controller.archive_mod_action_page()
 
-    #assert db_session.query(ModAction).count() == len(modaction_fixtures[0])
+    # assert db_session.query(ModAction).count() == len(modaction_fixtures[0])
     ### TODO: TEMPORARY TEST - this is because moderator_controller only will retrieve the first 'page' of results
     assert db_session.query(ModAction).count() == len(modaction_fixtures[0][0:100])
-    
+
     _assert_logged(log_filename, "BanneduserExperimentController::find_banned_users")
