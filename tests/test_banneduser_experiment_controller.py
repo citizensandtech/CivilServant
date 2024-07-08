@@ -1,10 +1,8 @@
 import pytest
 import os, yaml
 
-## SET UP THE DATABASE ENGINE
-TEST_DIR = os.path.dirname(os.path.realpath(__file__))
-BASE_DIR  = os.path.join(TEST_DIR, "../")
-ENV = os.environ['CS_ENV'] = "test"
+# XXX: must come before app imports
+ENV = os.environ["CS_ENV"] = "test"
 
 from mock import Mock, patch
 import unittest.mock
@@ -23,15 +21,24 @@ from dateutil import parser
 import praw, csv, random, string
 from collections import Counter
 
-### LOAD THE CLASSES TO TEST
 from app.models import *
 import app.cs_logger
 
 
-db_session = DbEngine(os.path.join(TEST_DIR, "../", "config") + "/{env}.json".format(env=ENV)).new_session()
-log = app.cs_logger.get_logger(ENV, BASE_DIR)
+TEST_DIR = os.path.dirname(os.path.realpath(__file__))
+BASE_DIR  = os.path.join(TEST_DIR, "../")
 
-def clear_all_tables():
+
+@pytest.fixture
+def db_session():
+    config_file = os.path.join(BASE_DIR, "config", f"{ENV}.json") 
+    return DbEngine(config_file).new_session()
+
+@pytest.fixture
+def logger():
+    return app.cs_logger.get_logger(ENV, BASE_DIR)
+
+def _clear_all_tables(db_session):
     db_session.execute("UNLOCK TABLES")
     db_session.query(FrontPage).delete()
     db_session.query(SubredditPage).delete()
@@ -47,83 +54,89 @@ def clear_all_tables():
     db_session.query(EventHook).delete()
     db_session.commit()    
 
-def setup_function(function):
-    clear_all_tables()
+@pytest.fixture(autouse=True)
+def with_setup_and_teardown(db_session):
+    _clear_all_tables(db_session)
+    yield
+    _clear_all_tables(db_session)
 
-def teardown_function(function):
-    clear_all_tables()
+@pytest.fixture
+def modaction_fixtures():
+    fixtures = []
+    for filename in sorted(glob.glob(f"{TEST_DIR}/fixture_data/mod_actions*")):
+        with open(filename, "r") as f:
+            fixtures.append(json.load(f))
+    return fixtures
 
-@patch('praw.Reddit', autospec=True)
-def test_initialize_experiment(mock_reddit):
-    r = mock_reddit.return_value
+@pytest.fixture
+def reddit_return_value(modaction_fixtures):
+    with patch('praw.Reddit', autospec=True) as mock_reddit:
+        r = mock_reddit.return_value
+        
+        m = Mock()
+        # Fixture data is broken up like this to allow testing of API 'pagination'
+        m.side_effect = [modaction_fixtures[0][0:100],
+                         modaction_fixtures[0][100:200],
+                         modaction_fixtures[0][200:300],
+                         modaction_fixtures[0][300:400],
+                         modaction_fixtures[0][400:500],
+                         modaction_fixtures[0][500:600],
+                         modaction_fixtures[0][600:700],
+                         modaction_fixtures[0][700:800],
+                         modaction_fixtures[0][800:900],
+                         modaction_fixtures[0][900:], 
+                         []]
+        r.get_mod_log = m
 
-    ## NOTE: The callback will create a new instance of 
-    ##       MessagingExperimentController, so you should
-    ##       not examine the state of this object for tests
-    mec = BanneduserExperimentController("banneduser_experiment_test", db_session, r, log)
-    subreddit_name = mec.experiment_settings['subreddit']
-    subreddit_id = mec.experiment_settings['subreddit_id']
+        return r
 
-    ##### SETUP
-    ## Set up conditions and fixtures for the comment controller
-    ## which contains an event hook to run 
-    ## MessagingExperimentController::enroll_new_participants
-    db_session.add(Subreddit(
-        id = subreddit_id, 
-        name = subreddit_name))
+@pytest.fixture
+def experiment_controller(db_session, reddit_return_value, logger):
+    c = BanneduserExperimentController("banneduser_experiment_test", db_session, reddit_return_value, logger)
+
+    db_session.add(Subreddit( id = c.experiment_settings['subreddit_id'], name = c.experiment_settings['subreddit']))
     db_session.commit()
 
-    modaction_fixtures = []
-    for filename in sorted(glob.glob("{script_dir}/fixture_data/mod_actions*".format(script_dir=TEST_DIR))):
-        f = open(filename, "r")
-        modaction_fixtures.append(json.loads(f.read()))
-        f.close()
+    return c
 
-    m = Mock()
-    # Fixture data is broken up like this to allow testing of API 'pagination'
-    m.side_effect = [modaction_fixtures[0][0:100],
-                     modaction_fixtures[0][100:200],
-                     modaction_fixtures[0][200:300],
-                     modaction_fixtures[0][300:400],
-                     modaction_fixtures[0][400:500],
-                     modaction_fixtures[0][500:600],
-                     modaction_fixtures[0][600:700],
-                     modaction_fixtures[0][700:800],
-                     modaction_fixtures[0][800:900],
-                     modaction_fixtures[0][900:], 
-                     []]
+@pytest.fixture
+def moderator_controller(subreddit_name, db_session, reddit_return_value, logger):
+    return app.controllers.moderator_controller.ModeratorController(subreddit_name, db_session, reddit_return_value, logger)
 
-    r.get_mod_log = m
-    patch('praw.')
-    ##### END SETUP
-        
-    ## RECEIVE INCOMING MODACTIONS (SUBREDDIT MATCH)
-    cc = app.controllers.moderator_controller.ModeratorController(subreddit_name, db_session, r, log)
-    assert db_session.query(ModAction).count() == 0
-    cc.archive_mod_action_page()
-    #assert db_session.query(ModAction).count() == len(modaction_fixtures[0])
+@pytest.fixture
+def subreddit_name(experiment_controller):
+    return experiment_controller.experiment_settings['subreddit']
 
-    ### TODO: TEMPORARY TEST - this is because moderator_controller only will retrieve the first 'page' of results
-    assert db_session.query(ModAction).count() == len(modaction_fixtures[0][0:100])
-    
-    ## NOW CHECK WHETHER THE EVENT HOOK WAS CALLED
-    ## BY EXAMINING THE LOG
+@pytest.fixture
+def subreddit_id(experiment_controller):
+    return experiment_controller.experiment_settings['subreddit_id']
+
+@pytest.fixture
+def log_filename(logger):
     file_handler = None
-    for handler in log.handlers:
+    for handler in logger.handlers:
         if type(handler).__name__ == "ConcurrentRotatingFileHandler":
             file_handler = handler
             break
-
-    if(file_handler):
-        log_filename = handler.baseFilename
-        last_log_line = None
-        with open(log_filename, "r") as f:
-            for line in f:
-                last_log_line = line
-        assert last_log_line.find("BanneduserExperimentController::find_banned_users") > -1
-    else:
-        ## IF THERE'S NO CONCURRENT ROTATING FILE HANDLER
-        ## RETURN FALSE
+    if not file_handler:
         assert False
+    return handler.baseFilename
 
+def _assert_logged(log_filename, text):
+    last_log_line = ""
+    with open(log_filename, "r") as f:
+        for line in f:
+            pass
+        last_log_line = line
+    assert text in last_log_line
 
+def test_modaction_archive(moderator_controller, db_session, modaction_fixtures, log_filename):
+    assert db_session.query(ModAction).count() == 0
+
+    moderator_controller.archive_mod_action_page()
+
+    #assert db_session.query(ModAction).count() == len(modaction_fixtures[0])
+    ### TODO: TEMPORARY TEST - this is because moderator_controller only will retrieve the first 'page' of results
+    assert db_session.query(ModAction).count() == len(modaction_fixtures[0][0:100])
+    
+    _assert_logged(log_filename, "BanneduserExperimentController::find_banned_users")
