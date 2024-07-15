@@ -2,19 +2,19 @@ test:
   subreddit: CivilServantBot2
   subreddit_id: mouw
   username: CivilServantBot
-  conditions: 
+  conditions:
     main:
-        randomizations: messaging_experiment_test_main.conditions.csv
-        next_randomization: 0
-        arms:
-            arm_0: null
-            arm_1: 
-              pm_subject: PM Subject Line (Arm 1)
-              pm_text: Hello, this is the message for arm 1 of the 1st condition.
-            arm_2: 
-              reason_text: This is arm 2 of the 1st condition
-              pm_subject: PM Subject Line (Arm 2)
-              pm_text: Hello, this is the message for arm 2 of the 1st condition.
+      randomizations: messaging_experiment_test_main.conditions.csv
+      next_randomization: 0
+      arms:
+        arm_0: null
+        arm_1:
+          pm_subject: PM Subject Line (Arm 1)
+          pm_text: Hello, this is the message for arm 1 of the 1st condition.
+        arm_2:
+          reason_text: This is arm 2 of the 1st condition
+          pm_subject: PM Subject Line (Arm 2)
+          pm_text: Hello, this is the message for arm 2 of the 1st condition.
   controller: BanneduserExperimentController
   start_time: 07/02/2024 00:00:00 UTC
   end_time: 07/02/3024 23:59:59 UTC
@@ -26,4 +26,4 @@ test:
       caller_method: archive_mod_action_page
       callee_module: app.controllers.banneduser_experiment_controller
       callee_controller: BanneduserExperimentController
-      callee_method: find_banned_users 
+      callee_method: enroll_new_participants

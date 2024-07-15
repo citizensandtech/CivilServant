@@ -153,7 +153,7 @@ def _assert_logged(log_filename, text):
     assert text in last_log_line
 
 
-def test_modaction_archive(
+def test_initialize_experiment(
     moderator_controller, db_session, modaction_fixtures, log_filename
 ):
     assert db_session.query(ModAction).count() == 0
@@ -164,4 +164,4 @@ def test_modaction_archive(
     ### TODO: TEMPORARY TEST - this is because moderator_controller only will retrieve the first 'page' of results
     assert db_session.query(ModAction).count() == len(modaction_fixtures[0][0:100])
 
-    _assert_logged(log_filename, "BanneduserExperimentController::find_banned_users")
+    _assert_logged(log_filename, "BanneduserExperimentController::enroll_new_participants")
