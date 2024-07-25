@@ -69,7 +69,7 @@ def modaction_fixtures():
     fixtures = []
     for filename in sorted(glob.glob(f"{TEST_DIR}/fixture_data/mod_actions*")):
         with open(filename, "r") as f:
-            fixtures.append(json.load(f))
+            fixtures += json.load(f)
     return fixtures
 
 
@@ -81,18 +81,9 @@ def reddit_return_value(modaction_fixtures):
         m = Mock()
         # Fixture data is broken up like this to allow testing of API 'pagination'
         m.side_effect = [
-            modaction_fixtures[0][0:100],
-            modaction_fixtures[0][100:200],
-            modaction_fixtures[0][200:300],
-            modaction_fixtures[0][300:400],
-            modaction_fixtures[0][400:500],
-            modaction_fixtures[0][500:600],
-            modaction_fixtures[0][600:700],
-            modaction_fixtures[0][700:800],
-            modaction_fixtures[0][800:900],
-            modaction_fixtures[0][900:],
-            [],
-        ]
+            modaction_fixtures[i : i + 100]
+            for i in range(0, len(modaction_fixtures), 100)
+        ] + [[]]
         r.get_mod_log = m
 
         return r
@@ -158,10 +149,29 @@ def test_initialize_experiment(
 ):
     assert db_session.query(ModAction).count() == 0
 
+    # Archive only the first API result page.
     moderator_controller.archive_mod_action_page()
 
-    # assert db_session.query(ModAction).count() == len(modaction_fixtures[0])
-    ### TODO: TEMPORARY TEST - this is because moderator_controller only will retrieve the first 'page' of results
-    assert db_session.query(ModAction).count() == len(modaction_fixtures[0][0:100])
+    # Fixtures are split into 100-item pages, and we just loaded one page.
+    assert db_session.query(ModAction).count() == 100
 
-    _assert_logged(log_filename, "BanneduserExperimentController::enroll_new_participants")
+    # Ensure that the experiment is triggering data loading.
+    _assert_logged(
+        log_filename, "BanneduserExperimentController::enroll_new_participants"
+    )
+
+
+def test_load_all_fixtures(moderator_controller, db_session, modaction_fixtures):
+    # We have multiple API result pages of fixtures.
+    assert len(modaction_fixtures) > 100
+
+    assert db_session.query(ModAction).count() == 0
+
+    # Load all fixtures, like `controller.fetch_mod_action_history`.
+    after_id, num_actions_stored = moderator_controller.archive_mod_action_page()
+    while num_actions_stored > 0:
+        after_id, num_actions_stored = moderator_controller.archive_mod_action_page(
+            after_id
+        )
+
+    assert db_session.query(ModAction).count() == len(modaction_fixtures)
