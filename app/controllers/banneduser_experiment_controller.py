@@ -108,6 +108,8 @@ class BanneduserExperimentController(ModactionExperimentController):
 
 
 
+    ################################################### 
+    ################################################### 
     #### FIND ELIGIBLE NEWCOMERS
 
     # Accepts a list of modactions
@@ -152,12 +154,50 @@ class BanneduserExperimentController(ModactionExperimentController):
 
 
 
-    def assign_randomized_conditions(self, new_tempbans):
-        self.log.info("###### Assigning randomized conditions")
+
+
+
+    def get_condition(self):
+        if("main" not in self.experiment_settings['conditions'].keys()):
+            self.log.error("Condition 'main' missing from configuration file.")
+            raise Exception("Condition 'main' missing from configuration file")
+        return "main"
+
+ 
+
+
+
+
+    ################################################### 
+    ################################################### 
+    #### ASSIGN RANDOMIZED CONDITIONS for newcomers
+    ## Log an ExperimentAction with the assignments
+    ## If you are out of available randomizations, throw an error
+
+    def assign_randomized_conditions(self, newcomer_modactions):
+
+        condition = self.get_condition()
+
+        newcomer_ids = newcomer_modactions.keys()
+
+        self.log.info(newcomer_ids)
 
         self.db_session.execute("Lock Tables experiments WRITE, experiment_things WRITE")
         try:
-            for newcomer in new_tempbans:
+
+            # list of newcomer experiment_things to be added to db
+            newcomer_ets = []
+            newcomers_without_randomization = 0
+            next_randomization = self.experiment_settings['conditions'][condition]['next_randomization']
+
+
+            self.log.info(self.experiment_settings['conditions'][condition]['randomizations'])
+
+            for newcomer in newcomer_modactions:
+
+                et_metadata = {}
+
+
                 self.log.info(newcomer)
 
                 # WRITE STUFF
@@ -176,6 +216,9 @@ class BanneduserExperimentController(ModactionExperimentController):
     ################################################### 
     ################################################### 
     ################################################### 
+    ################################################### 
+    ################################################### 
+    ##
     ## ENROLL NEW PARTICIPANTS
     ## Called from ModeratorController.archive_mod_action_page
 
