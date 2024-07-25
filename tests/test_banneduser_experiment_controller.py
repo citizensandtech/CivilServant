@@ -13,7 +13,6 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import and_, or_
 import glob, datetime, time, pytz, math, random, copy
 from app.controllers.banneduser_experiment_controller import *
-import app.controllers.comment_controller
 import app.controllers.moderator_controller
 
 from utils.common import *
@@ -107,7 +106,7 @@ def experiment_controller(db_session, reddit_return_value, logger):
 
 
 @pytest.fixture
-def moderator_controller(subreddit_name, db_session, reddit_return_value, logger):
+def mod_controller(subreddit_name, db_session, reddit_return_value, logger):
     return app.controllers.moderator_controller.ModeratorController(
         subreddit_name, db_session, reddit_return_value, logger
     )
@@ -136,42 +135,43 @@ def log_filename(logger):
 
 
 def _assert_logged(log_filename, text):
-    last_log_line = ""
     with open(log_filename, "r") as f:
         for line in f:
-            pass
-        last_log_line = line
-    assert text in last_log_line
+            if text in line:
+                return
+    assert False
 
 
 def test_initialize_experiment(
-    moderator_controller, db_session, modaction_fixtures, log_filename
+    mod_controller, db_session, modaction_fixtures, log_filename
 ):
     assert db_session.query(ModAction).count() == 0
 
     # Archive only the first API result page.
-    moderator_controller.archive_mod_action_page()
+    mod_controller.archive_mod_action_page()
 
     # Fixtures are split into 100-item pages, and we just loaded one page.
     assert db_session.query(ModAction).count() == 100
 
-    # Ensure that the experiment is triggering data loading.
     _assert_logged(
         log_filename, "BanneduserExperimentController::enroll_new_participants"
     )
 
 
-def test_load_all_fixtures(moderator_controller, db_session, modaction_fixtures):
+def test_load_all_fixtures(mod_controller, db_session, modaction_fixtures):
     # We have multiple API result pages of fixtures.
     assert len(modaction_fixtures) > 100
 
     assert db_session.query(ModAction).count() == 0
 
     # Load all fixtures, like `controller.fetch_mod_action_history`.
-    after_id, num_actions_stored = moderator_controller.archive_mod_action_page()
+    after_id, num_actions_stored = mod_controller.archive_mod_action_page()
     while num_actions_stored > 0:
-        after_id, num_actions_stored = moderator_controller.archive_mod_action_page(
-            after_id
-        )
+        after_id, num_actions_stored = mod_controller.archive_mod_action_page(after_id)
 
     assert db_session.query(ModAction).count() == len(modaction_fixtures)
+
+
+def test_current_ban_fixtures(modaction_fixtures):
+    ban_actions = [f for f in modaction_fixtures if f["action"] == "banuser"]
+    assert len(ban_actions) == 3

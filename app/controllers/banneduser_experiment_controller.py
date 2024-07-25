@@ -223,29 +223,32 @@ class BanneduserExperimentController(ModactionExperimentController):
     ## Called from ModeratorController.archive_mod_action_page
 
     def enroll_new_participants(self, instance):
-
-
-
-        ### STEP 1. FIND ELIGIBLE NEWCOMERS
-
-        self.log.info("Experiment {0}: scanning modactions in subreddit {1} to look for temporary bans".format(self.experiment.name, self.experiment_settings['subreddit_id']))
-
-        eligible_newcomers = self.find_eligible_newcomers(instance.fetched_mod_actions)
-
-   
-        ### STEP 2. ASSIGN RANDOMIZED CONDITIONS
-        
-        self.log.info("Assigning randomized conditions to eligible newcomers")
-
-        self.assign_randomized_conditions(eligible_newcomers)
-
-
-
-       
-        if instance.fetched_subreddit_id != self.experiment_settings["subreddit_id"]:
-            return
         self.log.info(
             "Successfully Ran Event Hook to BanneduserExperimentController::enroll_new_participants. Caller: {0}".format(
                 str(instance)
             )
         )
+
+        if instance.fetched_subreddit_id != self.experiment_settings["subreddit_id"]:
+            return
+        newcomers = self._identify_newcomers()
+        self._assign_randomized_conditions(newcomers)
+
+    def _identify_newcomers(self):
+        return []
+
+    def _get_condition(self):
+        if "main" not in self.experiment_settings["conditions"].keys():
+            self.log.error("Condition 'main' missing from configuration file.")
+            raise Exception("Condition 'main' missing from configuration file")
+        return "main"
+
+    def _assign_randomized_conditions(self, newcomers):
+        condition = self._get_condition()
+
+        try:
+            self.db_session.execute(
+                "LOCK TABLES experiments WRITE, experiment_things WRITE"
+            )
+        finally:
+            self.db_session.execute("UNLOCK TABLES")
