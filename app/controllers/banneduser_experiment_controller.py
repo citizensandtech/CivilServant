@@ -1,4 +1,5 @@
 import praw
+import abc
 import inspect, os, sys, uuid  # set the BASE_DIR
 import simplejson as json
 import datetime, yaml, time, csv
@@ -29,7 +30,7 @@ BASE_DIR = os.path.join(
 ENV = os.environ["CS_ENV"]
 
 
-class ModactionExperimentController(ExperimentController):
+class ModactionExperimentController(ExperimentController, abc.ABC):
     """
     Mod Action experiment controller.
 
@@ -46,13 +47,10 @@ class ModactionExperimentController(ExperimentController):
 
         super().__init__(experiment_name, db_session, r, log, required_keys)
 
+    @abc.abstractmethod
     def enroll_new_participants(self, instance):
-        """This is essentially an abstract method."""
-        if instance.fetched_subreddit_id != self.experiment_settings["subreddit_id"]:
-            return
-        self.log.info(
-            f"Successfully Ran Event Hook to ModactionExperimentController::enroll_new_participants. Caller: {instance}"
-        )
+        """Implement this method in a subclass for the experiment."""
+        pass
 
     def _get_condition(self):
         """Get the condition name to use in this experiment."""
@@ -79,7 +77,6 @@ class ModactionExperimentController(ExperimentController):
 class BanneduserExperimentController(ModactionExperimentController):
     """Banned user experiment controller.
 
-
     This experiment controller should:
     1. Observe modactions to identify and enroll new participants.
     2. Randomly assign these users to receive different types of private messages.
@@ -90,6 +87,26 @@ class BanneduserExperimentController(ModactionExperimentController):
         self, experiment_name, db_session, r, log, required_keys=["event_hooks"]
     ):
         super().__init__(experiment_name, db_session, r, log, required_keys)
+
+    def enroll_new_participants(self, instance):
+        """Enroll new participants in the experiment.
+
+        This is a callback that will be invoked declaratively.
+        """
+        if instance.fetched_subreddit_id != self.experiment_settings["subreddit_id"]:
+            return
+
+        self.log.info(
+            f"Experiment {self.experiment.name}: scanning modactions in subreddit {self.experiment_settings['subreddit_id']} to look for temporary bans"
+        )
+        eligible_newcomers = self._find_eligible_newcomers(instance.fetched_mod_actions)
+
+        self.log.info("Assigning randomized conditions to eligible newcomers")
+        self._assign_randomized_conditions(eligible_newcomers)
+
+        self.log.info(
+            f"Successfully Ran Event Hook to BanneduserExperimentController::enroll_new_participants. Caller: {instance}"
+        )
 
     def _find_eligible_newcomers(self, modactions):
         """Filter a list of mod actions to find newcomers to the experiment.
@@ -149,26 +166,6 @@ class BanneduserExperimentController(ModactionExperimentController):
            return []
         finally:
            self.db_session.execute("UNLOCK TABLES")
-
-    def enroll_new_participants(self, instance):
-        """Enroll new participants in the experiment.
-
-        This is a callback that will be invoked declaratively.
-        """
-        if instance.fetched_subreddit_id != self.experiment_settings["subreddit_id"]:
-            return
-
-        self.log.info(
-            f"Experiment {self.experiment.name}: scanning modactions in subreddit {self.experiment_settings['subreddit_id']} to look for temporary bans"
-        )
-        eligible_newcomers = self._find_eligible_newcomers(instance.fetched_mod_actions)
-
-        self.log.info("Assigning randomized conditions to eligible newcomers")
-        self._assign_randomized_conditions(eligible_newcomers)
-
-        self.log.info(
-            f"Successfully Ran Event Hook to BanneduserExperimentController::enroll_new_participants. Caller: {instance}"
-        )
 
 
 def _is_tempban(modaction):
