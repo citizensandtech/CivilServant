@@ -1,26 +1,12 @@
-import praw
-import abc
-import inspect, os, sys, uuid  # set the BASE_DIR
-import simplejson as json
-import datetime, yaml, time, csv
-import reddit.connection
-import reddit.praw_utils as praw_utils
-import reddit.queries
-import sqlalchemy
-from dateutil import parser
-from utils.common import *
-from app.models import Base, SubredditPage, Subreddit, Post, ModAction, PrawKey, Comment
-from app.models import (
-    Experiment,
-    ExperimentThing,
-    ExperimentAction,
-    ExperimentThingSnapshot,
-)
-from app.models import EventHook
-from sqlalchemy import and_, or_, not_, asc, desc
-from app.controllers.messaging_controller import MessagingController
-from app.controllers.experiment_controller import *
 from collections import defaultdict
+import inspect
+import os
+
+import praw
+
+from app.controllers.modaction_experiment_controller import (
+    ModactionExperimentController,
+)
 
 BASE_DIR = os.path.join(
     os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))),
@@ -28,50 +14,6 @@ BASE_DIR = os.path.join(
     "..",
 )
 ENV = os.environ["CS_ENV"]
-
-
-class ModactionExperimentController(ExperimentController, abc.ABC):
-    """
-    Mod Action experiment controller.
-
-    A superclass with methods that are useful for by any experiment on Reddit moderation actions.
-
-    Callback methods must accept these 2 arguments:
-        self: An instance of callee class
-        instance: An instance of caller class
-    """
-
-    def __init__(
-        self, experiment_name, db_session, r, log, required_keys=["event_hooks"]
-    ):
-
-        super().__init__(experiment_name, db_session, r, log, required_keys)
-
-    @abc.abstractmethod
-    def enroll_new_participants(self, instance):
-        """Implement this method in a subclass for the experiment."""
-        pass
-
-    def _get_condition(self):
-        """Get the condition name to use in this experiment."""
-        if "main" not in self.experiment_settings["conditions"].keys():
-            self.log.error("Condition 'main' missing from configuration file.")
-            raise Exception("Condition 'main' missing from configuration file")
-        return "main"
-
-    def _previously_enrolled_user_ids(self):
-        """Get user IDs that are already enrolled in this study.
-
-        Returns:
-            A list of user IDs.
-        """
-        user_ids = self.db_session.query(ExperimentThing.thing_id).filter(
-            and_(
-                ExperimentThing.experiment_id == self.experiment.id,
-                ExperimentThing.object_type == ThingType.USER.value,
-            )
-        )
-        return user_ids.all()
 
 
 class BanneduserExperimentController(ModactionExperimentController):
@@ -123,7 +65,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         previously_enrolled_user_ids = set(self._previously_enrolled_user_ids())
         eligible_newcomers = {}
         for modaction in modactions:
-            if _is_tempban(modaction) and not _is_enrolled(
+            if self._is_tempban(modaction) and not self._is_enrolled(
                 modaction, previously_enrolled_user_ids
             ):
                 eligible_newcomers[modaction["target_author"]] = modaction
@@ -168,11 +110,11 @@ class BanneduserExperimentController(ModactionExperimentController):
            self.db_session.execute("UNLOCK TABLES")
 
 
-def _is_tempban(modaction):
-    """Return true if an admin action is a temporary ban."""
-    return modaction["action"] == "banuser" and "days" in modaction["details"]
+    def _is_tempban(self, modaction):
+        """Return true if an admin action is a temporary ban."""
+        return modaction["action"] == "banuser" and "days" in modaction["details"]
 
 
-def _is_enrolled(modaction, enrolled_user_ids):
-    """Return true if the target of an admin action is already enrolled."""
-    return modaction["target_author"] not in enrolled_user_ids
+    def _is_enrolled(self, modaction, enrolled_user_ids):
+        """Return true if the target of an admin action is already enrolled."""
+        return modaction["target_author"] not in enrolled_user_ids
