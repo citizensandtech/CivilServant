@@ -191,16 +191,41 @@ def test_get_condition(experiment_controller):
     assert experiment_controller._get_condition() == "main"
 
 
-def test_previously_enrolled_user_ids(experiment_controller):
+def test_start_with_empty_enrollment(experiment_controller):
     assert experiment_controller._previously_enrolled_user_ids() == []
 
+
+def test_other_experiment_not_detected_as_enrolled(experiment_controller):
     et = ExperimentThing(
-        id="ABC",
+        id="et1",
+        thing_id="123",
+        experiment_id=9999,
+        object_type=ThingType.USER.value,
+    )
+    experiment_controller.db_session.add(et)
+    experiment_controller.db_session.commit()
+    assert experiment_controller._previously_enrolled_user_ids() == []
+
+
+def test_other_type_not_detected_as_enrolled(experiment_controller):
+    et = ExperimentThing(
+        id="et1",
+        thing_id="456",
+        experiment_id=experiment_controller.experiment.id,
+        object_type=ThingType.COMMENT.value,
+    )
+    experiment_controller.db_session.add(et)
+    experiment_controller.db_session.commit()
+    assert experiment_controller._previously_enrolled_user_ids() == []
+
+
+def test_user_detected_as_enrolled(experiment_controller):
+    et = ExperimentThing(
+        id="et1",
         thing_id="123",
         experiment_id=experiment_controller.experiment.id,
         object_type=ThingType.USER.value,
     )
     experiment_controller.db_session.add(et)
     experiment_controller.db_session.commit()
-
     assert experiment_controller._previously_enrolled_user_ids() == ["123"]
