@@ -1,27 +1,21 @@
 import pytest
-import os, yaml
+import os
+import yaml
+import glob
+import simplejson as json
+import praw
+from unittest.mock import Mock, patch
 
 # XXX: must come before app imports
 ENV = os.environ["CS_ENV"] = "test"
 
-from mock import Mock, patch
-import unittest.mock
-import simplejson as json
-import sqlalchemy
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import and_, or_
-import glob, datetime, time, pytz, math, random, copy
-from app.controllers.banneduser_experiment_controller import *
-import app.controllers.moderator_controller
-
-from utils.common import *
-from dateutil import parser
-import praw, csv, random, string
-from collections import Counter
-
-from app.models import *
+from app.controllers.banneduser_experiment_controller import (
+    BanneduserExperimentController,
+)
+from app.controllers.moderator_controller import ModeratorController
 import app.cs_logger
+from utils.common import DbEngine
+from app.models import *
 
 
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -107,9 +101,7 @@ def experiment_controller(db_session, reddit_return_value, logger):
 
 @pytest.fixture
 def mod_controller(subreddit_name, db_session, reddit_return_value, logger):
-    return app.controllers.moderator_controller.ModeratorController(
-        subreddit_name, db_session, reddit_return_value, logger
-    )
+    return ModeratorController(subreddit_name, db_session, reddit_return_value, logger)
 
 
 @pytest.fixture
@@ -162,7 +154,9 @@ def test_initialize_experiment(
     )
 
 
-def test_load_all_fixtures(mod_controller, db_session, modaction_fixtures, log_filename):
+def test_load_all_fixtures(
+    mod_controller, db_session, modaction_fixtures, log_filename
+):
     # We have multiple API result pages of fixtures.
     assert len(modaction_fixtures) > 100
 
@@ -178,10 +172,34 @@ def test_load_all_fixtures(mod_controller, db_session, modaction_fixtures, log_f
     # Archiving multiple pages gets chatty in the logs, so we allow some entries to come after.
     # This may break if we add more logging. If that happens, increase the max_lookback setting.
     _assert_logged(
-        log_filename, "BanneduserExperimentController::enroll_new_participants", max_lookback=12
+        log_filename,
+        "BanneduserExperimentController::enroll_new_participants",
+        max_lookback=12,
     )
 
 
 def test_current_ban_fixtures(modaction_fixtures):
     ban_actions = [f for f in modaction_fixtures if f["action"] == "banuser"]
     assert len(ban_actions) == 3
+
+
+# The following are testing the modaction experiment controller:
+
+
+def test_get_condition(experiment_controller):
+    assert experiment_controller._get_condition() == "main"
+
+
+def test_previously_enrolled_user_ids(experiment_controller):
+    assert experiment_controller._previously_enrolled_user_ids() == []
+
+    et = ExperimentThing(
+        id="ABC",
+        thing_id="123",
+        experiment_id=experiment_controller.experiment.id,
+        object_type=ThingType.USER.value,
+    )
+    experiment_controller.db_session.add(et)
+    experiment_controller.db_session.commit()
+
+    assert experiment_controller._previously_enrolled_user_ids() == ["123"]

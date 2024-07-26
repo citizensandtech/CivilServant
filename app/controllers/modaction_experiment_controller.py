@@ -47,4 +47,4 @@ class ModactionExperimentController(ExperimentController, abc.ABC):
                 ExperimentThing.object_type == ThingType.USER.value,
             )
         )
-        return user_ids.all()
+        return [u[0] for u in user_ids]
