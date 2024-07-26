@@ -178,6 +178,7 @@ def test_load_all_fixtures(
     )
 
 
+# TODO: remove this test; it's only here to make assertions about the current test data.
 def test_current_ban_fixtures(modaction_fixtures):
     ban_actions = [f for f in modaction_fixtures if f["action"] == "banuser"]
     assert len(ban_actions) == 3
