@@ -134,12 +134,16 @@ def log_filename(logger):
     return handler.baseFilename
 
 
-def _assert_logged(log_filename, text):
+def _assert_logged(log_filename, text, max_lookback=1):
+    lines_scanned = 0
     with open(log_filename, "r") as f:
-        for line in f:
+        for line in reversed(list(f.readlines())):
             if text in line:
                 return
-    assert False
+            lines_scanned += 1
+            if lines_scanned > max_lookback:
+                assert False, f"Log text note found within {max_lookback} lines: {text}"
+    assert False, "Log text not found: {text}"
 
 
 def test_initialize_experiment(
@@ -158,7 +162,7 @@ def test_initialize_experiment(
     )
 
 
-def test_load_all_fixtures(mod_controller, db_session, modaction_fixtures):
+def test_load_all_fixtures(mod_controller, db_session, modaction_fixtures, log_filename):
     # We have multiple API result pages of fixtures.
     assert len(modaction_fixtures) > 100
 
@@ -170,6 +174,12 @@ def test_load_all_fixtures(mod_controller, db_session, modaction_fixtures):
         after_id, num_actions_stored = mod_controller.archive_mod_action_page(after_id)
 
     assert db_session.query(ModAction).count() == len(modaction_fixtures)
+
+    # Archiving multiple pages gets chatty in the logs, so we allow some entries to come after.
+    # This may break if we add more logging. If that happens, increase the max_lookback setting.
+    _assert_logged(
+        log_filename, "BanneduserExperimentController::enroll_new_participants", max_lookback=12
+    )
 
 
 def test_current_ban_fixtures(modaction_fixtures):
