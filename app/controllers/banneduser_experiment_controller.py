@@ -8,6 +8,7 @@ import praw
 from app.controllers.modaction_experiment_controller import (
     ModactionExperimentController,
 )
+from app.models import ExperimentThing, ThingType
 
 BASE_DIR = os.path.join(
     os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))),
@@ -23,7 +24,7 @@ class BanneduserExperimentController(ModactionExperimentController):
     This experiment controller should:
     1. Observe modactions to identify and enroll new participants.
     2. Randomly assign these users to receive different types of private messages.
-    3. TBD
+    3. Send private messages at beginning and end of temporary ban.
     """
 
     def __init__(
@@ -47,6 +48,9 @@ class BanneduserExperimentController(ModactionExperimentController):
         self.log.info("Assigning randomized conditions to eligible newcomers")
         self._assign_randomized_conditions(eligible_newcomers)
 
+        self.log.info("Updating the ban state of existing participants")
+        self._update_existing_participants(instance.fetched_mod_actions)
+
         self.log.info(
             f"Successfully Ran Event Hook to BanneduserExperimentController::enroll_new_participants. Caller: {instance}"
         )
@@ -66,17 +70,66 @@ class BanneduserExperimentController(ModactionExperimentController):
         previously_enrolled_user_ids = set(self._previously_enrolled_user_ids())
         eligible_newcomers = {}
         for modaction in modactions:
-            if self._is_tempban(modaction) and not self._is_enrolled(
-                modaction, previously_enrolled_user_ids
+            # Skip irrelevant mod actions.
+            if (
+                self._is_enrolled(modaction, previously_enrolled_user_ids)
+                or not self._is_tempban(modaction)
+                or self._is_bot(modaction)
             ):
-                user_id = modaction["target_author"]
-                if user_id in eligible_newcomers:
-                    # FIXME: handle logic if the same user has multiple new bans
-                    self.log.error(
-                        f"BanneduserExperimentController got multiple ban actions for newcomer {user_id}; using latest only"
-                    )
-                eligible_newcomers[user_id] = modaction
+                continue
+
+            # NOTE: If there are multiple mod actions for the same user who isn't yet enrolled,
+            # we overwrite the previous action with the latest one.
+            # This assumes that they are processed in order.
+            eligible_newcomers[modaction["target_author"]] = modaction
+
         return eligible_newcomers
+
+    def _update_existing_participants(self, modactions):
+        """Find mod actions that update the state of any current participants.
+
+        Args:
+            modactions: A list of mod actions.
+        """
+        previously_enrolled_user_ids = set(self._previously_enrolled_user_ids())
+        updated_users = {}
+        for modaction in modactions:
+            # Skip mod actions that don't apply to a current participant.
+            if not self._is_enrolled(modaction, previously_enrolled_user_ids):
+                continue
+
+            # Update the details of the ban, upgrade to a permanent ban, or remove the ban.
+            # Assume that actions are in chronological order (last action per user wins).
+            if modaction["action"] in ["banuser", "unbanuser"]:
+                updated_users[modaction["target_author"]] = modaction
+
+        if not updated_users:
+            return
+
+        # Find user records to update.
+        users_by_username = {}
+        for ut in self.db_session.query(ExperimentThing).filter(
+            ExperimentThing.thing_id.in_(
+                ExperimentThing.object_type == ThingType.USER.value,
+                ExperimentThing.experiment_id == self.experiment.id,
+                ExperimentThing.thing_id.in_(updated_users.keys()),
+            )
+        ):
+            users_by_username[ut.thing_id] = ut
+
+        # Apply updates to corresponding `ExperimentThing`s.
+        for modaction in updated_users.values():
+            ut = users_by_username[modaction["target_author"]]
+            # TODO: Take a snapshot before applying changes.
+            if self._is_tempban(modaction):
+                # TODO: Temp ban was updated.
+                pass
+            elif modaction["action"] == "banuser":
+                # TODO: Escalated to permaban.
+                pass
+            elif modaction["action"] == "unbanuser":
+                # TODO: User was unbanned.
+                pass
 
     def _get_account_age(self, user_thing):
         user_thing = self._populate_redditor_info(user_thing)
@@ -89,7 +142,7 @@ class BanneduserExperimentController(ModactionExperimentController):
 
     def _get_condition(self, user_thing):
         age_bucket = self._get_account_age(user_thing)
-        
+
         # Combine multiple factors into condition.
         condition = f"{age_bucket}"
 
@@ -171,9 +224,20 @@ class BanneduserExperimentController(ModactionExperimentController):
            self.db_session.execute("UNLOCK TABLES")
 
     def _is_tempban(self, modaction):
-        """Return true if an admin action is a temporary ban."""
+        """Return true if an admin action is a temporary ban.
+
+        For permanent bans, we expect `details` to be "permanent".
+        For temporary bans, we expect the number of days, e.g. "7 days".
+        """
         return modaction["action"] == "banuser" and "days" in modaction["details"]
 
     def _is_enrolled(self, modaction, enrolled_user_ids):
         """Return true if the target of an admin action is already enrolled."""
         return modaction["target_author"] not in enrolled_user_ids
+
+    def _is_bot(self, modaction):
+        """Return true if the user appears to be a bot.
+
+        This is currently a rudimentary approach. Account age is typically a better indicator.
+        """
+        return modaction["target_author"].endswith("Bot")

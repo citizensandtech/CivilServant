@@ -55,7 +55,7 @@ class ModactionExperimentController(ExperimentController, abc.ABC):
     def _populate_redditor_info(self, user_thing):
         """Load redditor information, if available, and save it to the ExperimentThing.
         
-        Parameters:
+        Args:
             user_thing: ExperimentThing of type USER.
         
         Returns:
