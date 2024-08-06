@@ -89,6 +89,10 @@ class BanneduserExperimentController(ModactionExperimentController):
 
     def _get_condition(self, user_thing):
         age_bucket = self._get_account_age(user_thing)
+        
+        # Combine multiple factors into condition.
+        condition = f"{age_bucket}"
+
         self._check_condition(condition)
         return condition
 
