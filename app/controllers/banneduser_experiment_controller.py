@@ -90,18 +90,61 @@ class BanneduserExperimentController(ModactionExperimentController):
             # list of newcomer experiment_things to be added to db
             newcomer_ets = []
             newcomers_without_randomization = 0
-            next_randomization = self.experiment_settings['conditions'][condition]['next_randomization']
-
-
-            self.log.info(self.experiment_settings['conditions'][condition]['randomizations'])
 
             for newcomer in newcomer_modactions:
                 et_metadata = {}
 
+                # Get the next randomization, and ensure that it's valid.
+                next_randomization = self.experiment_settings["conditions"][condition][
+                    "next_randomization"
+                ]
+                if next_randomization is not None and next_randomization >= len(
+                    self.experiment_settings["conditions"][condition]["randomizations"]
+                ):
+                    next_randomization = None
+                    newcomers_without_randomization += 1
+                if next_randomization is None:
+                    # If there's no valid randomization for this newcomer, skip it.
+                    continue
 
-                self.log.info(newcomer)
+                # Get the current randomization and increment the experiment's counter.
+                randomization = self.experiment_settings["conditions"][condition][
+                    "randomizations"
+                ][next_randomization]
+                self.experiment_settings["conditions"][condition][
+                    "next_randomization"
+                ] += 1
 
-                # WRITE STUFF
+                et_metadata = {
+                    "condition": condition,
+                    "randomization": randomization,
+                }
+                et = {
+                    "id": uuid.uuid4().hex,
+                    "thing_id": newcomer["target_author"],
+                    "experiment_id": self.experiment.id,
+                    "object_type": ThingType.USER.value,
+                    # we don't have account creation info at this stage
+                    "object_created": None,
+                    "query_index": "Intervention TBD",
+                    "metadata_json": json.dumps(et_metadata),
+                }
+                newcomer_ets.append(et)
+
+            if newcomers_without_randomization > 0:
+                self.log.error(
+                    f"BanneduserExperimentController Experiment {self.experiment_name} has run out of randomizations from '{condition}' to assign."
+                )
+
+            if len(newcomer_ets) > 0:
+                self.db_session.insert_retryable(ExperimentThing, newcomer_ets)
+
+                self.experiment.settings_json = json.dumps(self.experiment_settings)
+                self.db_session.commit()
+
+            self.log.info(
+                f"Assigned randomizations to {len(newcomer_ets)} banned users: [{','.join([x['thing_id'] for x in newcomer_ets])}]"
+            )
 
         except(Exception) as e:
            self.log.error("Error in BanneduserExperimentController::assign_randomized_conditions", extra=sys.exc_info()[0])
@@ -109,11 +152,9 @@ class BanneduserExperimentController(ModactionExperimentController):
         finally:
            self.db_session.execute("UNLOCK TABLES")
 
-
     def _is_tempban(self, modaction):
         """Return true if an admin action is a temporary ban."""
         return modaction["action"] == "banuser" and "days" in modaction["details"]
-
 
     def _is_enrolled(self, modaction, enrolled_user_ids):
         """Return true if the target of an admin action is already enrolled."""
