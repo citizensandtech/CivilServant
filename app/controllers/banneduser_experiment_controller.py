@@ -2,6 +2,8 @@ from collections import defaultdict
 from datetime import datetime
 import inspect
 import os
+import re
+import sys
 
 import praw
 
@@ -109,16 +111,15 @@ class BanneduserExperimentController(ModactionExperimentController):
         # Find user records to update.
         users_by_username = {}
         for ut in self.db_session.query(ExperimentThing).filter(
-            ExperimentThing.thing_id.in_(
-                ExperimentThing.object_type == ThingType.USER.value,
-                ExperimentThing.experiment_id == self.experiment.id,
-                ExperimentThing.thing_id.in_(updated_users.keys()),
-            )
+            ExperimentThing.object_type == ThingType.USER.value,
+            ExperimentThing.experiment_id == self.experiment.id,
+            ExperimentThing.thing_id.in_(updated_users.keys()),
         ):
             users_by_username[ut.thing_id] = ut
 
         # Apply updates to corresponding `ExperimentThing`s.
         for modaction in updated_users.values():
+            # NOTE: This could throw a KeyError, but it shouldn't according to how we build this dict.
             ut = users_by_username[modaction["target_author"]]
             # TODO: Take a snapshot before applying changes.
             if self._is_tempban(modaction):
@@ -189,6 +190,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                 et_metadata = {
                     "condition": condition,
                     "randomization": randomization,
+                    **self._parse_temp_ban(newcomer),
                 }
                 et = {
                     "id": uuid.uuid4().hex,
@@ -217,9 +219,11 @@ class BanneduserExperimentController(ModactionExperimentController):
                 f"Assigned randomizations to {len(newcomer_ets)} banned users: [{','.join([x['thing_id'] for x in newcomer_ets])}]"
             )
 
-        except(Exception) as e:
-           self.log.error("Error in BanneduserExperimentController::assign_randomized_conditions", extra=sys.exc_info()[0])
-           return []
+        except Exception as e:
+            self.log.error(
+                "Error in BanneduserExperimentController::assign_randomized_conditions"
+            )
+            return []
         finally:
            self.db_session.execute("UNLOCK TABLES")
 
@@ -233,7 +237,7 @@ class BanneduserExperimentController(ModactionExperimentController):
 
     def _is_enrolled(self, modaction, enrolled_user_ids):
         """Return true if the target of an admin action is already enrolled."""
-        return modaction["target_author"] not in enrolled_user_ids
+        return modaction["target_author"] in enrolled_user_ids
 
     def _is_bot(self, modaction):
         """Return true if the user appears to be a bot.
@@ -241,3 +245,52 @@ class BanneduserExperimentController(ModactionExperimentController):
         This is currently a rudimentary approach. Account age is typically a better indicator.
         """
         return modaction["target_author"].endswith("Bot")
+
+    def _parse_temp_ban(self, modaction):
+        """Get details about the ban.
+
+        Args:
+            modaction: The moderation action for a temporary ban.
+
+        Returns:
+            A dict with details about the temporary ban, or None if the action is not a temp ban.
+            Note that `ban_start_time` and `ban_end_time` are UNIX timestamps in UTC.
+
+        Example result:
+            {
+                "ban_duration_days": 30,
+                "ban_reason": "Bad behavior",
+                "ban_start_time": 1704154715,
+                "ban_end_time": 1705277915,
+            }
+        """
+        days = self._parse_days(modaction)
+        if days is None:
+            return None
+
+        starts_at = int(newcomer["created_utc"])
+        ends_at = starts_at + (days * 86400)
+
+        return {
+            "ban_duration_days": days,
+            "ban_reason": newcomer["description"],
+            "ban_start_time": starts_at,
+            "ban_end_time": ends_at,
+        }
+
+    def _parse_days(self, modaction):
+        """Parse the details of a temp ban, returning the ban's duration.
+
+        This is always listed in the form "n days", with n being the number of days.
+
+        Args:
+            modaction: The mod action of a temp ban.
+
+        Returns:
+            The number of days of the temporary ban, or None.
+        """
+        if not self._is_tempban(modaction):
+            return None
+
+        m = re.search(r"(\d+) days", details, re.IGNORECASE)
+        return int(m.group(1)) if m else None
