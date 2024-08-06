@@ -28,12 +28,15 @@ class ModactionExperimentController(ExperimentController, abc.ABC):
         """Implement this method in a subclass for the experiment."""
         pass
 
+    @abc.abstractmethod
     def _get_condition(self):
         """Get the condition name to use in this experiment."""
-        if "main" not in self.experiment_settings["conditions"].keys():
-            self.log.error("Condition 'main' missing from configuration file.")
-            raise Exception("Condition 'main' missing from configuration file")
-        return "main"
+
+    def _check_condition(self, name):
+        if name not in self.experiment_settings["conditions"]:
+            error_message = f"Condition '{name}' missing from configuration file."
+            self.log.error(error_message)
+            raise Exception(error_message)
 
     def _previously_enrolled_user_ids(self):
         """Get user IDs that are already enrolled in this study.
@@ -48,3 +51,25 @@ class ModactionExperimentController(ExperimentController, abc.ABC):
             )
         )
         return [u[0] for u in user_ids]
+
+    def _populate_redditor_info(self, user_thing):
+        """Load redditor information, if available, and save it to the ExperimentThing.
+        
+        Parameters:
+            user_thing: ExperimentThing of type USER.
+        
+        Returns:
+            The up-to-date ExperimentThing.
+        """
+        if user_thing.object_created is not None:
+            # We already have the info we need.
+            return user_thing
+        redditor = self.r.redditor(user_thing.thing_id)
+
+        # Grab the useful data about this user.
+        user_thing.object_created = redditor.created_utc
+
+        # Add new data to the current database transaction.
+        self.db_session.add(redditor)
+        
+        return user_thing

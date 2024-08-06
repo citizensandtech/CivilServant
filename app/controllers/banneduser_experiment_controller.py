@@ -1,4 +1,5 @@
 from collections import defaultdict
+from datetime import datetime
 import inspect
 import os
 
@@ -68,21 +69,34 @@ class BanneduserExperimentController(ModactionExperimentController):
             if self._is_tempban(modaction) and not self._is_enrolled(
                 modaction, previously_enrolled_user_ids
             ):
-                eligible_newcomers[modaction["target_author"]] = modaction
-                # TODO: handle logic if the same user has multiple ban events
+                user_id = modaction["target_author"]
+                if user_id in eligible_newcomers:
+                    # FIXME: handle logic if the same user has multiple new bans
+                    self.log.error(
+                        f"BanneduserExperimentController got multiple ban actions for newcomer {user_id}; using latest only"
+                    )
+                eligible_newcomers[user_id] = modaction
         return eligible_newcomers
+
+    def _get_account_age(self, user_thing):
+        user_thing = self._populate_redditor_info(user_thing)
+        now_utc = datetime.utcnow().timestamp()
+        age_days = (now_utc - user_thing.object_created) / 86400
+        if age_days < 7:
+            return "weekling"
+        else:
+            return "oldster"
+
+    def _get_condition(self, user_thing):
+        age_bucket = self._get_account_age(user_thing)
+        self._check_condition(condition)
+        return condition
 
     def _assign_randomized_conditions(self, newcomer_modactions):
         """Assign randomized conditions to newcomers.
         Log an ExperimentAction with the assignments.
         If ther are no available randomizations, throw an error.
         """
-        condition = self._get_condition()
-
-        newcomer_ids = newcomer_modactions.keys()
-
-        self.log.info(newcomer_ids)
-
         self.db_session.execute(
             "LOCK TABLES experiments WRITE, experiment_things WRITE"
         )
@@ -92,7 +106,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             newcomers_without_randomization = 0
 
             for newcomer in newcomer_modactions:
-                et_metadata = {}
+                condition = self._get_condition(newcomer)
 
                 # Get the next randomization, and ensure that it's valid.
                 next_randomization = self.experiment_settings["conditions"][condition][

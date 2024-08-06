@@ -187,10 +187,6 @@ def test_current_ban_fixtures(modaction_fixtures):
 # The following are testing the modaction experiment controller:
 
 
-def test_get_condition(experiment_controller):
-    assert experiment_controller._get_condition() == "main"
-
-
 def test_start_with_empty_enrollment(experiment_controller):
     assert experiment_controller._previously_enrolled_user_ids() == []
 
