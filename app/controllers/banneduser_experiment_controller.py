@@ -225,7 +225,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             )
             return []
         finally:
-           self.db_session.execute("UNLOCK TABLES")
+            self.db_session.execute("UNLOCK TABLES")
 
     def _is_tempban(self, modaction):
         """Return true if an admin action is a temporary ban.
