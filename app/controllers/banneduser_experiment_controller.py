@@ -10,6 +10,11 @@ import praw
 from app.controllers.modaction_experiment_controller import (
     ModactionExperimentController,
 )
+
+from app.controllers.messaging_controller import (
+    MessagingController,
+)
+
 from app.models import ExperimentThing, ThingType
 
 BASE_DIR = os.path.join(
@@ -294,3 +299,184 @@ class BanneduserExperimentController(ModactionExperimentController):
 
         m = re.search(r"(\d+) days", details, re.IGNORECASE)
         return int(m.group(1)) if m else None
+
+    def update_experiment(self):
+
+        accounts_needing_messages = self._get_accounts_needing_interventions()
+        self.log.info(
+            "Experiment {0}: identified {1} accounts needing interventions. Sending messages now...".format(
+                self.experiment.name, len(accounts_needing_messages)
+            )
+        )
+        self._send_intervention_messages(accounts_needing_messages)
+
+    def _get_accounts_needing_interventions(self):
+        """Gets accounts that need interventions
+        details about the ban.
+
+        Returns:
+            A dict with users that are enrolled in the study, that have not had messages sent yet, where the ban happened more than twelve hours ago.
+        """
+
+        # variable is named 'twelve' and not something more generic because this is a crucial part of experiment
+
+        twelve_hours_ago = datetime.utcnow() - timedelta(hours=12)
+
+        return (
+            self.db_session.query(ExperimentThing)
+            .filter(
+                and_(
+                    ExperimentThing.object_type == ThingType.USER.value,
+                    ExperimentThing.experiment_id == self.experiment.id,
+                    ExperimentThing.query_index == "Intervention TBD",
+                    ExperimentThing.object_created < twelve_hours_ago,
+                )
+            )
+            .order_by(ExperimentThing.created_at)
+            .all()
+        )
+
+    ## TODO: this is the same as format_message in NewcomerMessagingExperimentController in messaging_experiment_controller.. should this be abstracted out into the parent class? Should this be abstracted out? or not touch working code?
+    def _format_intervention_message(self, experiment_thing):
+        """Format intervention message for an thing, given the arm that it is in. This reads from the experiment_settings (the YAML file in /config/experiments/.
+
+        Args:
+            experiment_thing: The ExperimentThing for a tempbanned user.
+
+        Returns:
+            A dict with message subject and body.
+
+        Example result:
+            {
+                "subject": "Tempban Message",
+                "message": "You have been temporarily banned...",
+            }
+        """
+        metadata_json = json.loads(experiment_thing.metadata_json)
+        account_info = {"username": experiment_thing.thing_id}
+        arm = metadata_json["arm"]
+        cond = self.experiment_settings["conditions"][self.get_condition()]
+        if arm not in cond["arms"].keys():
+            raise ExperimentConfigurationError(
+                "In the experiment '{0}', the '{1}' condition fails to include information about the '{2}' arm, despite having randomizations assigned to it".format(
+                    self.experiment_name, self.get_condition(), arm
+                )
+            )
+        if cond["arms"][arm] is None:
+            return None
+        message_subject = cond["arms"][arm]["pm_subject"].format(**account_info)
+        message_body = cond["arms"][arm]["pm_text"].format(**account_info)
+        return {"subject": message_subject, "message": message_body}
+
+    def _send_intervention_messages(self, experiment_things):
+        """Format intervention message for an thing, given the arm that it is in. This reads from the experiment_settings (the YAML file in /config/experiments/.
+
+        Args:
+            experiment_thing: The ExperimentThing for a tempbanned user.
+
+        Returns:
+            A dict with message subject and body.
+
+        Example result:
+            {
+                "subject": "Tempban Message",
+                "message": "You have been temporarily banned...",
+            }
+        """
+        self.db_session.execute(
+            "Lock Tables experiment_actions WRITE, experiment_things WRITE, message_logs WRITE"
+        )
+        message_results = []
+        try:
+            mc = MessagingController(self.db_session, self.r, self.log)
+            action = "SendMessage"
+            messages_to_send = []
+            for experiment_thing in experiment_things:
+                message = self._format_intervention_message(experiment_thing)
+                ## if it's a control group, log inaction
+                ## and do nothing, otherwise add to messages_to_send
+                if message is None:
+                    metadata = json.loads(experiment_thing.metadata_json)
+                    metadata["message_status"] = "sent"
+                    ea = ExperimentAction(
+                        experiment_id=self.experiment.id,
+                        action=action,
+                        action_object_type=ThingType.USER.value,
+                        action_object_id=experiment_thing.id,
+                        metadata_json=json.dumps(metadata),
+                    )
+                    experiment_thing.query_index = "Intervention Complete"
+                    experiment_thing.metadata_json = json.dumps(metadata)
+                    self.db_session.add(ea)
+                else:
+                    message["account"] = experiment_thing.thing_id
+                    messages_to_send.append(message)
+
+            # send messages_to_send
+            message_results = mc.send_messages(
+                messages_to_send,
+                "BannedUserMessagingExperiment({0})::_send_intervention_messages".format(
+                    self.experiment_name
+                ),
+            )
+
+            # iterate through message_result, linked with experiment_things
+            for experiment_thing in experiment_things:
+                if experiment_thing.thing_id in message_results.keys():
+                    message_result = message_results[experiment_thing.thing_id]
+
+                    metadata = json.loads(experiment_thing.metadata_json)
+                    update_records = False
+
+                    message_errors = 0
+                    if "errors" in message_result:
+                        message_errors = len(message_result["errors"])
+
+                    ## TAKE ACTION WITH INVALID USERNAME
+                    ## (add an action and UPDATE THE EXPERIMENT_THING)
+                    ## TO INDICATE THAT THE ACCOUNT DOESN'T EXIST
+                    ## NOTE: THE MESSAGE ATTEMPT WILL BE LOGGED
+                    ## SO YOU DON'T HAVE TO LOG AN ExperimentAction
+                    ## Ignore other errors
+                    ## (since you will want to retry in those cases)
+                    if message_errors > 0:
+                        for error in message_result["errors"]:
+                            invalid_username = False
+                            if error["error"] == "invalid username":
+                                invalid_username = True
+
+                            if invalid_username:
+                                metadata["message_status"] = "nonexistent"
+                                metadata["survey_status"] = "nonexistent"
+                                experiment_thing.query_index = "Intervention Impossible"
+                                update_records = True
+                    ## if there are no errors
+                    ## add an ExperimentAction and
+                    ## update the experiment_thing metadata
+                    else:
+                        metadata["message_status"] = "sent"
+                        experiment_thing.query_index = "Intervention Complete"
+                        update_records = True
+
+                    if update_records:
+                        metadata_json = json.dumps(metadata)
+                        ea = ExperimentAction(
+                            experiment_id=self.experiment.id,
+                            action=action,
+                            action_object_type=ThingType.USER.value,
+                            action_object_id=experiment_thing.id,
+                            metadata_json=metadata_json,
+                        )
+                        self.db_session.add(ea)
+                        experiment_thing.metadata_json = metadata_json
+            self.db_session.commit()
+        except Exception as e:
+            self.db_session.execute("UNLOCK TABLES")
+            self.log.error(
+                "Error in BannedUserExperimentController::_send_intervention_messages",
+                extra=sys.exc_info()[0],
+            )
+            return []
+        self.db_session.execute("UNLOCK TABLES")
+
+        return message_results
