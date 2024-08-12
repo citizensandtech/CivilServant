@@ -17,7 +17,12 @@ from app.controllers.messaging_controller import (
     MessagingController,
 )
 
-from app.models import ExperimentAction, ExperimentThing, ThingType
+from app.models import (
+    ExperimentAction,
+    ExperimentThing,
+    ExperimentThingSnapshot,
+    ThingType,
+)
 
 BASE_DIR = os.path.join(
     os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))),
@@ -127,18 +132,40 @@ class BanneduserExperimentController(ModactionExperimentController):
         # Apply updates to corresponding `ExperimentThing`s.
         for modaction in updated_users.values():
             # NOTE: This could throw a KeyError, but it shouldn't according to how we build this dict.
-            user_thing = users_by_username[modaction["target_author"]]
-            self.db_session.insert_retryable(ExperimentThing, user_thing)
+            user = users_by_username[modaction["target_author"]]
+
+            # TODO: If intervention already happened, we shouldn't remove them from the study. What do we do?
+
+            # Take a snapshot of the current user.
+            snapshot = {
+                "experiment_thing_id": user.id,
+                "object_type": user.object_type,
+                "experiment_id": user.experiment_id,
+                "metadata_json": user.metadata_json,
+            }
+            self.db_session.insert_retryable(ExperimentThingSnapshot, snapshot)
 
             if self._is_tempban(modaction):
-                # TODO: Temp ban was updated.
-                pass
+                # Temp ban was updated.
+                user.metadata_json = json.dumps(
+                    {
+                        **json.loads(user.metadata_json),
+                        **self._parse_temp_ban(user),
+                    }
+                )
+                self.db_session.execute_retryable(
+                    ExperimentThing.__table__.update(), user
+                )
             elif modaction["action"] == "banuser":
-                # TODO: Escalated to permaban.
-                pass
+                # Escalated to permaban, so remove from the study.
+                self.db_session.execute_retryable(
+                    ExperimentThing.__table__.delete(), user
+                )
             elif modaction["action"] == "unbanuser":
-                # TODO: User was unbanned.
-                pass
+                # User was unbanned, so remove from the study.
+                self.db_session.execute_retryable(
+                    ExperimentThing.__table__.delete(), user
+                )
 
     def _get_account_age(self, user_thing):
         user_thing = self._populate_redditor_info(user_thing)
