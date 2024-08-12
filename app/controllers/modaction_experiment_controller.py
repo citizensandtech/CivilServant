@@ -73,6 +73,6 @@ class ModactionExperimentController(ExperimentController, abc.ABC):
         user_thing.object_created = redditor.created_utc
 
         # Add new data to the current database transaction.
-        self.db_session.add(redditor)
+        self.db_session.add(user_thing)
 
         return user_thing
