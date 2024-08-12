@@ -138,13 +138,13 @@ class BanneduserExperimentController(ModactionExperimentController):
             # TODO: If intervention already happened, we shouldn't remove them from the study. What do we do?
 
             # Take a snapshot of the current user.
-            snapshot = {
+            snapshot = ExperimentThingSnapshot({
                 "experiment_thing_id": user.id,
                 "object_type": user.object_type,
                 "experiment_id": user.experiment_id,
                 "metadata_json": user.metadata_json,
-            }
-            self.db_session.insert_retryable(ExperimentThingSnapshot, snapshot)
+            })
+            self.db_session.add(snapshot)
 
             if self._is_tempban(modaction):
                 # Temp ban was updated.
@@ -154,19 +154,13 @@ class BanneduserExperimentController(ModactionExperimentController):
                         **self._parse_temp_ban(user),
                     }
                 )
-                self.db_session.execute_retryable(
-                    ExperimentThing.__table__.update(), user
-                )
+                self.db_session.add(user)
             elif modaction["action"] == "banuser":
                 # Escalated to permaban, so remove from the study.
-                self.db_session.execute_retryable(
-                    ExperimentThing.__table__.delete(), user
-                )
+                self.db_session.delete(user)
             elif modaction["action"] == "unbanuser":
                 # User was unbanned, so remove from the study.
-                self.db_session.execute_retryable(
-                    ExperimentThing.__table__.delete(), user
-                )
+                self.db_session.delete(user)
 
     def _get_account_age(self, user_thing):
         user_thing = self._populate_redditor_info(user_thing)
