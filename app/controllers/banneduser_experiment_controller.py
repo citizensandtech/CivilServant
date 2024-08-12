@@ -7,17 +7,15 @@ import sys
 import logging
 
 import uuid
-from app.controllers.experiment_controller import ExperimentConfigurationError
 from sqlalchemy import and_
 
+from app.controllers.experiment_controller import ExperimentConfigurationError
 from app.controllers.modaction_experiment_controller import (
     ModactionExperimentController,
 )
-
 from app.controllers.messaging_controller import (
     MessagingController,
 )
-
 from app.models import (
     ExperimentAction,
     ExperimentThing,
@@ -138,12 +136,14 @@ class BanneduserExperimentController(ModactionExperimentController):
             # TODO: If intervention already happened, we shouldn't remove them from the study. What do we do?
 
             # Take a snapshot of the current user.
-            snapshot = ExperimentThingSnapshot({
-                "experiment_thing_id": user.id,
-                "object_type": user.object_type,
-                "experiment_id": user.experiment_id,
-                "metadata_json": user.metadata_json,
-            })
+            snapshot = ExperimentThingSnapshot(
+                {
+                    "experiment_thing_id": user.id,
+                    "object_type": user.object_type,
+                    "experiment_id": user.experiment_id,
+                    "metadata_json": user.metadata_json,
+                }
+            )
             self.db_session.add(snapshot)
 
             if self._is_tempban(modaction):
