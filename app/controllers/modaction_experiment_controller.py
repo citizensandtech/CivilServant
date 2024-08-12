@@ -5,6 +5,7 @@ from sqlalchemy import and_
 
 from app.controllers.experiment_controller import ExperimentController
 from app.models import ExperimentThing, ThingType
+import logging
 
 
 class ModactionExperimentController(ExperimentController, abc.ABC):
@@ -54,6 +55,7 @@ class ModactionExperimentController(ExperimentController, abc.ABC):
         return [u[0] for u in user_ids]
 
     def _populate_redditor_info(self, user_thing):
+
         """Load redditor information, if available, and save it to the ExperimentThing.
 
         Args:
@@ -62,7 +64,7 @@ class ModactionExperimentController(ExperimentController, abc.ABC):
         Returns:
             The up-to-date ExperimentThing.
         """
-        if user_thing.object_created is not None:
+        if 'object_created' in user_thing and user_thing.object_created is not None:
             # We already have the info we need.
             return user_thing
         redditor = self.r.redditor(user_thing.thing_id)

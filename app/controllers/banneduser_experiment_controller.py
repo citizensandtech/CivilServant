@@ -4,12 +4,13 @@ import json
 import os
 import re
 import sys
+import logging
 
 import uuid
 from sqlalchemy import and_
 
 from app.controllers.modaction_experiment_controller import (
-    ExperimentConfigurationError,
+#    ExperimentConfigurationError,
     ModactionExperimentController,
 )
 
@@ -198,7 +199,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             newcomer_ets = []
             newcomers_without_randomization = 0
 
-            for newcomer in newcomer_modactions:
+            for newcomer_id, newcomer in newcomer_modactions.items():
                 condition = self._get_condition(newcomer)
 
                 # Get the next randomization, and ensure that it's valid.
@@ -256,7 +257,7 @@ class BanneduserExperimentController(ModactionExperimentController):
 
         except Exception as e:
             self.log.error(
-                "Error in BanneduserExperimentController::assign_randomized_conditions"
+                "Error in BanneduserExperimentController::assign_randomized_conditions", e
             )
             return []
         finally:
