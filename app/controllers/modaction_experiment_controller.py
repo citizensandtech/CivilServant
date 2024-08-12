@@ -1,4 +1,5 @@
 import abc
+import json
 
 from sqlalchemy import and_
 
@@ -54,10 +55,10 @@ class ModactionExperimentController(ExperimentController, abc.ABC):
 
     def _populate_redditor_info(self, user_thing):
         """Load redditor information, if available, and save it to the ExperimentThing.
-        
+
         Args:
             user_thing: ExperimentThing of type USER.
-        
+
         Returns:
             The up-to-date ExperimentThing.
         """
@@ -71,5 +72,5 @@ class ModactionExperimentController(ExperimentController, abc.ABC):
 
         # Add new data to the current database transaction.
         self.db_session.add(redditor)
-        
+
         return user_thing

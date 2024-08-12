@@ -1,13 +1,15 @@
-from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 import inspect
+import json
 import os
 import re
 import sys
 
-import praw
+import uuid
+from sqlalchemy import and_
 
 from app.controllers.modaction_experiment_controller import (
+    ExperimentConfigurationError,
     ModactionExperimentController,
 )
 
@@ -15,7 +17,7 @@ from app.controllers.messaging_controller import (
     MessagingController,
 )
 
-from app.models import ExperimentThing, ThingType
+from app.models import ExperimentAction, ExperimentThing, ThingType
 
 BASE_DIR = os.path.join(
     os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))),
@@ -125,8 +127,9 @@ class BanneduserExperimentController(ModactionExperimentController):
         # Apply updates to corresponding `ExperimentThing`s.
         for modaction in updated_users.values():
             # NOTE: This could throw a KeyError, but it shouldn't according to how we build this dict.
-            ut = users_by_username[modaction["target_author"]]
-            # TODO: Take a snapshot before applying changes.
+            user_thing = users_by_username[modaction["target_author"]]
+            self.db_session.insert_retryable(ExperimentThing, user_thing)
+
             if self._is_tempban(modaction):
                 # TODO: Temp ban was updated.
                 pass
@@ -273,12 +276,12 @@ class BanneduserExperimentController(ModactionExperimentController):
         if days is None:
             return None
 
-        starts_at = int(newcomer["created_utc"])
+        starts_at = int(modaction["created_utc"])
         ends_at = starts_at + (days * 86400)
 
         return {
             "ban_duration_days": days,
-            "ban_reason": newcomer["description"],
+            "ban_reason": modaction["description"],
             "ban_start_time": starts_at,
             "ban_end_time": ends_at,
         }
@@ -297,7 +300,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         if not self._is_tempban(modaction):
             return None
 
-        m = re.search(r"(\d+) days", details, re.IGNORECASE)
+        m = re.search(r"(\d+) days", modaction["details"], re.IGNORECASE)
         return int(m.group(1)) if m else None
 
     def update_experiment(self):
