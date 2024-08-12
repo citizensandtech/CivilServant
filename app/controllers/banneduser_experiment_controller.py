@@ -7,10 +7,10 @@ import sys
 import logging
 
 import uuid
+from app.controllers.experiment_controller import ExperimentConfigurationError
 from sqlalchemy import and_
 
 from app.controllers.modaction_experiment_controller import (
-#    ExperimentConfigurationError,
     ModactionExperimentController,
 )
 

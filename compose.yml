@@ -22,9 +22,10 @@ services:
       - ./docker/create_databases.sql:/docker-entrypoint-initdb.d/create_databases.sql
     healthcheck:
       test:
-        ["CMD", "mysql", "-u", "root", "-e", "USE civilservant_development;"]
-      start_period: 20s
+        ["CMD", "/bin/sh", "-c", "mysql -u root -e USE 'civilservant_development;' && echo 'ok'"]
+      start_period: 5s
       interval: 5s
+      retries: 10
 
 volumes:
   mysql-data:

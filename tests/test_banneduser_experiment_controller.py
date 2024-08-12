@@ -1,12 +1,9 @@
-import pytest
 import os
-import yaml
 import glob
-import simplejson as json
-import praw
-from collections import defaultdict
 from unittest.mock import Mock, patch
-import uuid
+
+import pytest
+import simplejson as json
 
 # XXX: must come before app imports
 ENV = os.environ["CS_ENV"] = "test"
