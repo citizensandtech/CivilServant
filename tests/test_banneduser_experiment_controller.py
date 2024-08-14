@@ -1,6 +1,11 @@
+from dataclasses import dataclass
 import os
 import glob
-from unittest.mock import Mock, patch
+import simplejson as json
+import praw
+from collections import defaultdict
+from unittest.mock import MagicMock, Mock, patch
+import uuid
 
 import pytest
 import simplejson as json
@@ -80,9 +85,10 @@ def reddit_return_value(modaction_fixtures):
         ] + [[]]
         r.get_mod_log = m
         
-        m = Mock()
-        # TODO: add redditor fixture data
-        r.redditor = m
+        @dataclass
+        class MockRedditor:
+            created_utc = 123
+        r.redditor = MagicMock(return_value=MockRedditor())
 
         return r
 
