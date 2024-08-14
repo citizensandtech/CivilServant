@@ -1,10 +1,10 @@
 from datetime import datetime, timedelta
+from enum import StrEnum
 import inspect
 import json
 import os
 import re
 import sys
-import logging
 
 import uuid
 from sqlalchemy import and_
@@ -29,6 +29,14 @@ BASE_DIR = os.path.join(
     "..",
 )
 ENV = os.environ["CS_ENV"]
+
+
+class BannedUserQueryIndex(StrEnum):
+    """Possible states of a banned user's query_index."""
+
+    COMPLETE = "Intervention Complete"
+    IMPOSSIBLE = "Intervention Impossible"
+    TBD = "Intervention TBD"
 
 
 class BanneduserExperimentController(ModactionExperimentController):
@@ -155,12 +163,16 @@ class BanneduserExperimentController(ModactionExperimentController):
                     }
                 )
                 self.db_session.add(user)
-            elif modaction["action"] == "banuser":
-                # Escalated to permaban, so remove from the study.
-                self.db_session.delete(user)
-            elif modaction["action"] == "unbanuser":
-                # User was unbanned, so remove from the study.
-                self.db_session.delete(user)
+            if user.query_index != BannedUserQueryIndex.COMPLETE:
+                # Cancel the intervention.
+                if modaction["action"] == "banuser":
+                    # Escalated to permaban, so remove from the study.
+                    user.query_index = BannedUserQueryIndex.IMPOSSIBLE
+                    self.db_session.add(user)
+                elif modaction["action"] == "unbanuser":
+                    # User was unbanned, so remove from the study.
+                    user.query_index = BannedUserQueryIndex.IMPOSSIBLE
+                    self.db_session.add(user)
 
     def _get_account_age(self, user_thing):
         user_thing = self._populate_redditor_info(user_thing)
@@ -229,7 +241,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                     "object_type": ThingType.USER.value,
                     # we don't have account creation info at this stage
                     "object_created": None,
-                    "query_index": "Intervention TBD",
+                    "query_index": BannedUserQueryIndex.TBD,
                     "metadata_json": json.dumps(et_metadata),
                 }
                 newcomer_ets.append(et)
@@ -251,7 +263,8 @@ class BanneduserExperimentController(ModactionExperimentController):
 
         except Exception as e:
             self.log.error(
-                "Error in BanneduserExperimentController::assign_randomized_conditions", e
+                "Error in BanneduserExperimentController::assign_randomized_conditions",
+                e,
             )
             return []
         finally:
@@ -353,7 +366,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                 and_(
                     ExperimentThing.object_type == ThingType.USER.value,
                     ExperimentThing.experiment_id == self.experiment.id,
-                    ExperimentThing.query_index == "Intervention TBD",
+                    ExperimentThing.query_index == BannedUserQueryIndex.TBD,
                     ExperimentThing.object_created < twelve_hours_ago,
                 )
             )
@@ -430,7 +443,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                         action_object_id=experiment_thing.id,
                         metadata_json=json.dumps(metadata),
                     )
-                    experiment_thing.query_index = "Intervention Complete"
+                    experiment_thing.query_index = BannedUserQueryIndex.COMPLETE
                     experiment_thing.metadata_json = json.dumps(metadata)
                     self.db_session.add(ea)
                 else:
@@ -473,14 +486,16 @@ class BanneduserExperimentController(ModactionExperimentController):
                             if invalid_username:
                                 metadata["message_status"] = "nonexistent"
                                 metadata["survey_status"] = "nonexistent"
-                                experiment_thing.query_index = "Intervention Impossible"
+                                experiment_thing.query_index = (
+                                    BannedUserQueryIndex.IMPOSSIBLE
+                                )
                                 update_records = True
                     ## if there are no errors
                     ## add an ExperimentAction and
                     ## update the experiment_thing metadata
                     else:
                         metadata["message_status"] = "sent"
-                        experiment_thing.query_index = "Intervention Complete"
+                        experiment_thing.query_index = BannedUserQueryIndex.COMPLETE
                         update_records = True
 
                     if update_records:
