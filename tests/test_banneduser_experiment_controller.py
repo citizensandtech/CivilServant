@@ -230,9 +230,18 @@ def test_user_detected_as_enrolled(experiment_controller):
 
 
 #### TEST BanneduserExperimentController::get_accounts_needing_interventions
-def test_interventions(experiment_controller):
+def test_interventions(experiment_controller, reddit_return_value):
 
     ## SET UP FIXTURES AND INITIALIZE DATABASE
+
+
+    m = Mock()
+    # Fixture data is broken up like this to allow testing of API 'pagination'
+    """
+    m.side_effect = "yo"
+    reddit_return_value.redditorr = m
+    logging.info(reddit_return_value.redditorr)
+    """
 
 
     all_modactions = {}
@@ -260,6 +269,8 @@ def test_interventions(experiment_controller):
         logging.info("Traceback: %s", traceback.format_exc())
         logger.exception("Error in BanneduserExperimentController::assign_randomized_conditions")
 
+
+        
 
     """
     ## TEST the result from get accounts needing intervention
