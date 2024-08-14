@@ -79,6 +79,10 @@ def reddit_return_value(modaction_fixtures):
             for i in range(0, len(modaction_fixtures), 100)
         ] + [[]]
         r.get_mod_log = m
+        
+        m = Mock()
+        # TODO: add redditor fixture data
+        r.redditor = m
 
         return r
 

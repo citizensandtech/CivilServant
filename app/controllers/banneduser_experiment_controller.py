@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from enum import StrEnum
+from enum import Enum
 import inspect
 import json
 import os
@@ -31,7 +31,7 @@ BASE_DIR = os.path.join(
 ENV = os.environ["CS_ENV"]
 
 
-class BannedUserQueryIndex(StrEnum):
+class BannedUserQueryIndex(str, Enum):
     """Possible states of a banned user's query_index."""
 
     COMPLETE = "Intervention Complete"
@@ -140,8 +140,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         for modaction in updated_users.values():
             # NOTE: This could throw a KeyError, but it shouldn't according to how we build this dict.
             user = users_by_username[modaction["target_author"]]
-
-            # TODO: If intervention already happened, we shouldn't remove them from the study. What do we do?
+            user_metadata = json.loads(user.metadata_json)
 
             # Take a snapshot of the current user.
             snapshot = ExperimentThingSnapshot(
@@ -154,37 +153,35 @@ class BanneduserExperimentController(ModactionExperimentController):
             )
             self.db_session.add(snapshot)
 
+            # Update the user based on the mod action taken.
             if self._is_tempban(modaction):
                 # Temp ban was updated.
-                user.metadata_json = json.dumps(
-                    {
-                        **json.loads(user.metadata_json),
-                        **self._parse_temp_ban(user),
-                    }
-                )
+                user_metadata = {**user_metadata, **self._parse_temp_ban(user)}
                 self.db_session.add(user)
-            if user.query_index != BannedUserQueryIndex.COMPLETE:
-                # Cancel the intervention.
-                if modaction["action"] == "banuser":
-                    # Escalated to permaban, so remove from the study.
+            elif modaction["action"] == "banuser":
+                # Escalated to permaban.
+                user_metadata["ban_type"] = "permanent"
+                if user.query_index == BannedUserQueryIndex.TBD:
                     user.query_index = BannedUserQueryIndex.IMPOSSIBLE
-                    self.db_session.add(user)
-                elif modaction["action"] == "unbanuser":
-                    # User was unbanned, so remove from the study.
+            elif modaction["action"] == "unbanuser":
+                # User was unbanned.
+                user_metadata["ban_type"] = "unbanned"
+                if user.query_index == BannedUserQueryIndex.TBD:
                     user.query_index = BannedUserQueryIndex.IMPOSSIBLE
-                    self.db_session.add(user)
 
-    def _get_account_age(self, user_thing):
-        user_thing = self._populate_redditor_info(user_thing)
+            user.metadata_json = json.dumps(user_metadata)
+            self.db_session.add(user)
+
+    def _get_account_age(self, account_created):
         now_utc = datetime.utcnow().timestamp()
-        age_days = (now_utc - user_thing.object_created) / 86400
+        age_days = (now_utc - account_created) / 86400
         if age_days < 7:
             return "weekling"
         else:
             return "oldster"
 
-    def _get_condition(self, user_thing):
-        age_bucket = self._get_account_age(user_thing)
+    def _get_condition(self, account_created):
+        age_bucket = self._get_account_age(account_created)
 
         # Combine multiple factors into condition.
         condition = f"{age_bucket}"
@@ -206,7 +203,10 @@ class BanneduserExperimentController(ModactionExperimentController):
             newcomers_without_randomization = 0
 
             for newcomer_id, newcomer in newcomer_modactions.items():
-                condition = self._get_condition(newcomer)
+                # Make an API call here to get the account age.
+                # This is required to assign condition/randomization to the newcomer.
+                info = self._load_redditor_info(newcomer_id)
+                condition = self._get_condition(info["object_created"])
 
                 # Get the next randomization, and ensure that it's valid.
                 next_randomization = self.experiment_settings["conditions"][condition][
@@ -229,22 +229,21 @@ class BanneduserExperimentController(ModactionExperimentController):
                     "next_randomization"
                 ] += 1
 
-                et_metadata = {
+                user_metadata = {
                     "condition": condition,
                     "randomization": randomization,
                     **self._parse_temp_ban(newcomer),
                 }
-                et = {
+                user = {
                     "id": uuid.uuid4().hex,
                     "thing_id": newcomer["target_author"],
                     "experiment_id": self.experiment.id,
                     "object_type": ThingType.USER.value,
-                    # we don't have account creation info at this stage
-                    "object_created": None,
+                    "object_created": info["object_created"],
                     "query_index": BannedUserQueryIndex.TBD,
-                    "metadata_json": json.dumps(et_metadata),
+                    "metadata_json": json.dumps(user_metadata),
                 }
-                newcomer_ets.append(et)
+                newcomer_ets.append(user)
 
             if newcomers_without_randomization > 0:
                 self.log.error(
@@ -303,6 +302,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             {
                 "ban_duration_days": 30,
                 "ban_reason": "Bad behavior",
+                "ban_type": "temporary",
                 "ban_start_time": 1704154715,
                 "ban_end_time": 1705277915,
             }
@@ -318,6 +318,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             "ban_duration_days": days,
             "ban_reason": modaction["description"],
             "ban_start_time": starts_at,
+            "ban_type": "temporary",
             "ban_end_time": ends_at,
         }
 

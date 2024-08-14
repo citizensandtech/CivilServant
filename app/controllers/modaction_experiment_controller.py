@@ -4,8 +4,7 @@ import json
 from sqlalchemy import and_
 
 from app.controllers.experiment_controller import ExperimentController
-from app.models import ExperimentThing, ThingType
-import logging
+from app.models import ExperimentThing, ExperimentThingSnapshot, ThingType
 
 
 class ModactionExperimentController(ExperimentController, abc.ABC):
@@ -54,25 +53,20 @@ class ModactionExperimentController(ExperimentController, abc.ABC):
         )
         return [u[0] for u in user_ids]
 
-    def _populate_redditor_info(self, user_thing):
-
-        """Load redditor information, if available, and save it to the ExperimentThing.
+    def _load_redditor_info(self, user_id):
+        """Load redditor information, if available.
 
         Args:
-            user_thing: ExperimentThing of type USER.
+            user_id: The reddit username.
 
         Returns:
-            The up-to-date ExperimentThing.
+            Dict of values about the redditor.
         """
-        if 'object_created' in user_thing and user_thing.object_created is not None:
-            # We already have the info we need.
-            return user_thing
-        redditor = self.r.redditor(user_thing.thing_id)
+        redditor = self.r.redditor(user_id)
 
         # Grab the useful data about this user.
-        user_thing.object_created = redditor.created_utc
+        info = {
+            "object_created": redditor.created_utc
+        }
 
-        # Add new data to the current database transaction.
-        self.db_session.add(user_thing)
-
-        return user_thing
+        return info
