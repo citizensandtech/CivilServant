@@ -202,11 +202,6 @@ class BanneduserExperimentController(ModactionExperimentController):
             newcomer_ets = []
             newcomers_without_randomization = 0
 
-            self.log.info("YO")
-            self.log.info(newcomer_modactions)
-            self.log.info(len(newcomer_modactions))
-            self.log.info(type(newcomer_modactions))
-
             for newcomer in newcomer_modactions:
                 # Make an API call here to get the account age.
                 # This is required to assign condition/randomization to the newcomer.
@@ -239,10 +234,12 @@ class BanneduserExperimentController(ModactionExperimentController):
 
               
 
+
                 user_metadata = {
                     "condition": condition,
                     "randomization": randomization,
                     **self._parse_temp_ban(newcomer),
+                    "arm": "arm_" + str(randomization['treatment']),
                 }
                 user = {
                     "id": uuid.uuid4().hex,
@@ -403,18 +400,21 @@ class BanneduserExperimentController(ModactionExperimentController):
         """
         metadata_json = json.loads(experiment_thing.metadata_json)
         account_info = {"username": experiment_thing.thing_id}
+
+        condition = metadata_json["condition"]
         arm = metadata_json["arm"]
-        cond = self.experiment_settings["conditions"][self.get_condition()]
-        if arm not in cond["arms"].keys():
+
+        yml_cond = self.experiment_settings["conditions"][condition]
+        if arm not in yml_cond["arms"].keys():
             raise ExperimentConfigurationError(
                 "In the experiment '{0}', the '{1}' condition fails to include information about the '{2}' arm, despite having randomizations assigned to it".format(
                     self.experiment_name, self.get_condition(), arm
                 )
             )
-        if cond["arms"][arm] is None:
+        if yml_cond["arms"][arm] is None:
             return None
-        message_subject = cond["arms"][arm]["pm_subject"].format(**account_info)
-        message_body = cond["arms"][arm]["pm_text"].format(**account_info)
+        message_subject = yml_cond["arms"][arm]["pm_subject"].format(**account_info)
+        message_body = yml_cond["arms"][arm]["pm_text"].format(**account_info)
         return {"subject": message_subject, "message": message_body}
 
     def _send_intervention_messages(self, experiment_things):

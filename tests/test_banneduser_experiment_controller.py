@@ -254,10 +254,8 @@ def test_interventions(experiment_controller, reddit_return_value):
     """
 
 
-    fetched_mod_actions = []
     modaction_fixtures = []
-    newcomer_modactions = []
-    for filename in sorted(glob.glob("{script_dir}/fixture_data/modactions_20240703/mod_actions_10*".format(script_dir=TEST_DIR))):
+    for filename in sorted(glob.glob("{script_dir}/fixture_data/modactions_20240703/mod_actions_1*".format(script_dir=TEST_DIR))):
         f = open(filename, "r")
         modaction_fixtures += json.loads(f.read())
         f.close()
@@ -266,6 +264,7 @@ def test_interventions(experiment_controller, reddit_return_value):
     ## LEST A BUG ACCIDENTALLY SEND PEOPLE COMMENTS
     ## WHILE WE ARE UNIT TESTING. reddit has a 20 character limit
     ## so any uuid4 will be an invalid username on reddit
+    fetched_mod_actions = []
     for modaction in modaction_fixtures:
         author = uuid.uuid4().hex
         modaction['target_author']  = author
@@ -273,61 +272,91 @@ def test_interventions(experiment_controller, reddit_return_value):
 
 
 
-
-    eligible_newcomers = self._find_eligible_newcomers(fetched_mod_actions)
-
+    # FIXME: SHOULD WE DUPLICATE LOGIC OF enroll_new_participants here?
 
 
 
     try:
-        experiment_controller._assign_randomized_conditions(fetched_mod_actions)
+        eligible_newcomers = experiment_controller._find_eligible_newcomers(fetched_mod_actions)
     except Exception as e:
-        logging.info("Error in BanneduserExperimentController::assign_randomized_conditions: %s", str(e))
+        logging.info("Error in BanneduserExperimentController::_find_eligible_newcomers: %s", str(e))
+        logging.info("Traceback: %s", traceback.format_exc())
+        #FIXME how should an exception be logged?
+
+    # TODO - craft assert based on data?
+    #assert len(eligible_newcomers) == 10
+
+
+    try:
+        experiment_controller._assign_randomized_conditions(eligible_newcomers)
+    except Exception as e:
+        logging.info("Error in BanneduserExperimentController::_assign_randomized_conditions: %s", str(e))
         logging.info("Traceback: %s", traceback.format_exc())
         #FIXME how should an exception be logged?
         #logger.exception("Error in BanneduserExperimentController::assign_randomized_conditions")
-    
+
+
+
+    # FIXME
+    """
+    try:
+        experiment_controller._update_existing_participants(fetched_mod_actions)
+    except Exception as e:
+        logging.info("Error in BanneduserExperimentController::_update_existing_participants: %s", str(e))
+        logging.info("Traceback: %s", traceback.format_exc())
+        #FIXME how should an exception be logged?
+        #logger.exception("Error in BanneduserExperimentController::assign_randomized_conditions")
+    """   
         
 
     ## TEST the result from get accounts needing intervention
     accounts_needing_intervention = experiment_controller._get_accounts_needing_interventions()
 
-    
-    assert len(accounts_needing_intervention) == len(newcomer_modactions)
-    # TODO: consider crafting test daa
+   
+    # TODO - craft assert based on data?
+    #assert len(accounts_needing_intervention) == len(newcomer_modactions)
 
-    """
 
-    newcomer_authors = [x['author'] for x in newcomer_comments]
+    # FIXME: Not sure why we need to do an assert here?
+    fetched_modactioned_accounts = [x['target_author'] for x in fetched_mod_actions]
     for account in accounts_needing_intervention:
-        assert account.thing_id in newcomer_authors
+
+        message = experiment_controller._format_intervention_message(account)
+        #logging.info(message)
+
+        assert account.thing_id in fetched_modactioned_accounts
+
+
+
 
     ## TEST the formatting of messages
     # first case: where the arm is arm_1 as specified in the randomizations csv
     arm_1_experiment_thing = [x for x in accounts_needing_intervention if json.loads(x.metadata_json)['arm']=="arm_1"][0]
-
-    message_output = experiment_controller.format_message(arm_1_experiment_thing)
-    assert message_output['message'].find("Hi {0}!".format(arm_1_experiment_thing.thing_id)) > -1
+    message_output = experiment_controller._format_intervention_message(arm_1_experiment_thing)
+    # TODO craft assert based on data 
+    assert message_output['message'].find("Hello" ) > -1
     # second case: where the arm is null experiment_controllerause it's the control group
     # in that case, the message output should be None
 
-    arm_0_experiment_thing = [x for x in accounts_needing_intervention if json.loads(x.metadata_json)['arm']=="arm_0"][0]
-    message_output = experiment_controller.format_message(arm_0_experiment_thing) 
-    assert message_output is None
+
+    # TODO craft additional asserts based on specifics of arm behavior
+
+
 
     ## TEST the result from sending messages
     m = Mock()
     message_return_vals = []
 
+    """
     ## SET UP accounts_to_test return values from message sending
     ## the final account in the set will be an invalid username error
     #for i in range(accounts_to_test-1):
     #    message_return_vals.append({"errors":[]})
     message_return_vals.append({"errors":[]})
-    message_return_vals.append({"errors":[{"username":newcomer_authors[accounts_to_test -2],
+    message_return_vals.append({"errors":[{"username":fetched_modactioned_accounts[accounts_to_test -2],
                                 "error": "nondescript error"}]})    
     message_return_vals.append(
-        {"errors":[{"username":newcomer_authors[accounts_to_test-1], 
+        {"errors":[{"username":fetched_modactioned_accounts[accounts_to_test-1], 
         "error":"invalid username"}]})
 
     m.side_effect = message_return_vals

@@ -3,23 +3,27 @@ test:
   subreddit_id: mouw
   username: CivilServantBot
   conditions:
-    main:
+    weekling:
       randomizations: messaging_experiment_test_main.conditions.csv
       next_randomization: 0
       arms:
-        arm_0: null
+        arm_0:
+          pm_subject: PM Subject Line (Weekling Arm 0)
+          pm_text: Hello, this is the message for arm 0 of the weekling condition.
         arm_1:
-          pm_subject: PM Subject Line (Arm 1)
-          pm_text: Hello, this is the message for arm 1 of the 1st condition.
+          pm_subject: PM Subject Line (Weekling Arm 1)
+          pm_text: Hello, this is the message for arm 1 of the weekling condition.
         arm_2:
           reason_text: This is arm 2 of the 1st condition
-          pm_subject: PM Subject Line (Arm 2)
-          pm_text: Hello, this is the message for arm 2 of the 1st condition.
+          pm_subject: PM Subject Line (Weekling Arm 2)
+          pm_text: Hello, this is the message for arm 2 of the weekling condition.
     oldster:
       randomizations: messaging_experiment_test_main.conditions.csv
       next_randomization: 0
       arms:
-        arm_0: null
+        arm_0: 
+          pm_subject: PM Subject Line (Oldster Arm 0)
+          pm_text: Hello, this is the message for arm 0 of the oldster condition.
         arm_1:
           pm_subject: PM Subject Line (Oldster Arm 1)
           pm_text: Hello, this is the message for arm 1 of the oldster condition.
