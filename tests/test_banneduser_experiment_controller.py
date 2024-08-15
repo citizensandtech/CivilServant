@@ -87,7 +87,7 @@ def reddit_return_value(modaction_fixtures):
         
         @dataclass
         class MockRedditor:
-            created_utc = 123
+            created_utc = 1234
         r.redditor = MagicMock(return_value=MockRedditor())
 
         return r
@@ -240,26 +240,37 @@ def test_user_detected_as_enrolled(experiment_controller):
 
 
 #### TEST BanneduserExperimentController::get_accounts_needing_interventions
-def test_interventions(experiment_controller, reddit_return_value):
+@patch('praw.Reddit', autospec=True)
+def test_interventions(mock_reddit, experiment_controller):
 
     ## SET UP FIXTURES AND INITIALIZE DATABASE
+    r = mock_reddit.return_value
 
 
-    m = Mock()
     # Fixture data is broken up like this to allow testing of API 'pagination'
-    """
-    m.side_effect = "yo"
-    reddit_return_value.redditorr = m
-    logging.info(reddit_return_value.redditorr)
-    """
-
-
     modaction_fixtures = []
     for filename in sorted(glob.glob("{script_dir}/fixture_data/modactions_20240703/mod_actions_1*".format(script_dir=TEST_DIR))):
         f = open(filename, "r")
         modaction_fixtures += json.loads(f.read())
         f.close()
+
+    m = Mock()
+    # Fixture data is broken up like this to allow testing of API 'pagination'
+    m.side_effect = [
+        modaction_fixtures[i : i + 100]
+        for i in range(0, len(modaction_fixtures), 100)
+    ] + [[]]
+    r.get_mod_log = m
     
+    @dataclass
+    class MockRedditor:
+        created_utc = 1723740667
+    r.redditor = MagicMock(return_value=MockRedditor())
+
+
+
+
+
     ## IN THIS CASE, WE ARE GENERATING TARGET_AUTHOR IDs
     ## LEST A BUG ACCIDENTALLY SEND PEOPLE COMMENTS
     ## WHILE WE ARE UNIT TESTING. reddit has a 20 character limit
@@ -317,12 +328,11 @@ def test_interventions(experiment_controller, reddit_return_value):
     #assert len(accounts_needing_intervention) == len(newcomer_modactions)
 
 
-    # FIXME: Not sure why we need to do an assert here?
     fetched_modactioned_accounts = [x['target_author'] for x in fetched_mod_actions]
     for account in accounts_needing_intervention:
 
         message = experiment_controller._format_intervention_message(account)
-        #logging.info(message)
+        logging.info(message)
 
         assert account.thing_id in fetched_modactioned_accounts
 

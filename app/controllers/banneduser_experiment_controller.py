@@ -207,6 +207,8 @@ class BanneduserExperimentController(ModactionExperimentController):
                 # This is required to assign condition/randomization to the newcomer.
                 newcomer_id = newcomer['target_author']
                 info = self._load_redditor_info(newcomer_id)
+
+                self.log.info(info)
                 condition = self._get_condition(info["object_created"])
 
                 # Get the next randomization, and ensure that it's valid.
