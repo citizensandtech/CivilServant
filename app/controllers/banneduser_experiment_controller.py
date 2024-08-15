@@ -56,7 +56,7 @@ class BanneduserExperimentController(ModactionExperimentController):
     def enroll_new_participants(self, instance):
         """Enroll new participants in the experiment.
 
-        This is a callback that will be invoked declaratively.
+        This is a callback that will be invoked declaratively. This is called by ModeratorController while running archive_mod_action_page, as noted in the experiment config YAML File.
         """
         if instance.fetched_subreddit_id != self.experiment_settings["subreddit_id"]:
             return
@@ -86,10 +86,10 @@ class BanneduserExperimentController(ModactionExperimentController):
             modactions: A list of mod actions.
 
         Returns:
-            A dict of relevant mod actions, indexed by the new user's ID.
+            A list of relevant mod actions
         """
         previously_enrolled_user_ids = set(self._previously_enrolled_user_ids())
-        eligible_newcomers = {}
+        eligible_newcomers = []
         for modaction in modactions:
             # Skip irrelevant mod actions.
             if (
@@ -102,7 +102,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             # NOTE: If there are multiple mod actions for the same user who isn't yet enrolled,
             # we overwrite the previous action with the latest one.
             # This assumes that they are processed in order.
-            eligible_newcomers[modaction["target_author"]] = modaction
+            eligible_newcomers.append(modaction)
 
         return eligible_newcomers
 
@@ -202,9 +202,15 @@ class BanneduserExperimentController(ModactionExperimentController):
             newcomer_ets = []
             newcomers_without_randomization = 0
 
-            for newcomer_id, newcomer in newcomer_modactions.items():
+            self.log.info("YO")
+            self.log.info(newcomer_modactions)
+            self.log.info(len(newcomer_modactions))
+            self.log.info(type(newcomer_modactions))
+
+            for newcomer in newcomer_modactions:
                 # Make an API call here to get the account age.
                 # This is required to assign condition/randomization to the newcomer.
+                newcomer_id = newcomer['target_author']
                 info = self._load_redditor_info(newcomer_id)
                 condition = self._get_condition(info["object_created"])
 
@@ -228,6 +234,10 @@ class BanneduserExperimentController(ModactionExperimentController):
                 self.experiment_settings["conditions"][condition][
                     "next_randomization"
                 ] += 1
+
+
+
+              
 
                 user_metadata = {
                     "condition": condition,
@@ -295,7 +305,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             modaction: The moderation action for a temporary ban.
 
         Returns:
-            A dict with details about the temporary ban, or None if the action is not a temp ban.
+            A dict with details about the temporary ban, or empty dict if the action is not a temp ban.
             Note that `ban_start_time` and `ban_end_time` are UNIX timestamps in UTC.
 
         Example result:
@@ -309,7 +319,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         """
         days = self._parse_days(modaction)
         if days is None:
-            return None
+            return {}
 
         starts_at = int(modaction["created_utc"])
         ends_at = starts_at + (days * 86400)

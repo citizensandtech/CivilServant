@@ -254,10 +254,10 @@ def test_interventions(experiment_controller, reddit_return_value):
     """
 
 
-    all_modactions = {}
+    fetched_mod_actions = []
     modaction_fixtures = []
     newcomer_modactions = []
-    for filename in sorted(glob.glob("{script_dir}/fixture_data/modactions_20240703/mod_actions_1*".format(script_dir=TEST_DIR))):
+    for filename in sorted(glob.glob("{script_dir}/fixture_data/modactions_20240703/mod_actions_10*".format(script_dir=TEST_DIR))):
         f = open(filename, "r")
         modaction_fixtures += json.loads(f.read())
         f.close()
@@ -269,23 +269,35 @@ def test_interventions(experiment_controller, reddit_return_value):
     for modaction in modaction_fixtures:
         author = uuid.uuid4().hex
         modaction['target_author']  = author
-        all_modactions[author] = modaction
+        fetched_mod_actions.append(modaction)
+
+
+
+
+    eligible_newcomers = self._find_eligible_newcomers(fetched_mod_actions)
+
+
 
 
     try:
-        experiment_controller._assign_randomized_conditions(all_modactions)
+        experiment_controller._assign_randomized_conditions(fetched_mod_actions)
     except Exception as e:
         logging.info("Error in BanneduserExperimentController::assign_randomized_conditions: %s", str(e))
         logging.info("Traceback: %s", traceback.format_exc())
-        logger.exception("Error in BanneduserExperimentController::assign_randomized_conditions")
-
-
+        #FIXME how should an exception be logged?
+        #logger.exception("Error in BanneduserExperimentController::assign_randomized_conditions")
+    
         
 
-    """
     ## TEST the result from get accounts needing intervention
-    accounts_needing_intervention = experiment_controller.get_accounts_needing_interventions()
-    assert len(accounts_needing_intervention) == len(newcomer_comments[0:accounts_to_test])
+    accounts_needing_intervention = experiment_controller._get_accounts_needing_interventions()
+
+    
+    assert len(accounts_needing_intervention) == len(newcomer_modactions)
+    # TODO: consider crafting test daa
+
+    """
+
     newcomer_authors = [x['author'] for x in newcomer_comments]
     for account in accounts_needing_intervention:
         assert account.thing_id in newcomer_authors
