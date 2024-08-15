@@ -240,11 +240,9 @@ def test_user_detected_as_enrolled(experiment_controller):
 
 
 #### TEST BanneduserExperimentController::get_accounts_needing_interventions
-@patch('praw.Reddit', autospec=True)
-def test_interventions(mock_reddit, experiment_controller):
+def test_interventions(experiment_controller, reddit_return_value):
 
-    ## SET UP FIXTURES AND INITIALIZE DATABASE
-    r = mock_reddit.return_value
+    r = reddit_return_value
 
 
     # Fixture data is broken up like this to allow testing of API 'pagination'
@@ -254,19 +252,11 @@ def test_interventions(mock_reddit, experiment_controller):
         modaction_fixtures += json.loads(f.read())
         f.close()
 
-    m = Mock()
-    # Fixture data is broken up like this to allow testing of API 'pagination'
-    m.side_effect = [
-        modaction_fixtures[i : i + 100]
-        for i in range(0, len(modaction_fixtures), 100)
-    ] + [[]]
-    r.get_mod_log = m
     
     @dataclass
     class MockRedditor:
-        created_utc = 1723740667
+        created_utc = datetime.utcnow().timestamp()
     r.redditor = MagicMock(return_value=MockRedditor())
-
 
 
 
