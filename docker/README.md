@@ -16,7 +16,7 @@
   - pick "web app"
   - give it a description of your research
   - link to an about url relevant to your research
-  - use http://localhost as the redirect URL
+  - use `http://127.0.0.1:65010` as the redirect URL
 - Paste the `oauth_client_id` and `oauth_client_secret` into `praw.ini`. This file should have been created in the previous section. If it's not in your local copy of the project now, run `make praw.ini`.
 
 ### Configure oAuth tokens to access Reddit
