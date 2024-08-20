@@ -1,9 +1,8 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import os
 import glob
 import simplejson as json
-import praw
-from collections import defaultdict
+import time
 from unittest.mock import MagicMock, Mock, patch
 import uuid
 
@@ -84,10 +83,11 @@ def reddit_return_value(modaction_fixtures):
             for i in range(0, len(modaction_fixtures), 100)
         ] + [[]]
         r.get_mod_log = m
-        
+
         @dataclass
         class MockRedditor:
             created_utc = 1234
+
         r.redditor = MagicMock(return_value=MockRedditor())
 
         return r
@@ -238,28 +238,28 @@ def test_user_detected_as_enrolled(experiment_controller):
     assert experiment_controller._previously_enrolled_user_ids() == ["123"]
 
 
-
 #### TEST BanneduserExperimentController::get_accounts_needing_interventions
 def test_interventions(experiment_controller, reddit_return_value):
-
     r = reddit_return_value
-
 
     # Fixture data is broken up like this to allow testing of API 'pagination'
     modaction_fixtures = []
-    for filename in sorted(glob.glob("{script_dir}/fixture_data/modactions_20240703/mod_actions_1*".format(script_dir=TEST_DIR))):
+    for filename in sorted(
+        glob.glob(
+            "{script_dir}/fixture_data/modactions_20240703/mod_actions_1*".format(
+                script_dir=TEST_DIR
+            )
+        )
+    ):
         f = open(filename, "r")
         modaction_fixtures += json.loads(f.read())
         f.close()
 
-    
     @dataclass
     class MockRedditor:
-        created_utc = datetime.utcnow().timestamp()
+        created_utc: int = field(default_factory=lambda: int(time.time()))
+
     r.redditor = MagicMock(return_value=MockRedditor())
-
-
-
 
     ## IN THIS CASE, WE ARE GENERATING TARGET_AUTHOR IDs
     ## LEST A BUG ACCIDENTALLY SEND PEOPLE COMMENTS
@@ -268,35 +268,36 @@ def test_interventions(experiment_controller, reddit_return_value):
     fetched_mod_actions = []
     for modaction in modaction_fixtures:
         author = uuid.uuid4().hex
-        modaction['target_author']  = author
+        modaction["target_author"] = author
         fetched_mod_actions.append(modaction)
-
-
 
     # FIXME: SHOULD WE DUPLICATE LOGIC OF enroll_new_participants here?
 
-
-
     try:
-        eligible_newcomers = experiment_controller._find_eligible_newcomers(fetched_mod_actions)
+        eligible_newcomers = experiment_controller._find_eligible_newcomers(
+            fetched_mod_actions
+        )
     except Exception as e:
-        logging.info("Error in BanneduserExperimentController::_find_eligible_newcomers: %s", str(e))
+        logging.info(
+            "Error in BanneduserExperimentController::_find_eligible_newcomers: %s",
+            str(e),
+        )
         logging.info("Traceback: %s", traceback.format_exc())
-        #FIXME how should an exception be logged?
+        # FIXME how should an exception be logged?
 
     # TODO - craft assert based on data?
-    #assert len(eligible_newcomers) == 10
-
+    # assert len(eligible_newcomers) == 10
 
     try:
         experiment_controller._assign_randomized_conditions(eligible_newcomers)
     except Exception as e:
-        logging.info("Error in BanneduserExperimentController::_assign_randomized_conditions: %s", str(e))
+        logging.info(
+            "Error in BanneduserExperimentController::_assign_randomized_conditions: %s",
+            str(e),
+        )
         logging.info("Traceback: %s", traceback.format_exc())
-        #FIXME how should an exception be logged?
-        #logger.exception("Error in BanneduserExperimentController::assign_randomized_conditions")
-
-
+        # FIXME how should an exception be logged?
+        # logger.exception("Error in BanneduserExperimentController::assign_randomized_conditions")
 
     # FIXME
     """
@@ -307,41 +308,39 @@ def test_interventions(experiment_controller, reddit_return_value):
         logging.info("Traceback: %s", traceback.format_exc())
         #FIXME how should an exception be logged?
         #logger.exception("Error in BanneduserExperimentController::assign_randomized_conditions")
-    """   
-        
+    """
 
     ## TEST the result from get accounts needing intervention
-    accounts_needing_intervention = experiment_controller._get_accounts_needing_interventions()
+    accounts_needing_intervention = (
+        experiment_controller._get_accounts_needing_interventions()
+    )
 
-   
     # TODO - craft assert based on data?
-    #assert len(accounts_needing_intervention) == len(newcomer_modactions)
+    # assert len(accounts_needing_intervention) == len(newcomer_modactions)
 
-
-    fetched_modactioned_accounts = [x['target_author'] for x in fetched_mod_actions]
+    fetched_modactioned_accounts = [x["target_author"] for x in fetched_mod_actions]
     for account in accounts_needing_intervention:
-
         message = experiment_controller._format_intervention_message(account)
         logging.info(message)
 
         assert account.thing_id in fetched_modactioned_accounts
 
-
-
-
     ## TEST the formatting of messages
     # first case: where the arm is arm_1 as specified in the randomizations csv
-    arm_1_experiment_thing = [x for x in accounts_needing_intervention if json.loads(x.metadata_json)['arm']=="arm_1"][0]
-    message_output = experiment_controller._format_intervention_message(arm_1_experiment_thing)
-    # TODO craft assert based on data 
-    assert message_output['message'].find("Hello" ) > -1
+    arm_1_experiment_thing = [
+        x
+        for x in accounts_needing_intervention
+        if json.loads(x.metadata_json)["arm"] == "arm_1"
+    ][0]
+    message_output = experiment_controller._format_intervention_message(
+        arm_1_experiment_thing
+    )
+    # TODO craft assert based on data
+    assert message_output["message"].find("Hello") > -1
     # second case: where the arm is null experiment_controllerause it's the control group
     # in that case, the message output should be None
 
-
     # TODO craft additional asserts based on specifics of arm behavior
-
-
 
     ## TEST the result from sending messages
     m = Mock()
@@ -392,4 +391,3 @@ def test_interventions(experiment_controller, reddit_return_value):
                     {"query_index":"Intervention Impossible",
                      "message_status":"nonexistent",
      """
-

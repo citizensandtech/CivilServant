@@ -144,19 +144,17 @@ class BanneduserExperimentController(ModactionExperimentController):
 
             # Take a snapshot of the current user.
             snapshot = ExperimentThingSnapshot(
-                {
-                    "experiment_thing_id": user.id,
-                    "object_type": user.object_type,
-                    "experiment_id": user.experiment_id,
-                    "metadata_json": user.metadata_json,
-                }
+                experiment_thing_id=user.id,
+                object_type=user.object_type,
+                experiment_id=user.experiment_id,
+                metadata_json=user.metadata_json,
             )
             self.db_session.add(snapshot)
 
             # Update the user based on the mod action taken.
             if self._is_tempban(modaction):
                 # Temp ban was updated.
-                user_metadata = {**user_metadata, **self._parse_temp_ban(user)}
+                user_metadata = {**user_metadata, **self._parse_temp_ban(modaction)}
                 self.db_session.add(user)
             elif modaction["action"] == "banuser":
                 # Escalated to permaban.
@@ -205,7 +203,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             for newcomer in newcomer_modactions:
                 # Make an API call here to get the account age.
                 # This is required to assign condition/randomization to the newcomer.
-                newcomer_id = newcomer['target_author']
+                newcomer_id = newcomer["target_author"]
                 info = self._load_redditor_info(newcomer_id)
 
                 self.log.info(info)
@@ -232,16 +230,11 @@ class BanneduserExperimentController(ModactionExperimentController):
                     "next_randomization"
                 ] += 1
 
-
-
-              
-
-
                 user_metadata = {
                     "condition": condition,
                     "randomization": randomization,
                     **self._parse_temp_ban(newcomer),
-                    "arm": "arm_" + str(randomization['treatment']),
+                    "arm": "arm_" + str(randomization["treatment"]),
                 }
                 user = {
                     "id": uuid.uuid4().hex,
@@ -349,7 +342,6 @@ class BanneduserExperimentController(ModactionExperimentController):
         return int(m.group(1)) if m else None
 
     def update_experiment(self):
-
         accounts_needing_messages = self._get_accounts_needing_interventions()
         self.log.info(
             "Experiment {0}: identified {1} accounts needing interventions. Sending messages now...".format(
