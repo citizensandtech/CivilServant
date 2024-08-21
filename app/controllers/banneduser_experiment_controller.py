@@ -174,9 +174,9 @@ class BanneduserExperimentController(ModactionExperimentController):
         now_utc = datetime.utcnow().timestamp()
         age_days = (now_utc - account_created) / 86400
         if age_days < 7:
-            return "weekling"
+            return "newcomer"
         else:
-            return "oldster"
+            return "experienced"
 
     def _get_condition(self, account_created):
         age_bucket = self._get_account_age(account_created)
@@ -221,6 +221,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                 if next_randomization is None:
                     # If there's no valid randomization for this newcomer, skip it.
                     continue
+
 
                 # Get the current randomization and increment the experiment's counter.
                 randomization = self.experiment_settings["conditions"][condition][

@@ -3,34 +3,34 @@ test:
   subreddit_id: mouw
   username: CivilServantBot
   conditions:
-    weekling:
-      randomizations: messaging_experiment_test_main.conditions.csv
+    newcomer:
+      randomizations: banneduser_experiment_test.newcomer.randomizations.test.csv
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line (Weekling Arm 0)
-          pm_text: Hello, this is the message for arm 0 of the weekling condition.
+          pm_subject: PM Subject Line (Newcomber Arm 0)
+          pm_text: Hello, this is the message for arm 0 of the newcomer condition.
         arm_1:
-          pm_subject: PM Subject Line (Weekling Arm 1)
-          pm_text: Hello, this is the message for arm 1 of the weekling condition.
+          pm_subject: PM Subject Line (Newcomber Arm 1)
+          pm_text: Hello, this is the message for arm 1 of the newcomer condition.
         arm_2:
           reason_text: This is arm 2 of the 1st condition
-          pm_subject: PM Subject Line (Weekling Arm 2)
-          pm_text: Hello, this is the message for arm 2 of the weekling condition.
-    oldster:
-      randomizations: messaging_experiment_test_main.conditions.csv
+          pm_subject: PM Subject Line (Newcomber Arm 2)
+          pm_text: Hello, this is the message for arm 2 of the newcomer condition.
+    experienced:
+      randomizations: banneduser_experiment_test.experienced.randomizations.test.csv
       next_randomization: 0
       arms:
         arm_0: 
-          pm_subject: PM Subject Line (Oldster Arm 0)
-          pm_text: Hello, this is the message for arm 0 of the oldster condition.
+          pm_subject: PM Subject Line (Experienced Arm 0)
+          pm_text: Hello, this is the message for arm 0 of the experienced condition.
         arm_1:
-          pm_subject: PM Subject Line (Oldster Arm 1)
-          pm_text: Hello, this is the message for arm 1 of the oldster condition.
+          pm_subject: PM Subject Line (Experienced Arm 1)
+          pm_text: Hello, this is the message for arm 1 of the experienced condition.
         arm_2:
           reason_text: This is arm 2 of the 1st condition
-          pm_subject: PM Subject Line (Oldster Arm 2)
-          pm_text: Hello, this is the message for arm 2 of the oldster condition.
+          pm_subject: PM Subject Line (Experienced Arm 2)
+          pm_text: Hello, this is the message for arm 2 of the experienced condition.
   controller: BanneduserExperimentController
   start_time: 07/02/2024 00:00:00 UTC
   end_time: 07/02/3024 23:59:59 UTC
