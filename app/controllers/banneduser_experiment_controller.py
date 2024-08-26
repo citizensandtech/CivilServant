@@ -222,7 +222,6 @@ class BanneduserExperimentController(ModactionExperimentController):
                     # If there's no valid randomization for this newcomer, skip it.
                     continue
 
-
                 # Get the current randomization and increment the experiment's counter.
                 randomization = self.experiment_settings["conditions"][condition][
                     "randomizations"
