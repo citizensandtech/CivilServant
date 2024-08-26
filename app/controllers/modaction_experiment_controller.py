@@ -63,7 +63,7 @@ class ModactionExperimentController(ExperimentController, abc.ABC):
         Returns:
             Dict of values about the redditor.
         """
-        redditor = self.r.redditor(user_id)
+        redditor = self.r.get_redditor(user_id)
 
         # Grab the useful data about this user.
         info = {"object_created": redditor.created_utc}
