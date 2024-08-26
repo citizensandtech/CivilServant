@@ -1,5 +1,4 @@
 import abc
-import json
 
 from sqlalchemy import and_
 
