@@ -45,7 +45,7 @@ class BanneduserExperimentController(ModactionExperimentController):
     This experiment controller should:
     1. Observe modactions to identify and enroll new participants.
     2. Randomly assign these users to receive different types of private messages.
-    3. Send private messages at beginning and end of temporary ban.
+    3. Send a private message at the beginning of a temporary ban.
     """
 
     def __init__(
