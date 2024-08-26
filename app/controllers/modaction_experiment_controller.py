@@ -21,19 +21,21 @@ class ModactionExperimentController(ExperimentController, abc.ABC):
     def __init__(
         self, experiment_name, db_session, r, log, required_keys=["event_hooks"]
     ):
-
         super().__init__(experiment_name, db_session, r, log, required_keys)
 
     @abc.abstractmethod
     def enroll_new_participants(self, instance):
         """Implement this method in a subclass for the experiment."""
-        pass
 
     @abc.abstractmethod
     def _get_condition(self):
         """Get the condition name to use in this experiment."""
 
     def _check_condition(self, name):
+        """Check whether the named condition is configured for this experiment.
+
+        If the experiment is not configured properly, log the error raise an exception.
+        """
         if name not in self.experiment_settings["conditions"]:
             error_message = f"Condition '{name}' missing from configuration file."
             self.log.error(error_message)
@@ -65,8 +67,6 @@ class ModactionExperimentController(ExperimentController, abc.ABC):
         redditor = self.r.redditor(user_id)
 
         # Grab the useful data about this user.
-        info = {
-            "object_created": redditor.created_utc
-        }
+        info = {"object_created": redditor.created_utc}
 
         return info

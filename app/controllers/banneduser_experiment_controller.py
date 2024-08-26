@@ -76,6 +76,19 @@ class BanneduserExperimentController(ModactionExperimentController):
             f"Successfully Ran Event Hook to BanneduserExperimentController::enroll_new_participants. Caller: {instance}"
         )
 
+    def update_experiment(self):
+        """Update loop for the banned user experiment.
+
+        Check for freshly enrolled accounts, and send messages to them.
+        """
+        accounts_needing_messages = self._get_accounts_needing_interventions()
+        self.log.info(
+            "Experiment {0}: identified {1} accounts needing interventions. Sending messages now...".format(
+                self.experiment.name, len(accounts_needing_messages)
+            )
+        )
+        self._send_intervention_messages(accounts_needing_messages)
+
     def _find_eligible_newcomers(self, modactions):
         """Filter a list of mod actions to find newcomers to the experiment.
         Starting with a list of arbitrary mod actions, select mod actions that:
@@ -340,15 +353,6 @@ class BanneduserExperimentController(ModactionExperimentController):
 
         m = re.search(r"(\d+) days", modaction["details"], re.IGNORECASE)
         return int(m.group(1)) if m else None
-
-    def update_experiment(self):
-        accounts_needing_messages = self._get_accounts_needing_interventions()
-        self.log.info(
-            "Experiment {0}: identified {1} accounts needing interventions. Sending messages now...".format(
-                self.experiment.name, len(accounts_needing_messages)
-            )
-        )
-        self._send_intervention_messages(accounts_needing_messages)
 
     def _get_accounts_needing_interventions(self):
         """Gets accounts that need interventions
