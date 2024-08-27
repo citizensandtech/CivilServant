@@ -2,10 +2,9 @@ from dataclasses import dataclass, field
 import os
 import glob
 import simplejson as json
-import time
 from unittest.mock import MagicMock, Mock, patch
-import uuid
 
+from praw.objects import Redditor
 import pytest
 import simplejson as json
 
@@ -15,13 +14,10 @@ ENV = os.environ["CS_ENV"] = "test"
 from app.controllers.banneduser_experiment_controller import (
     BanneduserExperimentController,
 )
-from app.controllers.moderator_controller import ModeratorController
 import app.cs_logger
+from app.controllers.moderator_controller import ModeratorController
 from utils.common import DbEngine
 from app.models import *
-
-import traceback
-import logging
 
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 BASE_DIR = os.path.join(TEST_DIR, "../")
@@ -33,70 +29,79 @@ def db_session():
     return DbEngine(config_file).new_session()
 
 
+@pytest.fixture(autouse=True)
+def with_setup_and_teardown(db_session):
+    def _clear_all_tables():
+        db_session.execute("UNLOCK TABLES")
+        db_session.query(FrontPage).delete()
+        db_session.query(SubredditPage).delete()
+        db_session.query(Subreddit).delete()
+        db_session.query(Post).delete()
+        db_session.query(User).delete()
+        db_session.query(ModAction).delete()
+        db_session.query(Comment).delete()
+        db_session.query(Experiment).delete()
+        db_session.query(ExperimentThing).delete()
+        db_session.query(ExperimentAction).delete()
+        db_session.query(ExperimentThingSnapshot).delete()
+        db_session.query(EventHook).delete()
+        db_session.commit()
+
+    _clear_all_tables()
+    yield
+    _clear_all_tables()
+
+
+@pytest.fixture
+def modaction_data():
+    actions = []
+    for filename in sorted(glob.glob(f"{TEST_DIR}/fixture_data/mod_actions*")):
+        with open(filename, "r") as f:
+            actions += json.load(f)
+    return actions
+
+
+@pytest.fixture
+def fake_get_mod_log(modaction_data):
+    # Fixture data is broken up like this to allow testing of pagination in API results.
+    # Always return a blank final page to ensure that our code thinks it's done pulling new results.
+    # NOTE: Mock will return the next item in the array each time it's called.
+    mod_log_pages = [
+        modaction_data[i : i + 100] for i in range(0, len(modaction_data), 100)
+    ] + [[]]
+
+    return MagicMock(side_effect=mod_log_pages)
+
+
+@pytest.fixture
+def fake_get_redditor():
+    # Generate a fake Redditor based only on the username.
+    # This could look up a record, but so far we don't need to do that.
+    def create_fake_redditor(username):
+        user_data = {"created_utc": 9999}
+        user = Redditor(MagicMock(), user_name=username, json_dict=user_data)
+        return user
+
+    yield MagicMock(side_effect=create_fake_redditor)
+
+
+@pytest.fixture
+def fake_reddit(fake_get_mod_log, fake_get_redditor):
+    with patch("praw.Reddit", autospec=True, spec_set=True) as reddit:
+        reddit.get_mod_log = fake_get_mod_log
+        reddit.get_redditor = fake_get_redditor
+        yield reddit
+
+
 @pytest.fixture
 def logger():
     return app.cs_logger.get_logger(ENV, BASE_DIR)
 
 
-def _clear_all_tables(db_session):
-    db_session.execute("UNLOCK TABLES")
-    db_session.query(FrontPage).delete()
-    db_session.query(SubredditPage).delete()
-    db_session.query(Subreddit).delete()
-    db_session.query(Post).delete()
-    db_session.query(User).delete()
-    db_session.query(ModAction).delete()
-    db_session.query(Comment).delete()
-    db_session.query(Experiment).delete()
-    db_session.query(ExperimentThing).delete()
-    db_session.query(ExperimentAction).delete()
-    db_session.query(ExperimentThingSnapshot).delete()
-    db_session.query(EventHook).delete()
-    db_session.commit()
-
-
-@pytest.fixture(autouse=True)
-def with_setup_and_teardown(db_session):
-    _clear_all_tables(db_session)
-    yield
-    _clear_all_tables(db_session)
-
-
 @pytest.fixture
-def modaction_fixtures():
-    fixtures = []
-    for filename in sorted(glob.glob(f"{TEST_DIR}/fixture_data/mod_actions*")):
-        with open(filename, "r") as f:
-            fixtures += json.load(f)
-    return fixtures
-
-
-@pytest.fixture
-def reddit_return_value(modaction_fixtures):
-    with patch("praw.Reddit", autospec=True) as mock_reddit:
-        r = mock_reddit.return_value
-
-        m = Mock()
-        # Fixture data is broken up like this to allow testing of API 'pagination'
-        m.side_effect = [
-            modaction_fixtures[i : i + 100]
-            for i in range(0, len(modaction_fixtures), 100)
-        ] + [[]]
-        r.get_mod_log = m
-
-        @dataclass
-        class MockRedditor:
-            created_utc = 1234
-
-        r.redditor = MagicMock(return_value=MockRedditor())
-
-        return r
-
-
-@pytest.fixture
-def experiment_controller(db_session, reddit_return_value, logger):
+def experiment_controller(db_session, fake_reddit, logger):
     c = BanneduserExperimentController(
-        "banneduser_experiment_test", db_session, reddit_return_value, logger
+        "banneduser_experiment_test", db_session, fake_reddit, logger
     )
 
     db_session.add(
@@ -111,283 +116,200 @@ def experiment_controller(db_session, reddit_return_value, logger):
 
 
 @pytest.fixture
-def mod_controller(subreddit_name, db_session, reddit_return_value, logger):
-    return ModeratorController(subreddit_name, db_session, reddit_return_value, logger)
-
-
-@pytest.fixture
-def subreddit_name(experiment_controller):
-    return experiment_controller.experiment_settings["subreddit"]
-
-
-@pytest.fixture
-def subreddit_id(experiment_controller):
-    return experiment_controller.experiment_settings["subreddit_id"]
-
-
-@pytest.fixture
-def log_filename(logger):
-    file_handler = None
-    for handler in logger.handlers:
-        if type(handler).__name__ == "ConcurrentRotatingFileHandler":
-            file_handler = handler
-            break
-    if not file_handler:
-        assert False
-    return handler.baseFilename
-
-
-def _assert_logged(log_filename, text, max_lookback=1):
-    lines_scanned = 0
-    with open(log_filename, "r") as f:
-        for line in reversed(list(f.readlines())):
-            if text in line:
-                return
-            lines_scanned += 1
-            if lines_scanned > max_lookback:
-                assert False, f"Log text note found within {max_lookback} lines: {text}"
-    assert False, "Log text not found: {text}"
-
-
-def test_initialize_experiment(
-    mod_controller, db_session, modaction_fixtures, log_filename
-):
-    assert db_session.query(ModAction).count() == 0
-
-    # Archive only the first API result page.
-    mod_controller.archive_mod_action_page()
-
-    # Fixtures are split into 100-item pages, and we just loaded one page.
-    assert db_session.query(ModAction).count() == 100
-
-    _assert_logged(
-        log_filename, "BanneduserExperimentController::enroll_new_participants"
+def moderator_controller(db_session, fake_reddit, logger, experiment_controller):
+    return ModeratorController(
+        experiment_controller.experiment_settings["subreddit"],
+        db_session,
+        fake_reddit,
+        logger,
     )
 
 
-def test_load_all_fixtures(
-    mod_controller, db_session, modaction_fixtures, log_filename
-):
-    # We have multiple API result pages of fixtures.
-    assert len(modaction_fixtures) > 100
+class TestRedditMock:
+    def test_fake_mod_log_first_page(self, fake_reddit):
+        page = fake_reddit.get_mod_log("fake_subreddit")
+        assert len(page) == 100
 
-    assert db_session.query(ModAction).count() == 0
+    def test_fake_mod_log_all_pages(self, fake_reddit):
+        page = fake_reddit.get_mod_log("fake_subreddit")
+        while page:
+            assert len(page) > 1
+            page = fake_reddit.get_mod_log("fake_subreddit")
+        assert len(page) == 0
 
-    # Load all fixtures, like `controller.fetch_mod_action_history`.
-    after_id, num_actions_stored = mod_controller.archive_mod_action_page()
-    while num_actions_stored > 0:
-        after_id, num_actions_stored = mod_controller.archive_mod_action_page(after_id)
-
-    assert db_session.query(ModAction).count() == len(modaction_fixtures)
-
-    # Archiving multiple pages gets chatty in the logs, so we allow some entries to come after.
-    # This may break if we add more logging. If that happens, increase the max_lookback setting.
-    _assert_logged(
-        log_filename,
-        "BanneduserExperimentController::enroll_new_participants",
-        max_lookback=12,
-    )
+    def test_fake_get_redditor(self, fake_reddit):
+        user = fake_reddit.get_redditor("uncivil")
+        assert user.created_utc > 0
+        assert user.name == "uncivil"
 
 
-# TODO: remove this test; it's only here to make assertions about the current test data.
-def test_current_ban_fixtures(modaction_fixtures):
-    ban_actions = [f for f in modaction_fixtures if f["action"] == "banuser"]
-    assert len(ban_actions) == 3
+class TestModeratorController:
+    def test_archive_mod_action_page(self, db_session, moderator_controller):
+        assert db_session.query(ModAction).count() == 0
 
+        # Archive the first API result page.
+        _, unique_count = moderator_controller.archive_mod_action_page()
+        assert unique_count == 100
 
-# The following are testing the modaction experiment controller:
+        # Fixtures are split into 100-item pages, and we just loaded one page.
+        assert db_session.query(ModAction).count() == 100
 
+    def test_load_all_fixtures(self, db_session, modaction_data, moderator_controller):
+        # Nothing is loaded yet.
+        assert db_session.query(ModAction).count() == 0
 
-def test_start_with_empty_enrollment(experiment_controller):
-    assert experiment_controller._previously_enrolled_user_ids() == []
+        # We have multiple API result pages of fixtures.
+        assert len(modaction_data) > 100
 
-
-def test_other_experiment_not_detected_as_enrolled(experiment_controller):
-    et = ExperimentThing(
-        id="et1",
-        thing_id="123",
-        experiment_id=9999,
-        object_type=ThingType.USER.value,
-    )
-    experiment_controller.db_session.add(et)
-    experiment_controller.db_session.commit()
-    assert experiment_controller._previously_enrolled_user_ids() == []
-
-
-def test_other_type_not_detected_as_enrolled(experiment_controller):
-    et = ExperimentThing(
-        id="et1",
-        thing_id="456",
-        experiment_id=experiment_controller.experiment.id,
-        object_type=ThingType.COMMENT.value,
-    )
-    experiment_controller.db_session.add(et)
-    experiment_controller.db_session.commit()
-    assert experiment_controller._previously_enrolled_user_ids() == []
-
-
-def test_user_detected_as_enrolled(experiment_controller):
-    et = ExperimentThing(
-        id="et1",
-        thing_id="123",
-        experiment_id=experiment_controller.experiment.id,
-        object_type=ThingType.USER.value,
-    )
-    experiment_controller.db_session.add(et)
-    experiment_controller.db_session.commit()
-    assert experiment_controller._previously_enrolled_user_ids() == ["123"]
-
-
-#### TEST BanneduserExperimentController::get_accounts_needing_interventions
-def test_interventions(experiment_controller, reddit_return_value):
-    r = reddit_return_value
-
-    # Fixture data is broken up like this to allow testing of API 'pagination'
-    modaction_fixtures = []
-    for filename in sorted(
-        glob.glob(
-            "{script_dir}/fixture_data/modactions_20240703/mod_actions_1*".format(
-                script_dir=TEST_DIR
+        # Load all fixture data, like `controller.fetch_mod_action_history` does.
+        # We're reimplementing it here for clarity, so we don't have to mock the function.
+        after_id, num_actions_stored = moderator_controller.archive_mod_action_page()
+        while num_actions_stored > 0:
+            after_id, num_actions_stored = moderator_controller.archive_mod_action_page(
+                after_id
             )
-        )
+
+        # All fixture records were loaded.
+        assert db_session.query(ModAction).count() == len(modaction_data)
+
+
+class TestExperimentController:
+    def test_enroll_new_participants(self, experiment_controller, moderator_controller):
+        assert len(experiment_controller._previously_enrolled_user_ids()) == 0
+
+        experiment_controller.enroll_new_participants(moderator_controller)
+
+        # FIXME someone should be enrolled now?
+        # assert len(experiment_controller._previously_enrolled_user_ids()) > 0
+
+    def test_update_experiment(self, experiment_controller):
+        experiment_controller.update_experiment()
+
+        # FIXME integration assertions
+
+
+class TestPrivateMethods:
+    # NOTE: experiment_id None will populate the current experiment ID.
+    @pytest.mark.parametrize(
+        "thing_id,experiment_id,object_type,want",
+        [
+            ("123", 9999, ThingType.USER.value, []),
+            ("456", None, ThingType.COMMENT.value, []),
+            ("123", None, ThingType.USER.value, ["123"]),
+        ],
+    )
+    def test_previously_enrolled_user_ids(
+        self, thing_id, experiment_id, object_type, want, experiment_controller
     ):
-        f = open(filename, "r")
-        modaction_fixtures += json.loads(f.read())
-        f.close()
-
-    @dataclass
-    class MockRedditor:
-        created_utc: int = field(default_factory=lambda: int(time.time()))
-
-    r.redditor = MagicMock(return_value=MockRedditor())
-
-    ## IN THIS CASE, WE ARE GENERATING TARGET_AUTHOR IDs
-    ## LEST A BUG ACCIDENTALLY SEND PEOPLE COMMENTS
-    ## WHILE WE ARE UNIT TESTING. reddit has a 20 character limit
-    ## so any uuid4 will be an invalid username on reddit
-    fetched_mod_actions = []
-    for modaction in modaction_fixtures:
-        author = uuid.uuid4().hex
-        modaction["target_author"] = author
-        fetched_mod_actions.append(modaction)
-
-    # FIXME: SHOULD WE DUPLICATE LOGIC OF enroll_new_participants here?
-
-    try:
-        eligible_newcomers = experiment_controller._find_eligible_newcomers(
-            fetched_mod_actions
+        et = ExperimentThing(
+            id="et1",
+            thing_id=thing_id,
+            experiment_id=experiment_id or experiment_controller.experiment.id,
+            object_type=object_type,
         )
-    except Exception as e:
-        logging.info(
-            "Error in BanneduserExperimentController::_find_eligible_newcomers: %s",
-            str(e),
-        )
-        logging.info("Traceback: %s", traceback.format_exc())
-        # FIXME how should an exception be logged?
+        experiment_controller.db_session.add(et)
+        experiment_controller.db_session.commit()
+        assert experiment_controller._previously_enrolled_user_ids() == want
 
-    # TODO - craft assert based on data?
-    # assert len(eligible_newcomers) == 10
+    def test_find_eligible_newcomers(self):
+        pytest.fail()
 
-    try:
-        experiment_controller._assign_randomized_conditions(eligible_newcomers)
-    except Exception as e:
-        logging.info(
-            "Error in BanneduserExperimentController::_assign_randomized_conditions: %s",
-            str(e),
-        )
-        logging.info("Traceback: %s", traceback.format_exc())
-        # FIXME how should an exception be logged?
-        # logger.exception("Error in BanneduserExperimentController::assign_randomized_conditions")
+    def test_update_existing_participants(self):
+        pytest.fail()
 
-    # FIXME
-    """
-    try:
-        experiment_controller._update_existing_participants(fetched_mod_actions)
-    except Exception as e:
-        logging.info("Error in BanneduserExperimentController::_update_existing_participants: %s", str(e))
-        logging.info("Traceback: %s", traceback.format_exc())
-        #FIXME how should an exception be logged?
-        #logger.exception("Error in BanneduserExperimentController::assign_randomized_conditions")
-    """
+    def test_get_account_age(self):
+        pytest.fail()
 
-    ## TEST the result from get accounts needing intervention
-    accounts_needing_intervention = (
-        experiment_controller._get_accounts_needing_interventions()
+    def test_get_condition(self):
+        pytest.fail()
+
+    def test_assign_randomized_conditions(self):
+        pytest.fail()
+
+    @pytest.mark.parametrize(
+        "action,details,want",
+        [
+            ("banuser", "3 days", True),
+            ("banuser", "1 day", False),  # They always use "days"
+            ("removecomment", "remove", False),
+            ("banuser", "permanent", False),
+        ],
     )
+    def test_is_tempban(self, action, details, want, experiment_controller):
+        got = experiment_controller._is_tempban({"action": action, "details": details})
+        assert got == want
 
-    # TODO - craft assert based on data?
-    # assert len(accounts_needing_intervention) == len(newcomer_modactions)
-
-    fetched_modactioned_accounts = [x["target_author"] for x in fetched_mod_actions]
-    for account in accounts_needing_intervention:
-        message = experiment_controller._format_intervention_message(account)
-        logging.info(message)
-
-        assert account.thing_id in fetched_modactioned_accounts
-
-    ## TEST the formatting of messages
-    # first case: where the arm is arm_1 as specified in the randomizations csv
-    arm_1_experiment_thing = [
-        x
-        for x in accounts_needing_intervention
-        if json.loads(x.metadata_json)["arm"] == "arm_1"
-    ][0]
-    message_output = experiment_controller._format_intervention_message(
-        arm_1_experiment_thing
+    @pytest.mark.parametrize(
+        "username,choices,want",
+        [
+            ("me", ["me", "you"], True),
+            ("me", ["you", "them"], False),
+            ("you", ["me", "them"], False),
+        ],
     )
-    # TODO craft assert based on data
-    assert message_output["message"].find("Hello") > -1
-    # second case: where the arm is null experiment_controllerause it's the control group
-    # in that case, the message output should be None
+    def test_is_enrolled(self, username, choices, want, experiment_controller):
+        got = experiment_controller._is_enrolled({"target_author": username}, choices)
+        assert got == want
 
-    # TODO craft additional asserts based on specifics of arm behavior
+    @pytest.mark.parametrize(
+        "username,want",
+        [
+            ("innocent_user", False),
+            ("evilbot", True),
+            ("HappyFunBot", True),
+            ("BotALicious", False),
+            ("FrancoisTalbot", True),  # LOL
+        ],
+    )
+    def test_is_bot(self, username, want, experiment_controller):
+        got = experiment_controller._is_bot({"target_author": username})
+        assert got == want
 
-    ## TEST the result from sending messages
-    m = Mock()
-    message_return_vals = []
+    @pytest.mark.parametrize(
+        "details,want",
+        [
+            (
+                "2 days",
+                {
+                    "ban_duration_days": 2,
+                    "ban_reason": "testing",
+                    "ban_start_time": 33,
+                    "ban_type": "temporary",
+                    "ban_end_time": 172833,
+                },
+            ),
+            ("bogus", {}),
+        ],
+    )
+    def test_parse_temp_ban(self, details, want, experiment_controller):
+        got = experiment_controller._parse_temp_ban(
+            {
+                "action": "banuser",
+                "created_utc": 33,
+                "description": "testing",
+                "details": details,
+            }
+        )
+        assert got == want
 
-    """
-    ## SET UP accounts_to_test return values from message sending
-    ## the final account in the set will be an invalid username error
-    #for i in range(accounts_to_test-1):
-    #    message_return_vals.append({"errors":[]})
-    message_return_vals.append({"errors":[]})
-    message_return_vals.append({"errors":[{"username":fetched_modactioned_accounts[accounts_to_test -2],
-                                "error": "nondescript error"}]})    
-    message_return_vals.append(
-        {"errors":[{"username":fetched_modactioned_accounts[accounts_to_test-1], 
-        "error":"invalid username"}]})
+    @pytest.mark.parametrize(
+        "action,details,want",
+        [
+            ("banuser", "1 days", 1),
+            ("banuser", "7 days", 7),
+            ("banuser", "forever", None),
+            ("unbanuser", "3 days", None),
+        ],
+    )
+    def test_parse_days(self, action, details, want, experiment_controller):
+        got = experiment_controller._parse_days({"action": action, "details": details})
+        assert got == want
 
-    m.side_effect = message_return_vals
-    r.send_message = m
-    patch('praw.')
+    def test_get_accounts_needing_interventions(self):
+        pytest.fail()
 
-    experiment_things = accounts_needing_intervention[0:accounts_to_test]
-    
-    message_results = mec.send_messages(experiment_things)
-    
-    ## assertions for ExperimentAction objects
-    experiment_actions = db_session.query(ExperimentAction).all()
-    assert len(experiment_actions) == 3
-    ea = json.loads(experiment_actions[0].metadata_json)
-    assert(ea['survey_status']=="TBD")
-    assert(ea['message_status']=="sent")
-    ea = json.loads(experiment_actions[1].metadata_json)
-    assert(ea['survey_status']=="TBD")
-    assert(ea['message_status']=="sent")
-    ea = json.loads(experiment_actions[2].metadata_json)
-    assert(ea['survey_status']=="nonexistent")
-    assert(ea['message_status']=="nonexistent")
+    def test_format_intervention_message(self):
+        pytest.fail()
 
-    ## assertions for ExperimentThing objects
-    outcome_bundles = [{"query_index": "Intervention Complete",
-                    "message_status": "sent",
-                    "survey_status": "TBD",
-                    "observed_count":0},
-                    {"query_index":"Intervention TBD",
-                     "message_status":"TBD",
-                     "survey_status":"TBD",
-                     "observed_count":0},
-                    {"query_index":"Intervention Impossible",
-                     "message_status":"nonexistent",
-     """
+    def test_send_intervention_messages(self):
+        pytest.fail()

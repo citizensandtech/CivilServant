@@ -270,7 +270,7 @@ class BanneduserExperimentController(ModactionExperimentController):
 
                 self.experiment.settings_json = json.dumps(self.experiment_settings)
                 self.db_session.commit()
-
+                
             self.log.info(
                 f"Assigned randomizations to {len(newcomer_ets)} banned users: [{','.join([x['thing_id'] for x in newcomer_ets])}]"
             )
@@ -301,7 +301,7 @@ class BanneduserExperimentController(ModactionExperimentController):
 
         This is currently a rudimentary approach. Account age is typically a better indicator.
         """
-        return modaction["target_author"].endswith("Bot")
+        return re.match(r".+bot$", modaction["target_author"], re.IGNORECASE) != None
 
     def _parse_temp_ban(self, modaction):
         """Get details about the ban.
