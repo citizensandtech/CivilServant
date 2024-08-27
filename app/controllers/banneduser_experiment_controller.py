@@ -34,9 +34,9 @@ ENV = os.environ["CS_ENV"]
 class BannedUserQueryIndex(str, Enum):
     """Possible states of a banned user's query_index."""
 
+    PENDING = "Intervention Pending"
     COMPLETE = "Intervention Complete"
     IMPOSSIBLE = "Intervention Impossible"
-    TBD = "Intervention TBD"
 
 
 class BanneduserExperimentController(ModactionExperimentController):
@@ -170,12 +170,12 @@ class BanneduserExperimentController(ModactionExperimentController):
             elif modaction["action"] == "banuser":
                 # Escalated to permaban.
                 user_metadata["ban_type"] = "permanent"
-                if user.query_index == BannedUserQueryIndex.TBD:
+                if user.query_index == BannedUserQueryIndex.PENDING:
                     user.query_index = BannedUserQueryIndex.IMPOSSIBLE
             elif modaction["action"] == "unbanuser":
                 # User was unbanned.
                 user_metadata["ban_type"] = "unbanned"
-                if user.query_index == BannedUserQueryIndex.TBD:
+                if user.query_index == BannedUserQueryIndex.PENDING:
                     user.query_index = BannedUserQueryIndex.IMPOSSIBLE
 
             user.metadata_json = json.dumps(user_metadata)
@@ -253,7 +253,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                     "experiment_id": self.experiment.id,
                     "object_type": ThingType.USER.value,
                     "object_created": info["object_created"],
-                    "query_index": BannedUserQueryIndex.TBD,
+                    "query_index": BannedUserQueryIndex.PENDING,
                     "metadata_json": json.dumps(user_metadata),
                 }
                 newcomer_ets.append(user)
@@ -370,7 +370,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                 and_(
                     ExperimentThing.object_type == ThingType.USER.value,
                     ExperimentThing.experiment_id == self.experiment.id,
-                    ExperimentThing.query_index == BannedUserQueryIndex.TBD,
+                    ExperimentThing.query_index == BannedUserQueryIndex.PENDING,
                     ExperimentThing.object_created < twelve_hours_ago,
                 )
             )
