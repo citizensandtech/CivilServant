@@ -13,6 +13,7 @@ ENV = os.environ["CS_ENV"] = "test"
 
 from app.controllers.banneduser_experiment_controller import (
     BanneduserExperimentController,
+    BannedUserQueryIndex,
 )
 import app.cs_logger
 from app.controllers.moderator_controller import ModeratorController
@@ -116,13 +117,32 @@ def experiment_controller(db_session, fake_reddit, logger):
 
 
 @pytest.fixture
-def moderator_controller(db_session, fake_reddit, logger, experiment_controller):
+def mod_controller(db_session, fake_reddit, logger, experiment_controller):
     return ModeratorController(
         experiment_controller.experiment_settings["subreddit"],
         db_session,
         fake_reddit,
         logger,
     )
+
+
+# Load all fixture data, like `controller.fetch_mod_action_history` does.
+# We're reimplementing it here for clarity, so we don't have to mock the function.
+def _load_mod_actions(mod_controller, experiment_controller):
+    after_id, num_actions_stored = mod_controller.archive_mod_action_page()
+    while num_actions_stored > 0:
+        after_id, num_actions_stored = mod_controller.archive_mod_action_page(after_id)
+
+    # NOTE: this also may store a subreddit ID that we don't want, short-circuiting matching logic.
+    # To work around this, we hardcode it to always match.
+    mod_controller.fetched_subreddit_id = experiment_controller.experiment_settings[
+        "subreddit_id"
+    ]
+
+
+@pytest.fixture
+def newcomer_modactions(experiment_controller, modaction_data):
+    return experiment_controller._find_eligible_newcomers(modaction_data)
 
 
 class TestRedditMock:
@@ -144,48 +164,43 @@ class TestRedditMock:
 
 
 class TestModeratorController:
-    def test_archive_mod_action_page(self, db_session, moderator_controller):
+    def test_archive_mod_action_page(self, db_session, mod_controller):
         assert db_session.query(ModAction).count() == 0
 
         # Archive the first API result page.
-        _, unique_count = moderator_controller.archive_mod_action_page()
+        _, unique_count = mod_controller.archive_mod_action_page()
         assert unique_count == 100
 
         # Fixtures are split into 100-item pages, and we just loaded one page.
         assert db_session.query(ModAction).count() == 100
 
-    def test_load_all_fixtures(self, db_session, modaction_data, moderator_controller):
+    def test_load_all_fixtures(
+        self, db_session, modaction_data, mod_controller, experiment_controller
+    ):
         # Nothing is loaded yet.
         assert db_session.query(ModAction).count() == 0
 
         # We have multiple API result pages of fixtures.
         assert len(modaction_data) > 100
 
-        # Load all fixture data, like `controller.fetch_mod_action_history` does.
-        # We're reimplementing it here for clarity, so we don't have to mock the function.
-        after_id, num_actions_stored = moderator_controller.archive_mod_action_page()
-        while num_actions_stored > 0:
-            after_id, num_actions_stored = moderator_controller.archive_mod_action_page(
-                after_id
-            )
+        _load_mod_actions(mod_controller, experiment_controller)
 
         # All fixture records were loaded.
         assert db_session.query(ModAction).count() == len(modaction_data)
 
 
 class TestExperimentController:
-    def test_enroll_new_participants(self, experiment_controller, moderator_controller):
+    def test_enroll_new_participants(self, experiment_controller, mod_controller):
         assert len(experiment_controller._previously_enrolled_user_ids()) == 0
 
-        experiment_controller.enroll_new_participants(moderator_controller)
+        _load_mod_actions(mod_controller, experiment_controller)
+        experiment_controller.enroll_new_participants(mod_controller)
 
-        # FIXME someone should be enrolled now?
-        # assert len(experiment_controller._previously_enrolled_user_ids()) > 0
+        assert len(experiment_controller._previously_enrolled_user_ids()) > 0
 
     def test_update_experiment(self, experiment_controller):
         experiment_controller.update_experiment()
-
-        # FIXME integration assertions
+        # FIXME add integration assertions
 
 
 class TestModactionPrivateMethods:
@@ -238,11 +253,67 @@ class TestPrivateMethods:
         assert experiment_controller._previously_enrolled_user_ids() == want
 
     def test_find_eligible_newcomers(self, modaction_data, experiment_controller):
-        users = experiment_controller._find_eligible_newcomers(modaction_data)
-        assert len(users) > 0
+        # NOTE: not using newcomer_modactions for extra clarity.
+        user_modactions = experiment_controller._find_eligible_newcomers(modaction_data)
+        assert len(user_modactions) > 0
 
-    def test_update_existing_participants(self):
-        pytest.fail()
+    # update temp ban duration
+    @pytest.mark.parametrize(
+        "action,details,want_duration,want_query_index,want_type",
+        [
+            ("banuser", "999 days", 999, BannedUserQueryIndex.PENDING, "temporary"),
+            ("banuser", "permaban", None, BannedUserQueryIndex.IMPOSSIBLE, "permanent"),
+            (
+                "unbanuser",
+                "whatever",
+                None,
+                BannedUserQueryIndex.IMPOSSIBLE,
+                "unbanned",
+            ),
+        ],
+    )
+    def test_update_existing_participants(
+        self,
+        action,
+        details,
+        want_duration,
+        want_query_index,
+        want_type,
+        newcomer_modactions,
+        experiment_controller,
+        mod_controller,
+    ):
+        _load_mod_actions(mod_controller, experiment_controller)
+        experiment_controller.enroll_new_participants(mod_controller)
+
+        original = newcomer_modactions[0]
+        update = {**original, "action": action, "details": details}
+        experiment_controller._update_existing_participants([update])
+
+        snap = (
+            experiment_controller.db_session.query(ExperimentThingSnapshot)
+            .filter(
+                ExperimentThingSnapshot.experiment_thing_id == original["target_author"]
+            )
+            .first()
+        )
+        assert snap.object_type == ThingType.USER.value
+        assert snap.experiment_id == experiment_controller.experiment.id
+        meta = json.loads(snap.metadata_json)
+        assert meta["ban_type"] == "temporary"
+
+        user = (
+            experiment_controller.db_session.query(ExperimentThing)
+            .filter(ExperimentThing.thing_id == original["target_author"])
+            .one()
+        )
+        assert user is not None
+        assert user.query_index == want_query_index
+
+        meta = json.loads(user.metadata_json)
+        if want_duration:
+            assert meta["ban_duration_days"] == want_duration
+        assert meta["ban_type"] == want_type
 
     @pytest.mark.parametrize(
         "seconds_ago,want",
@@ -269,8 +340,10 @@ class TestPrivateMethods:
         condition = experiment_controller._get_condition(now - seconds_ago)
         assert condition == want
 
-    def test_assign_randomized_conditions(self):
-        pytest.fail()
+    def test_assign_randomized_conditions(self, modaction_data, experiment_controller):
+        user_modactions = experiment_controller._find_eligible_newcomers(modaction_data)
+        experiment_controller._assign_randomized_conditions(user_modactions)
+        assert len(experiment_controller._previously_enrolled_user_ids()) > 1
 
     @pytest.mark.parametrize(
         "action,details,want",

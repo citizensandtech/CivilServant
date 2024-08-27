@@ -59,6 +59,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         This is a callback that will be invoked declaratively. This is called by ModeratorController while running archive_mod_action_page, as noted in the experiment config YAML File.
         """
         if instance.fetched_subreddit_id != self.experiment_settings["subreddit_id"]:
+            self.log.error(f"subreddit mismatch. fetched: {instance.fetched_subreddit_id}, experiment: {self.experiment_settings['subreddit_id']}")
             return
 
         self.log.info(
@@ -155,7 +156,7 @@ class BanneduserExperimentController(ModactionExperimentController):
 
             # Take a snapshot of the current user.
             snapshot = ExperimentThingSnapshot(
-                experiment_thing_id=user.id,
+                experiment_thing_id=user.thing_id,
                 object_type=user.object_type,
                 experiment_id=user.experiment_id,
                 metadata_json=user.metadata_json,
@@ -201,7 +202,7 @@ class BanneduserExperimentController(ModactionExperimentController):
     def _assign_randomized_conditions(self, newcomer_modactions):
         """Assign randomized conditions to newcomers.
         Log an ExperimentAction with the assignments.
-        If ther are no available randomizations, throw an error.
+        If there are no available randomizations, throw an error.
         """
         self.db_session.execute(
             "LOCK TABLES experiments WRITE, experiment_things WRITE"
@@ -244,8 +245,8 @@ class BanneduserExperimentController(ModactionExperimentController):
                 user_metadata = {
                     "condition": condition,
                     "randomization": randomization,
-                    **self._parse_temp_ban(newcomer),
                     "arm": "arm_" + str(randomization["treatment"]),
+                    **self._parse_temp_ban(newcomer),
                 }
                 user = {
                     "id": uuid.uuid4().hex,
@@ -265,20 +266,16 @@ class BanneduserExperimentController(ModactionExperimentController):
 
             if len(newcomer_ets) > 0:
                 self.db_session.insert_retryable(ExperimentThing, newcomer_ets)
-
                 self.experiment.settings_json = json.dumps(self.experiment_settings)
-                self.db_session.commit()
                 
             self.log.info(
                 f"Assigned randomizations to {len(newcomer_ets)} banned users: [{','.join([x['thing_id'] for x in newcomer_ets])}]"
             )
-
         except Exception as e:
             self.log.error(
                 "Error in BanneduserExperimentController::assign_randomized_conditions",
                 e,
             )
-            return []
         finally:
             self.db_session.execute("UNLOCK TABLES")
 

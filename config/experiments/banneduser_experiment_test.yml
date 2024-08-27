@@ -21,7 +21,7 @@ test:
       randomizations: banneduser_experiment_test.experienced.randomizations.test.csv
       next_randomization: 0
       arms:
-        arm_0: 
+        arm_0:
           pm_subject: PM Subject Line (Experienced Arm 0)
           pm_text: Hello, this is the message for arm 0 of the experienced condition.
         arm_1:
