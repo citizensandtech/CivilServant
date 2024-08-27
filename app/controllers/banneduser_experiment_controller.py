@@ -83,9 +83,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         """
         accounts_needing_messages = self._get_accounts_needing_interventions()
         self.log.info(
-            "Experiment {0}: identified {1} accounts needing interventions. Sending messages now...".format(
-                self.experiment.name, len(accounts_needing_messages)
-            )
+            f"Experiment {self.experiment.name}: identified {len(accounts_needing_messages)} accounts needing interventions. Sending messages now..."
         )
         self._send_intervention_messages(accounts_needing_messages)
 
@@ -405,9 +403,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         yml_cond = self.experiment_settings["conditions"][condition]
         if arm not in yml_cond["arms"].keys():
             raise ExperimentConfigurationError(
-                "In the experiment '{0}', the '{1}' condition fails to include information about the '{2}' arm, despite having randomizations assigned to it".format(
-                    self.experiment_name, self.get_condition(), arm
-                )
+                f"In the experiment '{self.experiment_name}', the '{self.get_condition()}' condition fails to include information about the '{arm}' arm, despite having randomizations assigned to it"
             )
         if yml_cond["arms"][arm] is None:
             return None
@@ -462,9 +458,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             # send messages_to_send
             message_results = mc.send_messages(
                 messages_to_send,
-                "BannedUserMessagingExperiment({0})::_send_intervention_messages".format(
-                    self.experiment_name
-                ),
+                f"BannedUserMessagingExperiment({self.experiment_name})::_send_intervention_messages"
             )
 
             # iterate through message_result, linked with experiment_things
