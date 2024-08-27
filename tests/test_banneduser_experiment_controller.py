@@ -188,6 +188,32 @@ class TestExperimentController:
         # FIXME integration assertions
 
 
+class TestModactionPrivateMethods:
+    def test_check_condition(self, experiment_controller):
+        experiment_controller._check_condition("newcomer")
+        experiment_controller._check_condition("experienced")
+        with pytest.raises(Exception):
+            experiment_controller._check_condition("reanimated")
+
+    def test_previously_enrolled_user_ids(self, experiment_controller):
+        assert experiment_controller._previously_enrolled_user_ids() == []
+
+        et = ExperimentThing(
+            id="prevuser",
+            thing_id="12345",
+            experiment_id=experiment_controller.experiment.id,
+            object_type=ThingType.USER.value,
+        )
+        experiment_controller.db_session.add(et)
+        experiment_controller.db_session.commit()
+
+        assert experiment_controller._previously_enrolled_user_ids() == ["12345"]
+
+    def test_load_redditor_info(self, experiment_controller):
+        redditor = experiment_controller._load_redditor_info("somebody")
+        assert redditor == {"object_created": 9999}
+
+
 class TestPrivateMethods:
     # NOTE: experiment_id None will populate the current experiment ID.
     @pytest.mark.parametrize(
@@ -230,8 +256,18 @@ class TestPrivateMethods:
         age = experiment_controller._get_account_age(now - seconds_ago)
         assert age == want
 
-    def test_get_condition(self):
-        pytest.fail()
+    @pytest.mark.parametrize(
+        "seconds_ago,want",
+        [
+            (1, "newcomer"),
+            (864001, "experienced"),
+        ],
+    )
+    def test_get_condition(self, seconds_ago, want, experiment_controller):
+        # NOTE: Condition is currently the same value as `_get_account_age`.`
+        now = datetime.datetime.utcnow().timestamp()
+        condition = experiment_controller._get_condition(now - seconds_ago)
+        assert condition == want
 
     def test_assign_randomized_conditions(self):
         pytest.fail()
