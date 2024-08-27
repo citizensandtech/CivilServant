@@ -1,8 +1,8 @@
-from dataclasses import dataclass, field
+import datetime
 import os
 import glob
 import simplejson as json
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 from praw.objects import Redditor
 import pytest
@@ -211,14 +211,24 @@ class TestPrivateMethods:
         experiment_controller.db_session.commit()
         assert experiment_controller._previously_enrolled_user_ids() == want
 
-    def test_find_eligible_newcomers(self):
-        pytest.fail()
+    def test_find_eligible_newcomers(self, modaction_data, experiment_controller):
+        users = experiment_controller._find_eligible_newcomers(modaction_data)
+        assert len(users) > 0
 
     def test_update_existing_participants(self):
         pytest.fail()
 
-    def test_get_account_age(self):
-        pytest.fail()
+    @pytest.mark.parametrize(
+        "seconds_ago,want",
+        [
+            (1, "newcomer"),
+            (864001, "experienced"),
+        ],
+    )
+    def test_get_account_age(self, seconds_ago, want, experiment_controller):
+        now = datetime.datetime.utcnow().timestamp()
+        age = experiment_controller._get_account_age(now - seconds_ago)
+        assert age == want
 
     def test_get_condition(self):
         pytest.fail()
