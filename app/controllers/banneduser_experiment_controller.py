@@ -404,10 +404,11 @@ class BanneduserExperimentController(ModactionExperimentController):
         return {"subject": message_subject, "message": message_body}
 
     def _send_intervention_messages(self, experiment_things):
-        """Format intervention message for an thing, given the arm that it is in. This reads from the experiment_settings (the YAML file in /config/experiments/.
+        """Format intervention message for an experiment thing, given the arm that it is in.
+        This reads from the experiment_settings (the YAML file in /config/experiments/).
 
         Args:
-            experiment_thing: The ExperimentThing for a tempbanned user.
+            experiment_things: A list of ExperimentThings representing tempbanned users.
 
         Returns:
             A dict with message subject and body.
@@ -421,7 +422,6 @@ class BanneduserExperimentController(ModactionExperimentController):
         self.db_session.execute(
             "Lock Tables experiment_actions WRITE, experiment_things WRITE, message_logs WRITE"
         )
-        message_results = []
         try:
             mc = MessagingController(self.db_session, self.r, self.log)
             action = "SendMessage"
@@ -506,12 +506,11 @@ class BanneduserExperimentController(ModactionExperimentController):
                         experiment_thing.metadata_json = metadata_json
             self.db_session.commit()
         except Exception as e:
-            self.db_session.execute("UNLOCK TABLES")
             self.log.error(
                 "Error in BannedUserExperimentController::_send_intervention_messages",
                 extra=sys.exc_info()[0],
             )
             return []
-        self.db_session.execute("UNLOCK TABLES")
-
+        finally:
+            self.db_session.execute("UNLOCK TABLES")
         return message_results
