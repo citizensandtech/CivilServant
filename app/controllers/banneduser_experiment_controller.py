@@ -354,12 +354,8 @@ class BanneduserExperimentController(ModactionExperimentController):
         details about the ban.
 
         Returns:
-            A dict with users that are enrolled in the study, that have not had messages sent yet, where the ban happened more than twelve hours ago.
+            A list of users that are enrolled in the study, that have not had messages sent yet.
         """
-
-        # variable is named 'twelve' and not something more generic because this is a crucial part of experiment
-
-        twelve_hours_ago = datetime.utcnow() - timedelta(hours=12)
 
         return (
             self.db_session.query(ExperimentThing)
@@ -368,7 +364,6 @@ class BanneduserExperimentController(ModactionExperimentController):
                     ExperimentThing.object_type == ThingType.USER.value,
                     ExperimentThing.experiment_id == self.experiment.id,
                     ExperimentThing.query_index == BannedUserQueryIndex.PENDING,
-                    ExperimentThing.object_created < twelve_hours_ago,
                 )
             )
             .order_by(ExperimentThing.created_at)

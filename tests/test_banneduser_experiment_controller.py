@@ -424,9 +424,17 @@ class TestPrivateMethods:
         got = experiment_controller._parse_days({"action": action, "details": details})
         assert got == want
 
-    @pytest.mark.skip
-    def test_get_accounts_needing_interventions(self):
-        pass
+    def test_get_accounts_needing_interventions(
+        self, experiment_controller, mod_controller
+    ):
+        users = experiment_controller._get_accounts_needing_interventions()
+        assert users == []
+
+        _load_mod_actions(mod_controller, experiment_controller)
+        experiment_controller.enroll_new_participants(mod_controller)
+
+        users = experiment_controller._get_accounts_needing_interventions()
+        assert len(users) > 0
 
     @pytest.mark.skip
     def test_format_intervention_message(self):
