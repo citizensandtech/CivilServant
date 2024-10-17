@@ -392,10 +392,15 @@ class BanneduserExperimentController(ModactionExperimentController):
         condition = metadata_json["condition"]
         arm = metadata_json["arm"]
 
-        yml_cond = self.experiment_settings["conditions"][condition]
-        if arm not in yml_cond["arms"].keys():
+        if condition not in self.experiment_settings["conditions"]:
             raise ExperimentConfigurationError(
-                f"In the experiment '{self.experiment_name}', the '{self.get_condition()}' condition fails to include information about the '{arm}' arm, despite having randomizations assigned to it"
+                f"In the experiment '{self.experiment_name}', the '{condition}' condition fails to exist in the configuration"
+            )
+
+        yml_cond = self.experiment_settings["conditions"][condition]
+        if arm not in yml_cond["arms"]:
+            raise ExperimentConfigurationError(
+                f"In the experiment '{self.experiment_name}', the '{condition}' condition fails to include information about the '{arm}' arm, despite having randomizations assigned to it"
             )
         if yml_cond["arms"][arm] is None:
             return None
