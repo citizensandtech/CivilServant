@@ -392,7 +392,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         condition = metadata_json["condition"]
         arm = metadata_json["arm"]
 
-        if condition not in self.experiment_settings["conditions"].keys():
+        if condition not in self.experiment_settings["conditions"]:
             raise ExperimentConfigurationError(
                 f"In the experiment '{self.experiment_name}', the '{condition}' condition fails to exist in the configuration"
             )
