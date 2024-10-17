@@ -59,7 +59,9 @@ class BanneduserExperimentController(ModactionExperimentController):
         This is a callback that will be invoked declaratively. This is called by ModeratorController while running archive_mod_action_page, as noted in the experiment config YAML File.
         """
         if instance.fetched_subreddit_id != self.experiment_settings["subreddit_id"]:
-            self.log.error(f"subreddit mismatch. fetched: {instance.fetched_subreddit_id}, experiment: {self.experiment_settings['subreddit_id']}")
+            self.log.error(
+                f"subreddit mismatch. fetched: {instance.fetched_subreddit_id}, experiment: {self.experiment_settings['subreddit_id']}"
+            )
             return
 
         self.log.info(
@@ -267,7 +269,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             if len(newcomer_ets) > 0:
                 self.db_session.insert_retryable(ExperimentThing, newcomer_ets)
                 self.experiment.settings_json = json.dumps(self.experiment_settings)
-                
+
             self.log.info(
                 f"Assigned randomizations to {len(newcomer_ets)} banned users: [{','.join([x['thing_id'] for x in newcomer_ets])}]"
             )
@@ -392,10 +394,15 @@ class BanneduserExperimentController(ModactionExperimentController):
         condition = metadata_json["condition"]
         arm = metadata_json["arm"]
 
+        if condition not in self.experiment_settings["conditions"].keys():
+            raise ExperimentConfigurationError(
+                f"In the experiment '{self.experiment_name}', the '{condition}' condition fails to exist"
+            )
         yml_cond = self.experiment_settings["conditions"][condition]
+
         if arm not in yml_cond["arms"].keys():
             raise ExperimentConfigurationError(
-                f"In the experiment '{self.experiment_name}', the '{self.get_condition()}' condition fails to include information about the '{arm}' arm, despite having randomizations assigned to it"
+                f"In the experiment '{self.experiment_name}', the '{condition}' condition fails to include information about the '{arm}' arm, despite having randomizations assigned to it"
             )
         if yml_cond["arms"][arm] is None:
             return None
@@ -450,7 +457,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             # send messages_to_send
             message_results = mc.send_messages(
                 messages_to_send,
-                f"BannedUserMessagingExperiment({self.experiment_name})::_send_intervention_messages"
+                f"BannedUserMessagingExperiment({self.experiment_name})::_send_intervention_messages",
             )
 
             # iterate through message_result, linked with experiment_things

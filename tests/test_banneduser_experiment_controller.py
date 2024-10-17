@@ -17,6 +17,7 @@ from app.controllers.banneduser_experiment_controller import (
 )
 import app.cs_logger
 from app.controllers.moderator_controller import ModeratorController
+from app.controllers.experiment_controller import ExperimentConfigurationError
 from utils.common import DbEngine
 from app.models import *
 
@@ -461,7 +462,7 @@ class TestPrivateMethods:
             ),
         ],
     )
-    def test_format_intervention_message(
+    def test_format_intervention_message_normal_cases(
         self, metadata_json, want, experiment_controller
     ):
         et = ExperimentThing(
@@ -474,6 +475,33 @@ class TestPrivateMethods:
 
         got = experiment_controller._format_intervention_message(et)
         assert got == want
+
+    @pytest.mark.parametrize(
+        "metadata_json",
+        [
+            {
+                "condition": "experienced",
+                "arm": "arm_9999",
+            },  # Example where arm is not valid
+            {
+                "condition": "invalid_condition",
+                "arm": "arm_0",
+            },  # Example with invalid condition
+        ],
+    )
+    def test_format_intervention_message_raises_error(
+        self, metadata_json, experiment_controller
+    ):
+        et = ExperimentThing(
+            id=12345,
+            thing_id=23456,
+            experiment_id=experiment_controller.experiment.id,
+            object_type=ThingType.USER.value,
+            metadata_json=json.dumps(metadata_json),
+        )
+
+        with pytest.raises(ExperimentConfigurationError):
+            experiment_controller._format_intervention_message(et)
 
     @pytest.mark.skip
     def test_send_intervention_messages(self):
