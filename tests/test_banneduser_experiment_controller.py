@@ -436,9 +436,46 @@ class TestPrivateMethods:
         users = experiment_controller._get_accounts_needing_interventions()
         assert len(users) > 0
 
-    @pytest.mark.skip
-    def test_format_intervention_message(self):
-        pass
+    @pytest.mark.parametrize(
+        "thing_id,metadata_json,want",
+        [
+            (
+                "12345",
+                {
+                    "condition": "newcomer",
+                    "arm": "arm_0",
+                },
+                {
+                    "subject": "PM Subject Line (Newcomer Arm 0)",
+                    "message": "Hello, this is the message for arm 0 of the newcomer condition.",
+                },
+            ),
+            (
+                "23456",
+                {
+                    "condition": "experienced",
+                    "arm": "arm_1",
+                },
+                {
+                    "subject": "PM Subject Line (Experienced Arm 1)",
+                    "message": "Hello, this is the message for arm 1 of the experienced condition.",
+                },
+            ),
+        ],
+    )
+    def test_format_intervention_message(
+        self, thing_id, metadata_json, want, experiment_controller
+    ):
+        et = ExperimentThing(
+            id=12345,
+            thing_id=thing_id,
+            experiment_id=experiment_controller.experiment.id,
+            object_type=ThingType.USER.value,
+            metadata_json=json.dumps(metadata_json),
+        )
+
+        got = experiment_controller._format_intervention_message(et)
+        assert got == want
 
     @pytest.mark.skip
     def test_send_intervention_messages(self):

@@ -8,14 +8,14 @@ test:
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line (Newcomber Arm 0)
+          pm_subject: PM Subject Line (Newcomer Arm 0)
           pm_text: Hello, this is the message for arm 0 of the newcomer condition.
         arm_1:
-          pm_subject: PM Subject Line (Newcomber Arm 1)
+          pm_subject: PM Subject Line (Newcomer Arm 1)
           pm_text: Hello, this is the message for arm 1 of the newcomer condition.
         arm_2:
           reason_text: This is arm 2 of the 1st condition
-          pm_subject: PM Subject Line (Newcomber Arm 2)
+          pm_subject: PM Subject Line (Newcomer Arm 2)
           pm_text: Hello, this is the message for arm 2 of the newcomer condition.
     experienced:
       randomizations: banneduser_experiment_test.experienced.randomizations.test.csv
