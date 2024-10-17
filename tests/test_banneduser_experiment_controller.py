@@ -88,6 +88,7 @@ def fake_get_redditor():
 
 @pytest.fixture
 def fake_reddit(fake_get_mod_log, fake_get_redditor):
+    # Mock relevant methods in the praw package: the mock will not touch the network.
     with patch("praw.Reddit", autospec=True, spec_set=True) as reddit:
         reddit.get_mod_log = fake_get_mod_log
         reddit.get_redditor = fake_get_redditor
@@ -96,11 +97,13 @@ def fake_reddit(fake_get_mod_log, fake_get_redditor):
 
 @pytest.fixture
 def logger():
+    # The logger is passed as an argument to various constructors so we need an instance ready.
     return app.cs_logger.get_logger(ENV, BASE_DIR)
 
 
 @pytest.fixture
 def experiment_controller(db_session, fake_reddit, logger):
+    # Create a controller instance with accompanying seed data for an experiment.
     c = BanneduserExperimentController(
         "banneduser_experiment_test", db_session, fake_reddit, logger
     )
