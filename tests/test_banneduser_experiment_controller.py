@@ -437,10 +437,9 @@ class TestPrivateMethods:
         assert len(users) > 0
 
     @pytest.mark.parametrize(
-        "thing_id,metadata_json,want",
+        "metadata_json,want",
         [
             (
-                "12345",
                 {
                     "condition": "newcomer",
                     "arm": "arm_0",
@@ -451,7 +450,6 @@ class TestPrivateMethods:
                 },
             ),
             (
-                "23456",
                 {
                     "condition": "experienced",
                     "arm": "arm_1",
@@ -464,11 +462,11 @@ class TestPrivateMethods:
         ],
     )
     def test_format_intervention_message(
-        self, thing_id, metadata_json, want, experiment_controller
+        self, metadata_json, want, experiment_controller
     ):
         et = ExperimentThing(
             id=12345,
-            thing_id=thing_id,
+            thing_id=23456,
             experiment_id=experiment_controller.experiment.id,
             object_type=ThingType.USER.value,
             metadata_json=json.dumps(metadata_json),
