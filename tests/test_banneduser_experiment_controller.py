@@ -500,6 +500,41 @@ class TestPrivateMethods:
         with pytest.raises(ExperimentConfigurationError):
             experiment_controller._format_intervention_message(et)
 
-    @pytest.mark.skip
-    def test_send_intervention_messages(self):
-        pass
+    @pytest.mark.parametrize(
+        "thing_id,metadata_json",
+        [
+            (
+                "ThusSpoke44",
+                {
+                    "condition": "newcomer",
+                    "arm": "arm_1",
+                },
+            ),
+            (
+                "LaLaLatour47",
+                {
+                    "condition": "experienced",
+                    "arm": "arm_2",
+                },
+            ),
+        ],
+    )
+    def test_send_intervention_messages(
+        self, thing_id, metadata_json, db_session, experiment_controller
+    ):
+
+        et = ExperimentThing(
+            id=thing_id,
+            thing_id=thing_id,
+            experiment_id=experiment_controller.experiment.id,
+            object_type=ThingType.USER.value,
+            metadata_json=json.dumps(metadata_json),
+        )
+        experiment_controller._send_intervention_messages([et])
+
+        assert (
+            experiment_controller.db_session.query(ExperimentAction)
+            .filter(ExperimentAction.action_object_id == thing_id)
+            .count()
+            == 1
+        )
