@@ -1,12 +1,9 @@
 import datetime
 import os
-import glob
-import simplejson as json
 from unittest.mock import MagicMock, patch
 
 from praw.objects import Redditor
 import pytest
-import simplejson as json
 
 # XXX: must come before app imports
 ENV = os.environ["CS_ENV"] = "test"
@@ -15,20 +12,9 @@ from app.controllers.banneduser_experiment_controller import (
     BanneduserExperimentController,
     BannedUserQueryIndex,
 )
-import app.cs_logger
 from app.controllers.experiment_controller import ExperimentConfigurationError
 from app.controllers.moderator_controller import ModeratorController
-from utils.common import DbEngine
 from app.models import *
-
-TEST_DIR = os.path.dirname(os.path.realpath(__file__))
-BASE_DIR = os.path.join(TEST_DIR, "../")
-
-
-@pytest.fixture
-def db_session():
-    config_file = os.path.join(BASE_DIR, "config", f"{ENV}.json")
-    return DbEngine(config_file).new_session()
 
 
 @pytest.fixture(autouse=True)
@@ -52,15 +38,6 @@ def with_setup_and_teardown(db_session):
     _clear_all_tables()
     yield
     _clear_all_tables()
-
-
-@pytest.fixture
-def modaction_data():
-    actions = []
-    for filename in sorted(glob.glob(f"{TEST_DIR}/fixture_data/mod_actions*")):
-        with open(filename, "r") as f:
-            actions += json.load(f)
-    return actions
 
 
 @pytest.fixture
@@ -94,12 +71,6 @@ def fake_reddit(fake_get_mod_log, fake_get_redditor):
         reddit.get_mod_log = fake_get_mod_log
         reddit.get_redditor = fake_get_redditor
         yield reddit
-
-
-@pytest.fixture
-def logger():
-    # The logger is passed as an argument to various constructors so we need an instance ready.
-    return app.cs_logger.get_logger(ENV, BASE_DIR)
 
 
 @pytest.fixture
