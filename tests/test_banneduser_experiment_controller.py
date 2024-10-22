@@ -1,12 +1,9 @@
 import datetime
 import os
-import glob
-import simplejson as json
 from unittest.mock import MagicMock, patch
 
 from praw.objects import Redditor
 import pytest
-import simplejson as json
 
 # XXX: must come before app imports
 ENV = os.environ["CS_ENV"] = "test"
@@ -15,98 +12,37 @@ from app.controllers.banneduser_experiment_controller import (
     BanneduserExperimentController,
     BannedUserQueryIndex,
 )
-import app.cs_logger
 from app.controllers.experiment_controller import ExperimentConfigurationError
 from app.controllers.moderator_controller import ModeratorController
-from utils.common import DbEngine
 from app.models import *
-
-TEST_DIR = os.path.dirname(os.path.realpath(__file__))
-BASE_DIR = os.path.join(TEST_DIR, "../")
-
-
-@pytest.fixture
-def db_session():
-    config_file = os.path.join(BASE_DIR, "config", f"{ENV}.json")
-    return DbEngine(config_file).new_session()
 
 
 @pytest.fixture(autouse=True)
-def with_setup_and_teardown(db_session):
-    def _clear_all_tables():
-        db_session.execute("UNLOCK TABLES")
-        db_session.query(FrontPage).delete()
-        db_session.query(SubredditPage).delete()
-        db_session.query(Subreddit).delete()
-        db_session.query(Post).delete()
-        db_session.query(User).delete()
-        db_session.query(ModAction).delete()
-        db_session.query(Comment).delete()
-        db_session.query(Experiment).delete()
-        db_session.query(ExperimentThing).delete()
-        db_session.query(ExperimentAction).delete()
-        db_session.query(ExperimentThingSnapshot).delete()
-        db_session.query(EventHook).delete()
-        db_session.commit()
-
-    _clear_all_tables()
+def with_setup_and_teardown(helpers, db_session):
+    helpers.clear_all_tables(db_session)
     yield
-    _clear_all_tables()
+    helpers.clear_all_tables(db_session)
 
 
 @pytest.fixture
-def modaction_data():
-    actions = []
-    for filename in sorted(glob.glob(f"{TEST_DIR}/fixture_data/mod_actions*")):
-        with open(filename, "r") as f:
-            actions += json.load(f)
-    return actions
-
-
-@pytest.fixture
-def fake_get_mod_log(modaction_data):
-    # Fixture data is broken up like this to allow testing of pagination in API results.
-    # Always return a blank final page to ensure that our code thinks it's done pulling new results.
-    # NOTE: Mock will return the next item in the array each time it's called.
-    mod_log_pages = [
-        modaction_data[i : i + 100] for i in range(0, len(modaction_data), 100)
-    ] + [[]]
-
-    return MagicMock(side_effect=mod_log_pages)
-
-
-@pytest.fixture
-def fake_get_redditor():
-    # Generate a fake Redditor based only on the username.
-    # This could look up a record, but so far we don't need to do that.
-    def create_fake_redditor(username):
+def mock_reddit(helpers, modaction_data):
+    def create_redditor(username):
+        """Generate a Redditor based only on the username.
+        This could look up a record, but so far we don't need to do that.
+        """
         user_data = {"created_utc": 9999}
         user = Redditor(MagicMock(), user_name=username, json_dict=user_data)
         return user
 
-    yield MagicMock(side_effect=create_fake_redditor)
-
-
-@pytest.fixture
-def fake_reddit(fake_get_mod_log, fake_get_redditor):
-    # Mock relevant methods in the praw package: the mock will not touch the network.
-    with patch("praw.Reddit", autospec=True, spec_set=True) as reddit:
-        reddit.get_mod_log = fake_get_mod_log
-        reddit.get_redditor = fake_get_redditor
+    with helpers.with_mock_reddit(modaction_data, create_redditor) as reddit:
         yield reddit
 
 
 @pytest.fixture
-def logger():
-    # The logger is passed as an argument to various constructors so we need an instance ready.
-    return app.cs_logger.get_logger(ENV, BASE_DIR)
-
-
-@pytest.fixture
-def experiment_controller(db_session, fake_reddit, logger):
+def experiment_controller(db_session, mock_reddit, logger):
     # Create a controller instance with accompanying seed data for an experiment.
     c = BanneduserExperimentController(
-        "banneduser_experiment_test", db_session, fake_reddit, logger
+        "banneduser_experiment_test", db_session, mock_reddit, logger
     )
 
     db_session.add(
@@ -121,27 +57,13 @@ def experiment_controller(db_session, fake_reddit, logger):
 
 
 @pytest.fixture
-def mod_controller(db_session, fake_reddit, logger, experiment_controller):
+def mod_controller(db_session, mock_reddit, logger, experiment_controller):
     return ModeratorController(
         experiment_controller.experiment_settings["subreddit"],
         db_session,
-        fake_reddit,
+        mock_reddit,
         logger,
     )
-
-
-# Load all fixture data, like `controller.fetch_mod_action_history` does.
-# We're reimplementing it here for clarity, so we don't have to mock the function.
-def _load_mod_actions(mod_controller, experiment_controller):
-    after_id, num_actions_stored = mod_controller.archive_mod_action_page()
-    while num_actions_stored > 0:
-        after_id, num_actions_stored = mod_controller.archive_mod_action_page(after_id)
-
-    # NOTE: this also may store a subreddit ID that we don't want, short-circuiting matching logic.
-    # To work around this, we hardcode it to always match.
-    mod_controller.fetched_subreddit_id = experiment_controller.experiment_settings[
-        "subreddit_id"
-    ]
 
 
 @pytest.fixture
@@ -150,19 +72,19 @@ def newcomer_modactions(experiment_controller, modaction_data):
 
 
 class TestRedditMock:
-    def test_fake_mod_log_first_page(self, fake_reddit):
-        page = fake_reddit.get_mod_log("fake_subreddit")
+    def test_fake_mod_log_first_page(self, mock_reddit):
+        page = mock_reddit.get_mod_log("fake_subreddit")
         assert len(page) == 100
 
-    def test_fake_mod_log_all_pages(self, fake_reddit):
-        page = fake_reddit.get_mod_log("fake_subreddit")
+    def test_fake_mod_log_all_pages(self, mock_reddit):
+        page = mock_reddit.get_mod_log("fake_subreddit")
         while page:
             assert len(page) > 1
-            page = fake_reddit.get_mod_log("fake_subreddit")
+            page = mock_reddit.get_mod_log("fake_subreddit")
         assert len(page) == 0
 
-    def test_fake_get_redditor(self, fake_reddit):
-        user = fake_reddit.get_redditor("uncivil")
+    def test_get_redditor(self, mock_reddit):
+        user = mock_reddit.get_redditor("uncivil")
         assert user.created_utc > 0
         assert user.name == "uncivil"
 
@@ -179,7 +101,7 @@ class TestModeratorController:
         assert db_session.query(ModAction).count() == 100
 
     def test_load_all_fixtures(
-        self, db_session, modaction_data, mod_controller, experiment_controller
+        self, helpers, db_session, modaction_data, mod_controller, experiment_controller
     ):
         # Nothing is loaded yet.
         assert db_session.query(ModAction).count() == 0
@@ -187,17 +109,19 @@ class TestModeratorController:
         # We have multiple API result pages of fixtures.
         assert len(modaction_data) > 100
 
-        _load_mod_actions(mod_controller, experiment_controller)
+        helpers.load_mod_actions(mod_controller, experiment_controller)
 
         # All fixture records were loaded.
         assert db_session.query(ModAction).count() == len(modaction_data)
 
 
 class TestExperimentController:
-    def test_enroll_new_participants(self, experiment_controller, mod_controller):
+    def test_enroll_new_participants(
+        self, helpers, experiment_controller, mod_controller
+    ):
         assert len(experiment_controller._previously_enrolled_user_ids()) == 0
 
-        _load_mod_actions(mod_controller, experiment_controller)
+        helpers.load_mod_actions(mod_controller, experiment_controller)
         experiment_controller.enroll_new_participants(mod_controller)
 
         assert len(experiment_controller._previously_enrolled_user_ids()) > 0
@@ -278,6 +202,7 @@ class TestPrivateMethods:
     )
     def test_update_existing_participants(
         self,
+        helpers,
         action,
         details,
         want_duration,
@@ -287,7 +212,7 @@ class TestPrivateMethods:
         experiment_controller,
         mod_controller,
     ):
-        _load_mod_actions(mod_controller, experiment_controller)
+        helpers.load_mod_actions(mod_controller, experiment_controller)
         experiment_controller.enroll_new_participants(mod_controller)
 
         original = newcomer_modactions[0]
@@ -429,12 +354,12 @@ class TestPrivateMethods:
         assert got == want
 
     def test_get_accounts_needing_interventions(
-        self, experiment_controller, mod_controller
+        self, helpers, experiment_controller, mod_controller
     ):
         users = experiment_controller._get_accounts_needing_interventions()
         assert users == []
 
-        _load_mod_actions(mod_controller, experiment_controller)
+        helpers.load_mod_actions(mod_controller, experiment_controller)
         experiment_controller.enroll_new_participants(mod_controller)
 
         users = experiment_controller._get_accounts_needing_interventions()
