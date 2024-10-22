@@ -25,40 +25,24 @@ def with_setup_and_teardown(helpers, db_session):
 
 
 @pytest.fixture
-def fake_get_mod_log(modaction_data):
-    # Fixture data is broken up like this to allow testing of pagination in API results.
-    # Always return a blank final page to ensure that our code thinks it's done pulling new results.
-    # NOTE: Mock will return the next item in the array each time it's called.
-    mod_log_pages = [
-        modaction_data[i : i + 100] for i in range(0, len(modaction_data), 100)
-    ] + [[]]
-
-    return MagicMock(side_effect=mod_log_pages)
-
-
-@pytest.fixture
-def fake_get_redditor():
-    # Generate a fake Redditor based only on the username.
-    # This could look up a record, but so far we don't need to do that.
-    def create_fake_redditor(username):
+def mock_reddit(helpers, modaction_data):
+    def create_redditor(username):
+        """Generate a Redditor based only on the username.
+        This could look up a record, but so far we don't need to do that.
+        """
         user_data = {"created_utc": 9999}
         user = Redditor(MagicMock(), user_name=username, json_dict=user_data)
         return user
 
-    yield MagicMock(side_effect=create_fake_redditor)
-
-
-@pytest.fixture
-def fake_reddit(helpers, fake_get_mod_log, fake_get_redditor):
-    with helpers.with_mock_reddit(fake_get_mod_log, fake_get_redditor) as reddit:
+    with helpers.with_mock_reddit(modaction_data, create_redditor) as reddit:
         yield reddit
 
 
 @pytest.fixture
-def experiment_controller(db_session, fake_reddit, logger):
+def experiment_controller(db_session, mock_reddit, logger):
     # Create a controller instance with accompanying seed data for an experiment.
     c = BanneduserExperimentController(
-        "banneduser_experiment_test", db_session, fake_reddit, logger
+        "banneduser_experiment_test", db_session, mock_reddit, logger
     )
 
     db_session.add(
@@ -73,11 +57,11 @@ def experiment_controller(db_session, fake_reddit, logger):
 
 
 @pytest.fixture
-def mod_controller(db_session, fake_reddit, logger, experiment_controller):
+def mod_controller(db_session, mock_reddit, logger, experiment_controller):
     return ModeratorController(
         experiment_controller.experiment_settings["subreddit"],
         db_session,
-        fake_reddit,
+        mock_reddit,
         logger,
     )
 
@@ -88,19 +72,19 @@ def newcomer_modactions(experiment_controller, modaction_data):
 
 
 class TestRedditMock:
-    def test_fake_mod_log_first_page(self, fake_reddit):
-        page = fake_reddit.get_mod_log("fake_subreddit")
+    def test_fake_mod_log_first_page(self, mock_reddit):
+        page = mock_reddit.get_mod_log("fake_subreddit")
         assert len(page) == 100
 
-    def test_fake_mod_log_all_pages(self, fake_reddit):
-        page = fake_reddit.get_mod_log("fake_subreddit")
+    def test_fake_mod_log_all_pages(self, mock_reddit):
+        page = mock_reddit.get_mod_log("fake_subreddit")
         while page:
             assert len(page) > 1
-            page = fake_reddit.get_mod_log("fake_subreddit")
+            page = mock_reddit.get_mod_log("fake_subreddit")
         assert len(page) == 0
 
-    def test_fake_get_redditor(self, fake_reddit):
-        user = fake_reddit.get_redditor("uncivil")
+    def test_get_redditor(self, mock_reddit):
+        user = mock_reddit.get_redditor("uncivil")
         assert user.created_utc > 0
         assert user.name == "uncivil"
 

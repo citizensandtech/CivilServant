@@ -59,11 +59,27 @@ class Helpers:
 
     @staticmethod
     @contextmanager
-    def with_mock_reddit(get_mod_log, get_redditor):
-        # Mock relevant methods in the `praw` package: this mock will not touch the network.
+    def with_mock_reddit(modaction_data, create_redditor):
+        """Mock the `praw.Reddit` class so it does not touch the network.
+        Note that this should be used as a context manager in your test fixtures.
+
+        Args:
+            modaction_data: paginated fixture records.
+            create_redditor: a function that takes a username and returns a `praw.Redditor`.
+
+        Returns:
+            A mocked `praw.Reddit` instance.
+        """
+        # Fixture data is broken up like this to allow testing of pagination in API results.
+        # Always return a blank final page to ensure that our code thinks it's done pulling new results.
+        # NOTE: Mock will return the next item in the array each time it's called.
+        mod_log_pages = [
+            modaction_data[i : i + 100] for i in range(0, len(modaction_data), 100)
+        ] + [[]]
+
         with patch("praw.Reddit", autospec=True, spec_set=True) as reddit:
-            reddit.get_mod_log = get_mod_log
-            reddit.get_redditor = get_redditor
+            reddit.get_mod_log = MagicMock(side_effect=mod_log_pages)
+            reddit.get_redditor = MagicMock(side_effect=create_redditor)
             yield reddit
 
     @staticmethod
