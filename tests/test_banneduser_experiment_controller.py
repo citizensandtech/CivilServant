@@ -501,7 +501,7 @@ class TestPrivateMethods:
             experiment_controller._format_intervention_message(et)
 
     @pytest.mark.parametrize(
-        "thing_id,metadata_json,want_error",
+        "thing_id,metadata_json,want_error,want_user_query_index,want_user_message_status",
         [
             (
                 "ThusSpoke44",
@@ -510,6 +510,8 @@ class TestPrivateMethods:
                     "arm": "arm_1",
                 },
                 False,
+                BannedUserQueryIndex.COMPLETE,
+                "sent",
             ),
             (
                 "LaLaLatour47",
@@ -518,6 +520,8 @@ class TestPrivateMethods:
                     "arm": "arm_2",
                 },
                 False,
+                BannedUserQueryIndex.COMPLETE,
+                "sent",
             ),
             (
                 "ErrorWhoa99",
@@ -526,6 +530,8 @@ class TestPrivateMethods:
                     "arm": "arm_999999",
                 },
                 True,
+                None,
+                None,
             ),
             (
                 "ErrorErrorOnTheWall11",
@@ -534,14 +540,23 @@ class TestPrivateMethods:
                     "arm": "arm_0",
                 },
                 True,
+                None,
+                None,
             ),
         ],
     )
     def test_send_intervention_messages(
-        self, thing_id, metadata_json, want_error, db_session, experiment_controller
+        self,
+        thing_id,
+        metadata_json,
+        want_error,
+        want_user_query_index,
+        want_user_message_status,
+        experiment_controller,
     ):
 
-        assert db_session.query(ExperimentAction).count() == 0
+        assert experiment_controller.db_session.query(ExperimentAction).count() == 0
+        assert experiment_controller.db_session.query(ExperimentThing).count() == 0
 
         et = ExperimentThing(
             id=thing_id,
@@ -550,6 +565,7 @@ class TestPrivateMethods:
             object_type=ThingType.USER.value,
             metadata_json=json.dumps(metadata_json),
         )
+        experiment_controller.db_session.add(et)
 
         if want_error:
             with pytest.raises(Exception):
@@ -569,5 +585,12 @@ class TestPrivateMethods:
             meta = json.loads(ea.metadata_json)
             assert meta["message_status"] == "sent"
 
-
-
+            user = (
+                experiment_controller.db_session.query(ExperimentThing)
+                .filter(ExperimentThing.thing_id == thing_id)
+                .one()
+            )
+            assert user is not None
+            assert user.query_index == want_user_query_index
+            meta_u = json.loads(user.metadata_json)
+            assert meta_u["message_status"] == "sent"

@@ -512,6 +512,8 @@ class BanneduserExperimentController(ModactionExperimentController):
                         )
                         self.db_session.add(ea)
                         experiment_thing.metadata_json = metadata_json
+            # NOTE: experiment_things also become updated in database with this commit method,
+            # as they are sqlalchemy objects
             self.db_session.commit()
         except Exception as e:
             self.log.error(
