@@ -1,5 +1,6 @@
 import argparse
 import json
+import random
 
 
 def clear_descriptions(data):
@@ -7,6 +8,24 @@ def clear_descriptions(data):
     for obj in data:
         if "description" in obj:
             obj["description"] = ""
+    return data
+
+
+def clear_subreddits(data):
+    print("-- Clearing subreddit fields")
+    for obj in data:
+        if "subreddit" in obj:
+            obj["subreddit"] = "anonymized"
+        if "subreddit_name_prefixed" in obj:
+            obj["subreddit_name_prefixed"] = "r/anonymized"
+    return data
+
+
+def add_random_to_timestamp(data):
+    print("-- Adding random seconds to timestamp")
+    for obj in data:
+        if "created_utc" in obj:
+            obj["created_utc"] += random.randint(-60, 60)
     return data
 
 
@@ -31,6 +50,10 @@ if __name__ == "__main__":
     data = filter_banuser(data)
 
     data = clear_descriptions(data)
+
+    data = clear_subreddits(data)
+
+    data = add_random_to_timestamp(data)
 
     with open(args.output_file, "w") as outfile:
         json.dump(data, outfile, indent=4)
