@@ -18,26 +18,10 @@ from app.models import *
 
 
 @pytest.fixture(autouse=True)
-def with_setup_and_teardown(db_session):
-    def _clear_all_tables():
-        db_session.execute("UNLOCK TABLES")
-        db_session.query(FrontPage).delete()
-        db_session.query(SubredditPage).delete()
-        db_session.query(Subreddit).delete()
-        db_session.query(Post).delete()
-        db_session.query(User).delete()
-        db_session.query(ModAction).delete()
-        db_session.query(Comment).delete()
-        db_session.query(Experiment).delete()
-        db_session.query(ExperimentThing).delete()
-        db_session.query(ExperimentAction).delete()
-        db_session.query(ExperimentThingSnapshot).delete()
-        db_session.query(EventHook).delete()
-        db_session.commit()
-
-    _clear_all_tables()
+def with_setup_and_teardown(helpers, db_session):
+    helpers.clear_all_tables(db_session)
     yield
-    _clear_all_tables()
+    helpers.clear_all_tables(db_session)
 
 
 @pytest.fixture
@@ -65,11 +49,8 @@ def fake_get_redditor():
 
 
 @pytest.fixture
-def fake_reddit(fake_get_mod_log, fake_get_redditor):
-    # Mock relevant methods in the praw package: the mock will not touch the network.
-    with patch("praw.Reddit", autospec=True, spec_set=True) as reddit:
-        reddit.get_mod_log = fake_get_mod_log
-        reddit.get_redditor = fake_get_redditor
+def fake_reddit(helpers, fake_get_mod_log, fake_get_redditor):
+    with helpers.with_mock_reddit(fake_get_mod_log, fake_get_redditor) as reddit:
         yield reddit
 
 
@@ -99,20 +80,6 @@ def mod_controller(db_session, fake_reddit, logger, experiment_controller):
         fake_reddit,
         logger,
     )
-
-
-# Load all fixture data, like `controller.fetch_mod_action_history` does.
-# We're reimplementing it here for clarity, so we don't have to mock the function.
-def _load_mod_actions(mod_controller, experiment_controller):
-    after_id, num_actions_stored = mod_controller.archive_mod_action_page()
-    while num_actions_stored > 0:
-        after_id, num_actions_stored = mod_controller.archive_mod_action_page(after_id)
-
-    # NOTE: this also may store a subreddit ID that we don't want, short-circuiting matching logic.
-    # To work around this, we hardcode it to always match.
-    mod_controller.fetched_subreddit_id = experiment_controller.experiment_settings[
-        "subreddit_id"
-    ]
 
 
 @pytest.fixture
@@ -150,7 +117,7 @@ class TestModeratorController:
         assert db_session.query(ModAction).count() == 100
 
     def test_load_all_fixtures(
-        self, db_session, modaction_data, mod_controller, experiment_controller
+        self, helpers, db_session, modaction_data, mod_controller, experiment_controller
     ):
         # Nothing is loaded yet.
         assert db_session.query(ModAction).count() == 0
@@ -158,17 +125,19 @@ class TestModeratorController:
         # We have multiple API result pages of fixtures.
         assert len(modaction_data) > 100
 
-        _load_mod_actions(mod_controller, experiment_controller)
+        helpers.load_mod_actions(mod_controller, experiment_controller)
 
         # All fixture records were loaded.
         assert db_session.query(ModAction).count() == len(modaction_data)
 
 
 class TestExperimentController:
-    def test_enroll_new_participants(self, experiment_controller, mod_controller):
+    def test_enroll_new_participants(
+        self, helpers, experiment_controller, mod_controller
+    ):
         assert len(experiment_controller._previously_enrolled_user_ids()) == 0
 
-        _load_mod_actions(mod_controller, experiment_controller)
+        helpers.load_mod_actions(mod_controller, experiment_controller)
         experiment_controller.enroll_new_participants(mod_controller)
 
         assert len(experiment_controller._previously_enrolled_user_ids()) > 0
@@ -249,6 +218,7 @@ class TestPrivateMethods:
     )
     def test_update_existing_participants(
         self,
+        helpers,
         action,
         details,
         want_duration,
@@ -258,7 +228,7 @@ class TestPrivateMethods:
         experiment_controller,
         mod_controller,
     ):
-        _load_mod_actions(mod_controller, experiment_controller)
+        helpers.load_mod_actions(mod_controller, experiment_controller)
         experiment_controller.enroll_new_participants(mod_controller)
 
         original = newcomer_modactions[0]
@@ -400,12 +370,12 @@ class TestPrivateMethods:
         assert got == want
 
     def test_get_accounts_needing_interventions(
-        self, experiment_controller, mod_controller
+        self, helpers, experiment_controller, mod_controller
     ):
         users = experiment_controller._get_accounts_needing_interventions()
         assert users == []
 
-        _load_mod_actions(mod_controller, experiment_controller)
+        helpers.load_mod_actions(mod_controller, experiment_controller)
         experiment_controller.enroll_new_participants(mod_controller)
 
         users = experiment_controller._get_accounts_needing_interventions()
