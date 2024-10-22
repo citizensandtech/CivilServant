@@ -59,7 +59,9 @@ class BanneduserExperimentController(ModactionExperimentController):
         This is a callback that will be invoked declaratively. This is called by ModeratorController while running archive_mod_action_page, as noted in the experiment config YAML File.
         """
         if instance.fetched_subreddit_id != self.experiment_settings["subreddit_id"]:
-            self.log.error(f"subreddit mismatch. fetched: {instance.fetched_subreddit_id}, experiment: {self.experiment_settings['subreddit_id']}")
+            self.log.error(
+                f"subreddit mismatch. fetched: {instance.fetched_subreddit_id}, experiment: {self.experiment_settings['subreddit_id']}"
+            )
             return
 
         self.log.info(
@@ -267,7 +269,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             if len(newcomer_ets) > 0:
                 self.db_session.insert_retryable(ExperimentThing, newcomer_ets)
                 self.experiment.settings_json = json.dumps(self.experiment_settings)
-                
+
             self.log.info(
                 f"Assigned randomizations to {len(newcomer_ets)} banned users: [{','.join([x['thing_id'] for x in newcomer_ets])}]"
             )
@@ -409,19 +411,20 @@ class BanneduserExperimentController(ModactionExperimentController):
         return {"subject": message_subject, "message": message_body}
 
     def _send_intervention_messages(self, experiment_things):
-        """Format intervention message for an experiment thing, given the arm that it is in.
-        This reads from the experiment_settings (the YAML file in /config/experiments/).
+        """Sends appropriate intervention messages for a list of experiment things.
 
         Args:
             experiment_things: A list of ExperimentThings representing tempbanned users.
 
         Returns:
-            A dict with message subject and body.
+            A dict with server response from praw's send_message,
+            or a dict with key 'error' if there was an error sending a message.
 
         Example result:
             {
-                "subject": "Tempban Message",
-                "message": "You have been temporarily banned...",
+                "LaLaLatour47": {
+                    ....
+                }
             }
         """
         self.db_session.execute(
@@ -455,7 +458,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             # send messages_to_send
             message_results = mc.send_messages(
                 messages_to_send,
-                f"BannedUserMessagingExperiment({self.experiment_name})::_send_intervention_messages"
+                f"BannedUserMessagingExperiment({self.experiment_name})::_send_intervention_messages",
             )
 
             # iterate through message_result, linked with experiment_things
@@ -509,6 +512,8 @@ class BanneduserExperimentController(ModactionExperimentController):
                         )
                         self.db_session.add(ea)
                         experiment_thing.metadata_json = metadata_json
+            # NOTE: experiment_things also become updated in database with this commit method,
+            # as they are sqlalchemy objects
             self.db_session.commit()
         except Exception as e:
             self.log.error(

@@ -427,6 +427,97 @@ class TestPrivateMethods:
         with pytest.raises(ExperimentConfigurationError):
             experiment_controller._format_intervention_message(et)
 
-    @pytest.mark.skip
-    def test_send_intervention_messages(self):
-        pass
+    @pytest.mark.parametrize(
+        "thing_id,metadata_json,want_error,want_user_query_index,want_user_message_status",
+        [
+            (
+                "ThusSpoke44",
+                {
+                    "condition": "newcomer",
+                    "arm": "arm_1",
+                },
+                False,
+                BannedUserQueryIndex.COMPLETE,
+                "sent",
+            ),
+            (
+                "LaLaLatour47",
+                {
+                    "condition": "experienced",
+                    "arm": "arm_2",
+                },
+                False,
+                BannedUserQueryIndex.COMPLETE,
+                "sent",
+            ),
+            (
+                "ErrorWhoa99",
+                {
+                    "condition": "experienced",
+                    "arm": "arm_999999",
+                },
+                True,
+                None,
+                None,
+            ),
+            (
+                "ErrorErrorOnTheWall11",
+                {
+                    "condition": "errorconditionhere",
+                    "arm": "arm_0",
+                },
+                True,
+                None,
+                None,
+            ),
+        ],
+    )
+    def test_send_intervention_messages(
+        self,
+        thing_id,
+        metadata_json,
+        want_error,
+        want_user_query_index,
+        want_user_message_status,
+        experiment_controller,
+    ):
+
+        assert experiment_controller.db_session.query(ExperimentAction).count() == 0
+        assert experiment_controller.db_session.query(ExperimentThing).count() == 0
+
+        et = ExperimentThing(
+            id=thing_id,
+            thing_id=thing_id,
+            experiment_id=experiment_controller.experiment.id,
+            object_type=ThingType.USER.value,
+            metadata_json=json.dumps(metadata_json),
+        )
+        experiment_controller.db_session.add(et)
+
+        if want_error:
+            with pytest.raises(Exception):
+                experiment_controller._send_intervention_messages([et])
+
+        else:
+            experiment_controller._send_intervention_messages([et])
+
+            ea = (
+                experiment_controller.db_session.query(ExperimentAction)
+                .filter(ExperimentAction.action_object_id == thing_id)
+                .filter(ExperimentAction.action_object_type == ThingType.USER.value)
+                .one()
+            )
+
+            assert ea is not None
+            meta = json.loads(ea.metadata_json)
+            assert meta["message_status"] == "sent"
+
+            user = (
+                experiment_controller.db_session.query(ExperimentThing)
+                .filter(ExperimentThing.thing_id == thing_id)
+                .one()
+            )
+            assert user is not None
+            assert user.query_index == want_user_query_index
+            meta_u = json.loads(user.metadata_json)
+            assert meta_u["message_status"] == "sent"
