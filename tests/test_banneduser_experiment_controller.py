@@ -501,7 +501,7 @@ class TestPrivateMethods:
             experiment_controller._format_intervention_message(et)
 
     @pytest.mark.parametrize(
-        "thing_id,metadata_json",
+        "thing_id,metadata_json,want_error",
         [
             (
                 "ThusSpoke44",
@@ -509,6 +509,7 @@ class TestPrivateMethods:
                     "condition": "newcomer",
                     "arm": "arm_1",
                 },
+                False,
             ),
             (
                 "LaLaLatour47",
@@ -516,12 +517,31 @@ class TestPrivateMethods:
                     "condition": "experienced",
                     "arm": "arm_2",
                 },
+                False,
+            ),
+            (
+                "ErrorWhoa99",
+                {
+                    "condition": "experienced",
+                    "arm": "arm_999999",
+                },
+                True,
+            ),
+            (
+                "ErrorErrorOnTheWall11",
+                {
+                    "condition": "errorconditionhere",
+                    "arm": "arm_0",
+                },
+                True,
             ),
         ],
     )
     def test_send_intervention_messages(
-        self, thing_id, metadata_json, db_session, experiment_controller
+        self, thing_id, metadata_json, want_error, db_session, experiment_controller
     ):
+
+        assert db_session.query(ExperimentAction).count() == 0
 
         et = ExperimentThing(
             id=thing_id,
@@ -530,11 +550,24 @@ class TestPrivateMethods:
             object_type=ThingType.USER.value,
             metadata_json=json.dumps(metadata_json),
         )
-        experiment_controller._send_intervention_messages([et])
 
-        assert (
-            experiment_controller.db_session.query(ExperimentAction)
-            .filter(ExperimentAction.action_object_id == thing_id)
-            .count()
-            == 1
-        )
+        if want_error:
+            with pytest.raises(Exception):
+                experiment_controller._send_intervention_messages([et])
+
+        else:
+            experiment_controller._send_intervention_messages([et])
+
+            ea = (
+                experiment_controller.db_session.query(ExperimentAction)
+                .filter(ExperimentAction.action_object_id == thing_id)
+                .filter(ExperimentAction.action_object_type == ThingType.USER.value)
+                .one()
+            )
+
+            assert ea is not None
+            meta = json.loads(ea.metadata_json)
+            assert meta["message_status"] == "sent"
+
+
+

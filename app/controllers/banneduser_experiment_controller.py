@@ -59,7 +59,9 @@ class BanneduserExperimentController(ModactionExperimentController):
         This is a callback that will be invoked declaratively. This is called by ModeratorController while running archive_mod_action_page, as noted in the experiment config YAML File.
         """
         if instance.fetched_subreddit_id != self.experiment_settings["subreddit_id"]:
-            self.log.error(f"subreddit mismatch. fetched: {instance.fetched_subreddit_id}, experiment: {self.experiment_settings['subreddit_id']}")
+            self.log.error(
+                f"subreddit mismatch. fetched: {instance.fetched_subreddit_id}, experiment: {self.experiment_settings['subreddit_id']}"
+            )
             return
 
         self.log.info(
@@ -267,7 +269,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             if len(newcomer_ets) > 0:
                 self.db_session.insert_retryable(ExperimentThing, newcomer_ets)
                 self.experiment.settings_json = json.dumps(self.experiment_settings)
-                
+
             self.log.info(
                 f"Assigned randomizations to {len(newcomer_ets)} banned users: [{','.join([x['thing_id'] for x in newcomer_ets])}]"
             )
@@ -456,7 +458,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             # send messages_to_send
             message_results = mc.send_messages(
                 messages_to_send,
-                f"BannedUserMessagingExperiment({self.experiment_name})::_send_intervention_messages"
+                f"BannedUserMessagingExperiment({self.experiment_name})::_send_intervention_messages",
             )
 
             # iterate through message_result, linked with experiment_things
