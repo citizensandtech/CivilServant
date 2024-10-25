@@ -53,10 +53,12 @@ class BanneduserExperimentController(ModactionExperimentController):
     ):
         super().__init__(experiment_name, db_session, r, log, required_keys)
 
-    def enroll_new_participants(self, instance):
+    def enroll_new_participants(self, instance, now_utc=datetime.utcnow().timestamp()):
         """Enroll new participants in the experiment.
 
-        This is a callback that will be invoked declaratively. This is called by ModeratorController while running archive_mod_action_page, as noted in the experiment config YAML File.
+        This is a callback that will be invoked declaratively.
+        It is called by ModeratorController while running archive_mod_action_page, as noted in the experiment config YAML File.
+        The `now_utc` timestamp may be set as a parameter for testing or replay purposes.
         """
         if instance.fetched_subreddit_id != self.experiment_settings["subreddit_id"]:
             self.log.error(
@@ -70,7 +72,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         eligible_newcomers = self._find_eligible_newcomers(instance.fetched_mod_actions)
 
         self.log.info("Assigning randomized conditions to eligible newcomers")
-        self._assign_randomized_conditions(eligible_newcomers)
+        self._assign_randomized_conditions(now_utc, eligible_newcomers)
 
         self.log.info("Updating the ban state of existing participants")
         self._update_existing_participants(instance.fetched_mod_actions)
@@ -188,21 +190,20 @@ class BanneduserExperimentController(ModactionExperimentController):
             user.metadata_json = json.dumps(user_metadata)
             self.db_session.add(user)
 
-    def _get_account_age_days(self, account_created):
+    def _get_account_age_days(self, now_utc, account_created):
         """Return the account age in days."""
-        now_utc = datetime.utcnow().timestamp()
         age_days = (now_utc - account_created) / 86400
         return age_days
 
-    def _get_account_age_bucket(self, account_created):
-        age_days = self._get_account_age_days(account_created)
+    def _get_account_age_bucket(self, now_utc, account_created):
+        age_days = self._get_account_age_days(now_utc, account_created)
         if age_days < 7:
             return "newcomer"
         else:
             return "experienced"
 
-    def _get_condition(self, account_created):
-        age_bucket = self._get_account_age_bucket(account_created)
+    def _get_condition(self, now_utc, account_created):
+        age_bucket = self._get_account_age_bucket(now_utc, account_created)
 
         # Combine multiple factors into condition.
         condition = f"{age_bucket}"
@@ -210,12 +211,12 @@ class BanneduserExperimentController(ModactionExperimentController):
         self._check_condition(condition)
         return condition
 
-    def _is_too_new(self, account_created):
+    def _is_too_new(self, now_utc, account_created):
         """Return true if the account is too new to enter into the study."""
-        age_days = self._get_account_age_days(account_created)
+        age_days = self._get_account_age_days(now_utc, account_created)
         return age_days <= 7
 
-    def _assign_randomized_conditions(self, newcomer_modactions):
+    def _assign_randomized_conditions(self, now_utc, newcomer_modactions):
         """Assign randomized conditions to newcomers.
         Log an ExperimentAction with the assignments.
         If there are no available randomizations, throw an error.
@@ -235,11 +236,11 @@ class BanneduserExperimentController(ModactionExperimentController):
                 info = self._load_redditor_info(newcomer_id)
 
                 # Exclude newcomers that have very new accounts.
-                if self._is_too_new(info["object_created"]):
+                if self._is_too_new(now_utc, info["object_created"]):
                     continue
 
                 self.log.info(info)
-                condition = self._get_condition(info["object_created"])
+                condition = self._get_condition(now_utc, info["object_created"])
 
                 # Get the next randomization, and ensure that it's valid.
                 next_randomization = self.experiment_settings["conditions"][condition][

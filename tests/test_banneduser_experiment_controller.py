@@ -253,7 +253,7 @@ class TestPrivateMethods:
     )
     def test_get_account_age_bucket(self, seconds_ago, want, experiment_controller):
         now = datetime.datetime.utcnow().timestamp()
-        age = experiment_controller._get_account_age_bucket(now - seconds_ago)
+        age = experiment_controller._get_account_age_bucket(now, now - seconds_ago)
         assert age == want
 
     @pytest.mark.parametrize(
@@ -266,7 +266,7 @@ class TestPrivateMethods:
     def test_get_condition(self, seconds_ago, want, experiment_controller):
         # NOTE: Condition is currently the same value as `_get_account_age_bucket`.
         now = datetime.datetime.utcnow().timestamp()
-        condition = experiment_controller._get_condition(now - seconds_ago)
+        condition = experiment_controller._get_condition(now, now - seconds_ago)
         assert condition == want
 
     @pytest.mark.parametrize(
@@ -279,12 +279,13 @@ class TestPrivateMethods:
     def test_is_too_new(self, seconds_ago, want, experiment_controller):
         # NOTE: Condition is currently the same value as `_get_account_age_bucket`.
         now = datetime.datetime.utcnow().timestamp()
-        condition = experiment_controller._is_too_new(now - seconds_ago)
+        condition = experiment_controller._is_too_new(now, now - seconds_ago)
         assert condition == want
 
     def test_assign_randomized_conditions(self, modaction_data, experiment_controller):
+        now = datetime.datetime.utcnow().timestamp()
         user_modactions = experiment_controller._find_eligible_newcomers(modaction_data)
-        experiment_controller._assign_randomized_conditions(user_modactions)
+        experiment_controller._assign_randomized_conditions(now, user_modactions)
         assert len(experiment_controller._previously_enrolled_user_ids()) > 1
 
     @pytest.mark.parametrize(
