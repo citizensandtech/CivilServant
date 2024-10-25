@@ -93,8 +93,12 @@ class BanneduserExperimentController(ModactionExperimentController):
     def _find_eligible_newcomers(self, modactions):
         """Filter a list of mod actions to find newcomers to the experiment.
         Starting with a list of arbitrary mod actions, select mod actions that:
+        - are not for users already in the study,
         - are temporary bans, and
-        - are not for users already in the study.
+        - do not appear to be bots.
+
+        NOTE: We also exclude very new accounts.
+        That happens in `_assign_randomized_conditions` because it requires extra user data.
 
         Args:
             modactions: A list of mod actions.
@@ -184,22 +188,32 @@ class BanneduserExperimentController(ModactionExperimentController):
             user.metadata_json = json.dumps(user_metadata)
             self.db_session.add(user)
 
-    def _get_account_age(self, account_created):
+    def _get_account_age_days(self, account_created):
+        """Return the account age in days."""
         now_utc = datetime.utcnow().timestamp()
         age_days = (now_utc - account_created) / 86400
+        return age_days
+
+    def _get_account_age_bucket(self, account_created):
+        age_days = self._get_account_age_days(account_created)
         if age_days < 7:
             return "newcomer"
         else:
             return "experienced"
 
     def _get_condition(self, account_created):
-        age_bucket = self._get_account_age(account_created)
+        age_bucket = self._get_account_age_bucket(account_created)
 
         # Combine multiple factors into condition.
         condition = f"{age_bucket}"
 
         self._check_condition(condition)
         return condition
+
+    def _is_too_new(self, account_created):
+        """Return true if the account is too new to enter into the study."""
+        age_days = self._get_account_age_days(account_created)
+        return age_days <= 7
 
     def _assign_randomized_conditions(self, newcomer_modactions):
         """Assign randomized conditions to newcomers.
@@ -219,6 +233,10 @@ class BanneduserExperimentController(ModactionExperimentController):
                 # This is required to assign condition/randomization to the newcomer.
                 newcomer_id = newcomer["target_author"]
                 info = self._load_redditor_info(newcomer_id)
+
+                # Exclude newcomers that have very new accounts.
+                if self._is_too_new(info["object_created"]):
+                    continue
 
                 self.log.info(info)
                 condition = self._get_condition(info["object_created"])

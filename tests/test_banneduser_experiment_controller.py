@@ -251,9 +251,9 @@ class TestPrivateMethods:
             (864001, "experienced"),
         ],
     )
-    def test_get_account_age(self, seconds_ago, want, experiment_controller):
+    def test_get_account_age_bucket(self, seconds_ago, want, experiment_controller):
         now = datetime.datetime.utcnow().timestamp()
-        age = experiment_controller._get_account_age(now - seconds_ago)
+        age = experiment_controller._get_account_age_bucket(now - seconds_ago)
         assert age == want
 
     @pytest.mark.parametrize(
@@ -264,9 +264,22 @@ class TestPrivateMethods:
         ],
     )
     def test_get_condition(self, seconds_ago, want, experiment_controller):
-        # NOTE: Condition is currently the same value as `_get_account_age`.`
+        # NOTE: Condition is currently the same value as `_get_account_age_bucket`.
         now = datetime.datetime.utcnow().timestamp()
         condition = experiment_controller._get_condition(now - seconds_ago)
+        assert condition == want
+
+    @pytest.mark.parametrize(
+        "seconds_ago,want",
+        [
+            (1, True),
+            (864001, False),
+        ],
+    )
+    def test_is_too_new(self, seconds_ago, want, experiment_controller):
+        # NOTE: Condition is currently the same value as `_get_account_age_bucket`.
+        now = datetime.datetime.utcnow().timestamp()
+        condition = experiment_controller._is_too_new(now - seconds_ago)
         assert condition == want
 
     def test_assign_randomized_conditions(self, modaction_data, experiment_controller):
@@ -481,7 +494,6 @@ class TestPrivateMethods:
         want_user_message_status,
         experiment_controller,
     ):
-
         assert experiment_controller.db_session.query(ExperimentAction).count() == 0
         assert experiment_controller.db_session.query(ExperimentThing).count() == 0
 
