@@ -72,6 +72,8 @@ def newcomer_modactions(experiment_controller, modaction_data):
 
 
 class TestRedditMock:
+    """NOTE: The reddit mock is part of a higher level test structure, beyond the banned user experiment."""
+
     def test_fake_mod_log_first_page(self, mock_reddit):
         page = mock_reddit.get_mod_log("fake_subreddit")
         assert len(page) == 100
@@ -283,10 +285,23 @@ class TestPrivateMethods:
         assert condition == want
 
     def test_assign_randomized_conditions(self, modaction_data, experiment_controller):
+        assert len(experiment_controller._previously_enrolled_user_ids()) == 0
+
         now = datetime.datetime.utcnow().timestamp()
         user_modactions = experiment_controller._find_eligible_newcomers(modaction_data)
         experiment_controller._assign_randomized_conditions(now, user_modactions)
+
         assert len(experiment_controller._previously_enrolled_user_ids()) > 1
+
+    def test_assign_randomized_conditions_exclusion(
+        self, modaction_data, experiment_controller
+    ):
+        user_modactions = experiment_controller._find_eligible_newcomers(modaction_data)
+        # NOTE: currently, all mock redditors have a creation timestamp 9999.
+        now = 10001
+        experiment_controller._assign_randomized_conditions(now, user_modactions)
+
+        assert len(experiment_controller._previously_enrolled_user_ids()) == 0
 
     @pytest.mark.parametrize(
         "action,details,want",
