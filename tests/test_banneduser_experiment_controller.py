@@ -293,7 +293,7 @@ class TestPrivateMethods:
 
         assert len(experiment_controller._previously_enrolled_user_ids()) > 1
 
-    def test_assign_randomized_conditions_exclusion(
+    def test_assign_randomized_conditions__new_accounts_exclusion(
         self, modaction_data, experiment_controller
     ):
         user_modactions = experiment_controller._find_eligible_newcomers(modaction_data)
