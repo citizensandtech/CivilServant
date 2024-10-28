@@ -67,11 +67,18 @@ def mod_controller(db_session, mock_reddit, logger, experiment_controller):
 
 
 @pytest.fixture
-def newcomer_modactions(experiment_controller, modaction_data):
-    return experiment_controller._find_eligible_newcomers(modaction_data)
+def static_now():
+    return datetime.datetime.utcnow().timestamp()
+
+
+@pytest.fixture
+def newcomer_modactions(static_now, experiment_controller, modaction_data):
+    return experiment_controller._find_eligible_newcomers(static_now, modaction_data)
 
 
 class TestRedditMock:
+    """NOTE: The reddit mock is part of a higher level test structure, beyond the banned user experiment."""
+
     def test_fake_mod_log_first_page(self, mock_reddit):
         page = mock_reddit.get_mod_log("fake_subreddit")
         assert len(page) == 100
@@ -180,10 +187,20 @@ class TestPrivateMethods:
         experiment_controller.db_session.commit()
         assert experiment_controller._previously_enrolled_user_ids() == want
 
-    def test_find_eligible_newcomers(self, modaction_data, experiment_controller):
+    def test_find_eligible_newcomers(self, modaction_data, experiment_controller, static_now):
         # NOTE: not using newcomer_modactions for extra clarity.
-        user_modactions = experiment_controller._find_eligible_newcomers(modaction_data)
+        user_modactions = experiment_controller._find_eligible_newcomers(static_now, modaction_data)
         assert len(user_modactions) > 0
+
+    def test_find_eligible_newcomers__new_accounts_exclusion(
+        self, modaction_data, experiment_controller
+    ):
+        # NOTE: currently, all mock redditors have a creation timestamp 9999.
+        now = 10001
+        user_modactions = experiment_controller._find_eligible_newcomers(now, modaction_data)
+
+        assert len(user_modactions) == 0
+
 
     # update temp ban duration
     @pytest.mark.parametrize(
@@ -215,7 +232,7 @@ class TestPrivateMethods:
         helpers.load_mod_actions(mod_controller, experiment_controller)
         experiment_controller.enroll_new_participants(mod_controller)
 
-        original = newcomer_modactions[0]
+        original = newcomer_modactions[0][0]
         update = {**original, "action": action, "details": details}
         experiment_controller._update_existing_participants([update])
 
@@ -251,9 +268,8 @@ class TestPrivateMethods:
             (864001, "experienced"),
         ],
     )
-    def test_get_account_age(self, seconds_ago, want, experiment_controller):
-        now = datetime.datetime.utcnow().timestamp()
-        age = experiment_controller._get_account_age(now - seconds_ago)
+    def test_get_account_age_bucket(self, seconds_ago, want, experiment_controller, static_now):
+        age = experiment_controller._get_account_age_bucket(static_now, static_now - seconds_ago)
         assert age == want
 
     @pytest.mark.parametrize(
@@ -263,15 +279,28 @@ class TestPrivateMethods:
             (864001, "experienced"),
         ],
     )
-    def test_get_condition(self, seconds_ago, want, experiment_controller):
-        # NOTE: Condition is currently the same value as `_get_account_age`.`
-        now = datetime.datetime.utcnow().timestamp()
-        condition = experiment_controller._get_condition(now - seconds_ago)
+    def test_get_condition(self, seconds_ago, want, experiment_controller, static_now):
+        # NOTE: Condition is currently the same value as `_get_account_age_bucket`.
+        condition = experiment_controller._get_condition(static_now, static_now - seconds_ago)
         assert condition == want
 
-    def test_assign_randomized_conditions(self, modaction_data, experiment_controller):
-        user_modactions = experiment_controller._find_eligible_newcomers(modaction_data)
-        experiment_controller._assign_randomized_conditions(user_modactions)
+    @pytest.mark.parametrize(
+        "seconds_ago,want",
+        [
+            (1, True),
+            (864001, False),
+        ],
+    )
+    def test_is_too_new(self, seconds_ago, want, experiment_controller, static_now):
+        condition = experiment_controller._is_too_new(static_now, static_now - seconds_ago)
+        assert condition == want
+
+    def test_assign_randomized_conditions(self, modaction_data, experiment_controller, static_now):
+        assert len(experiment_controller._previously_enrolled_user_ids()) == 0
+
+        user_modactions = experiment_controller._find_eligible_newcomers(static_now, modaction_data)
+        experiment_controller._assign_randomized_conditions(static_now, user_modactions)
+
         assert len(experiment_controller._previously_enrolled_user_ids()) > 1
 
     @pytest.mark.parametrize(
@@ -481,7 +510,6 @@ class TestPrivateMethods:
         want_user_message_status,
         experiment_controller,
     ):
-
         assert experiment_controller.db_session.query(ExperimentAction).count() == 0
         assert experiment_controller.db_session.query(ExperimentThing).count() == 0
 
