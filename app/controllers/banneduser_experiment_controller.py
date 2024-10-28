@@ -69,7 +69,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         self.log.info(
             f"Experiment {self.experiment.name}: scanning modactions in subreddit {self.experiment_settings['subreddit_id']} to look for temporary bans"
         )
-        eligible_newcomers = self._find_eligible_newcomers(instance.fetched_mod_actions)
+        eligible_newcomers = self._find_eligible_newcomers(now_utc, instance.fetched_mod_actions)
 
         self.log.info("Assigning randomized conditions to eligible newcomers")
         self._assign_randomized_conditions(now_utc, eligible_newcomers)
@@ -92,7 +92,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         )
         self._send_intervention_messages(accounts_needing_messages)
 
-    def _find_eligible_newcomers(self, modactions):
+    def _find_eligible_newcomers(self, now_utc, modactions):
         """Filter a list of mod actions to find newcomers to the experiment.
         Starting with a list of arbitrary mod actions, select mod actions that:
         - are not for users already in the study,
@@ -106,7 +106,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             modactions: A list of mod actions.
 
         Returns:
-            A list of relevant mod actions
+            A list of matched tuples `(mod action, redditor info)`.
         """
         previously_enrolled_user_ids = set(self._previously_enrolled_user_ids())
         eligible_newcomers = []
@@ -119,10 +119,17 @@ class BanneduserExperimentController(ModactionExperimentController):
             ):
                 continue
 
+            # Fetch account info. This will be a performance bottleneck!
+            redditor_info = self._load_redditor_info(modaction["target_author"])
+
+            # Exclude newcomers that have very new accounts.
+            if self._is_too_new(now_utc, redditor_info["object_created"]):
+                continue
+
             # NOTE: If there are multiple mod actions for the same user who isn't yet enrolled,
             # we overwrite the previous action with the latest one.
             # This assumes that they are processed in order.
-            eligible_newcomers.append(modaction)
+            eligible_newcomers.append((modaction, redditor_info))
 
         return eligible_newcomers
 
@@ -216,10 +223,14 @@ class BanneduserExperimentController(ModactionExperimentController):
         age_days = self._get_account_age_days(now_utc, account_created)
         return age_days <= 7
 
-    def _assign_randomized_conditions(self, now_utc, newcomer_modactions):
+    def _assign_randomized_conditions(self, now_utc, newcomers):
         """Assign randomized conditions to newcomers.
         Log an ExperimentAction with the assignments.
         If there are no available randomizations, throw an error.
+
+        Args:
+            now_utc: the current datetime in UTC.
+            newcomers: a list of tuples of `(mod action, redditor info)`.
         """
         self.db_session.execute(
             "LOCK TABLES experiments WRITE, experiment_things WRITE"
@@ -229,18 +240,10 @@ class BanneduserExperimentController(ModactionExperimentController):
             newcomer_ets = []
             newcomers_without_randomization = 0
 
-            for newcomer in newcomer_modactions:
-                # Make an API call here to get the account age.
-                # This is required to assign condition/randomization to the newcomer.
-                newcomer_id = newcomer["target_author"]
-                info = self._load_redditor_info(newcomer_id)
-
-                # Exclude newcomers that have very new accounts.
-                if self._is_too_new(now_utc, info["object_created"]):
-                    continue
-
-                self.log.info(info)
-                condition = self._get_condition(now_utc, info["object_created"])
+            for newcomer, redditor_info in newcomers:
+                condition = self._get_condition(
+                    now_utc, redditor_info["object_created"]
+                )
 
                 # Get the next randomization, and ensure that it's valid.
                 next_randomization = self.experiment_settings["conditions"][condition][
@@ -274,7 +277,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                     "thing_id": newcomer["target_author"],
                     "experiment_id": self.experiment.id,
                     "object_type": ThingType.USER.value,
-                    "object_created": info["object_created"],
+                    "object_created": redditor_info["object_created"],
                     "query_index": BannedUserQueryIndex.PENDING,
                     "metadata_json": json.dumps(user_metadata),
                 }
