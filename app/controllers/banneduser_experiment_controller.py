@@ -96,11 +96,9 @@ class BanneduserExperimentController(ModactionExperimentController):
         """Filter a list of mod actions to find newcomers to the experiment.
         Starting with a list of arbitrary mod actions, select mod actions that:
         - are not for users already in the study,
-        - are temporary bans, and
-        - do not appear to be bots.
-
-        NOTE: We also exclude very new accounts.
-        That happens in `_assign_randomized_conditions` because it requires extra user data.
+        - are temporary bans,
+        - do not appear to be bots, and
+        - have existed for more than one week.
 
         Args:
             modactions: A list of mod actions.
