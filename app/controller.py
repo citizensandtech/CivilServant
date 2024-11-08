@@ -9,6 +9,7 @@ import app.controllers.stylesheet_experiment_controller
 import app.controllers.sticky_comment_experiment_controller
 import app.controllers.messaging_controller
 import app.controllers.messaging_experiment_controller
+import app.controllers.banneduser_experiment_controller
 from utils.common import PageType, DbEngine
 from utils.perftest import profilable
 import app.cs_logger
@@ -80,7 +81,7 @@ def get_experiment_class(experiment_name):
     experiment_file_path = os.path.join(BASE_DIR, "config", "experiments", experiment_name) + ".yml"
     with open(experiment_file_path, 'r') as f:
         try:
-            experiment_config_all = yaml.load(f)
+            experiment_config_all = yaml.full_load(f)
         except yaml.YAMLError as exc:
             log.error("Failure loading experiment yaml {0}".format(experiment_file_path), str(exc))
             sys.exit(1)
@@ -93,12 +94,34 @@ def get_experiment_class(experiment_name):
     ## this is a hack. needs to be improved
     if(experiment_config['controller'] == "StylesheetExperimentController"):
         c = getattr(app.controllers.stylesheet_experiment_controller, experiment_config['controller'])
+    elif(experiment_config['controller'] == "BanneduserExperimentController"):
+        c = getattr(app.controllers.banneduser_experiment_controller, experiment_config['controller'])
     else:
         c = getattr(app.controllers.sticky_comment_experiment_controller, experiment_config['controller'])
     return c
 
 
 # for sticky comment experiments that are NOT using event_handler+callbacks
+@profilable
+def conduct_banuser_experiment(experiment_name):
+    bue = initialize_banuser_experiment(experiment_name)
+    bue.update_experiment()
+
+# not to be run as a job, just to store and get a sce object
+@profilable
+def initialize_banuser_experiment(experiment_name):
+    c = get_experiment_class(experiment_name) 
+    r = conn.connect(controller=experiment_name)    
+    bue = c(        
+        experiment_name = experiment_name,
+        db_session = db_session,
+        r = r,
+        log = log
+    )
+    return bue
+
+
+## for sticky comment experiments that are NOT using event_handler+callbacks
 @profilable
 def conduct_sticky_comment_experiment(experiment_name):
     sce = initialize_sticky_comment_experiment(experiment_name)

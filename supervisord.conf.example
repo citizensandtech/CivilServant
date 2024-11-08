@@ -1,0 +1,24 @@
+[supervisord]
+user=root
+environment=CS_ENV="production",PYTHONPATH=.,AIRBRAKE_API_KEY=<API_KEY_HERE>,AIRBRAKE_PROJECT_ID=<ID>,AIRBRAKE_ENVIRONMENT=<ENV>,AIRBRAKE_BASE_URL=<URL>
+
+[group:all]
+programs=rqscheduler,rqworker,rq-dashboard,praw-multiprocess
+
+[program:rqscheduler]
+directory=/cs/civilservant
+command=/cs/civilservant/venv/bin/rqscheduler
+
+[program:rqworker]
+directory=/cs/civilservant
+command=/cs/civilservant/venv/bin/rqworker production 
+
+[program:rq-dashboard]
+directory=/cs/civilservant
+command=/cs/civilservant/venv/bin/rq-dashboard
+
+[program:praw-multiprocess]
+directory=/cs/civilservant
+command=/cs/civilservant/venv/bin/praw-multiprocess
+
+

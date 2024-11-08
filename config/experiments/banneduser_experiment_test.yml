@@ -1,7 +1,7 @@
-test:
-  subreddit: CivilServantBot2
+production:
+  subreddit: catlabreddit_testbu1
   subreddit_id: mouw
-  username: CivilServantBot
+  username: catlabreddit
   conditions:
     newcomer:
       randomizations: banneduser_experiment_test.newcomer.randomizations.test.csv
