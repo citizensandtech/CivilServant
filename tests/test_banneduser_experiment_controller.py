@@ -159,10 +159,6 @@ class TestModactionPrivateMethods:
 
         assert experiment_controller._previously_enrolled_user_ids() == ["12345"]
 
-    def test_load_redditor_info(self, experiment_controller):
-        redditor = experiment_controller._load_redditor_info("somebody")
-        assert redditor == {"object_created": 9999}
-
 
 class TestPrivateMethods:
     # NOTE: experiment_id None will populate the current experiment ID.
@@ -191,16 +187,6 @@ class TestPrivateMethods:
         # NOTE: not using newcomer_modactions for extra clarity.
         user_modactions = experiment_controller._find_eligible_newcomers(static_now, modaction_data)
         assert len(user_modactions) > 0
-
-    def test_find_eligible_newcomers__new_accounts_exclusion(
-        self, modaction_data, experiment_controller
-    ):
-        # NOTE: currently, all mock redditors have a creation timestamp 9999.
-        now = 10001
-        user_modactions = experiment_controller._find_eligible_newcomers(now, modaction_data)
-
-        assert len(user_modactions) == 0
-
 
     # update temp ban duration
     @pytest.mark.parametrize(
@@ -232,7 +218,7 @@ class TestPrivateMethods:
         helpers.load_mod_actions(mod_controller, experiment_controller)
         experiment_controller.enroll_new_participants(mod_controller)
 
-        original = newcomer_modactions[0][0]
+        original = newcomer_modactions[0]
         update = {**original, "action": action, "details": details}
         experiment_controller._update_existing_participants([update])
 
@@ -261,39 +247,8 @@ class TestPrivateMethods:
             assert meta["ban_duration_days"] == want_duration
         assert meta["ban_type"] == want_type
 
-    @pytest.mark.parametrize(
-        "seconds_ago,want",
-        [
-            (1, "newcomer"),
-            (864001, "experienced"),
-        ],
-    )
-    def test_get_account_age_bucket(self, seconds_ago, want, experiment_controller, static_now):
-        age = experiment_controller._get_account_age_bucket(static_now, static_now - seconds_ago)
-        assert age == want
-
-    @pytest.mark.parametrize(
-        "seconds_ago,want",
-        [
-            (1, "newcomer"),
-            (864001, "experienced"),
-        ],
-    )
-    def test_get_condition(self, seconds_ago, want, experiment_controller, static_now):
-        # NOTE: Condition is currently the same value as `_get_account_age_bucket`.
-        condition = experiment_controller._get_condition(static_now, static_now - seconds_ago)
-        assert condition == want
-
-    @pytest.mark.parametrize(
-        "seconds_ago,want",
-        [
-            (1, True),
-            (864001, False),
-        ],
-    )
-    def test_is_too_new(self, seconds_ago, want, experiment_controller, static_now):
-        condition = experiment_controller._is_too_new(static_now, static_now - seconds_ago)
-        assert condition == want
+    def test_get_condition(self, experiment_controller):
+        experiment_controller._get_condition()
 
     def test_assign_randomized_conditions(self, modaction_data, experiment_controller, static_now):
         assert len(experiment_controller._previously_enrolled_user_ids()) == 0

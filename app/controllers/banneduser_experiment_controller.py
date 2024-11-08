@@ -104,7 +104,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             modactions: A list of mod actions.
 
         Returns:
-            A list of matched tuples `(mod action, redditor info)`.
+            A filtered list of mod actions.
         """
         previously_enrolled_user_ids = set(self._previously_enrolled_user_ids())
         eligible_newcomers = []
@@ -117,17 +117,10 @@ class BanneduserExperimentController(ModactionExperimentController):
             ):
                 continue
 
-            # Fetch account info. This will be a performance bottleneck!
-            redditor_info = self._load_redditor_info(modaction["target_author"])
-
-            # Exclude newcomers that have very new accounts.
-            if self._is_too_new(now_utc, redditor_info["object_created"]):
-                continue
-
             # NOTE: If there are multiple mod actions for the same user who isn't yet enrolled,
             # we overwrite the previous action with the latest one.
             # This assumes that they are processed in order.
-            eligible_newcomers.append((modaction, redditor_info))
+            eligible_newcomers.append(modaction)
 
         return eligible_newcomers
 
@@ -195,31 +188,10 @@ class BanneduserExperimentController(ModactionExperimentController):
             user.metadata_json = json.dumps(user_metadata)
             self.db_session.add(user)
 
-    def _get_account_age_days(self, now_utc, account_created):
-        """Return the account age in days."""
-        age_days = (now_utc - account_created) / 86400
-        return age_days
-
-    def _get_account_age_bucket(self, now_utc, account_created):
-        age_days = self._get_account_age_days(now_utc, account_created)
-        if age_days < 7:
-            return "newcomer"
-        else:
-            return "experienced"
-
-    def _get_condition(self, now_utc, account_created):
-        age_bucket = self._get_account_age_bucket(now_utc, account_created)
-
-        # Combine multiple factors into condition.
-        condition = f"{age_bucket}"
-
+    def _get_condition(self):
+        condition = "experienced"
         self._check_condition(condition)
         return condition
-
-    def _is_too_new(self, now_utc, account_created):
-        """Return true if the account is too new to enter into the study."""
-        age_days = self._get_account_age_days(now_utc, account_created)
-        return age_days <= 7
 
     def _assign_randomized_conditions(self, now_utc, newcomers):
         """Assign randomized conditions to newcomers.
@@ -238,10 +210,8 @@ class BanneduserExperimentController(ModactionExperimentController):
             newcomer_ets = []
             newcomers_without_randomization = 0
 
-            for newcomer, redditor_info in newcomers:
-                condition = self._get_condition(
-                    now_utc, redditor_info["object_created"]
-                )
+            for newcomer in newcomers:
+                condition = self._get_condition()
 
                 # Get the next randomization, and ensure that it's valid.
                 next_randomization = self.experiment_settings["conditions"][condition][
@@ -275,7 +245,6 @@ class BanneduserExperimentController(ModactionExperimentController):
                     "thing_id": newcomer["target_author"],
                     "experiment_id": self.experiment.id,
                     "object_type": ThingType.USER.value,
-                    "object_created": redditor_info["object_created"],
                     "query_index": BannedUserQueryIndex.PENDING,
                     "metadata_json": json.dumps(user_metadata),
                 }

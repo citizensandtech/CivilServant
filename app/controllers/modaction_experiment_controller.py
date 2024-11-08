@@ -53,19 +53,3 @@ class ModactionExperimentController(ExperimentController, abc.ABC):
             )
         )
         return [u[0] for u in user_ids]
-
-    def _load_redditor_info(self, user_id):
-        """Load redditor information, if available.
-
-        Args:
-            user_id: The reddit username.
-
-        Returns:
-            Dict of values about the redditor.
-        """
-        redditor = self.r.get_redditor(user_id)
-
-        # Grab the useful data about this user.
-        info = {"object_created": redditor.created_utc}
-
-        return info
