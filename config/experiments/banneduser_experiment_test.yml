@@ -1,6 +1,6 @@
 production:
-  subreddit: catlabreddit_testbu1
-  subreddit_id: ctveex
+  subreddit: catlabtest
+  subreddit_id: cu3dxg
   username: catlabreddit
   conditions:
     newcomer:
