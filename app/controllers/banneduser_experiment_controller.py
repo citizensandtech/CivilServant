@@ -69,11 +69,11 @@ class BanneduserExperimentController(ModactionExperimentController):
         self.log.info(
             f"Experiment {self.experiment.name}: scanning modactions in subreddit {self.experiment_settings['subreddit_id']} to look for temporary bans"
         )
-        eligible_newcomers = self._find_eligible_newcomers(now_utc, instance.fetched_mod_actions)
-
-        self.log.info(
-            f"Identified {len(eligible_newcomers)} eligible newcomers"
+        eligible_newcomers = self._find_eligible_newcomers(
+            now_utc, instance.fetched_mod_actions
         )
+
+        self.log.info(f"Identified {len(eligible_newcomers)} eligible newcomers")
 
         self.log.info("Assigning randomized conditions to eligible newcomers")
         self._assign_randomized_conditions(now_utc, eligible_newcomers)
@@ -233,7 +233,6 @@ class BanneduserExperimentController(ModactionExperimentController):
                 if next_randomization is None:
                     # If there's no valid randomization for this newcomer, skip it.
                     continue
-
 
                 # Get the current randomization and increment the experiment's counter.
                 randomization = self.experiment_settings["conditions"][condition][
