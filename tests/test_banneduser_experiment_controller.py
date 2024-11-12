@@ -272,6 +272,21 @@ class TestPrivateMethods:
         assert got == want
 
     @pytest.mark.parametrize(
+        "action,details,want",
+        [
+            ("banuser", "1 days", False),
+            ("banuser", "2 days", False),
+            ("banuser", "3 days", True),
+            ("banuser", "7 days", True),
+            ("banuser", "14 days", True),
+            ("banuser", "30 days", True),
+        ],
+    )
+    def test_is_valid_tempban_duration(self, action, details, want, experiment_controller):
+        got = experiment_controller._is_valid_tempban_duration({"action": action, "details": details})
+        assert got == want
+
+    @pytest.mark.parametrize(
         "username,choices,want",
         [
             ("me", ["me", "you"], True),
