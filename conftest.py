@@ -16,6 +16,18 @@ BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 TEST_DIR = os.path.join(BASE_DIR, "tests")
 
 
+class DictObject(dict):
+    __getattr__ = dict.get
+    __setattr__ = dict.__setitem__
+    __delattr__ = dict.__delitem__
+
+
+class MockRedditData(DictObject):
+    def __init__(self, *args, **kw):
+        self.json_dict = args[0]
+        super().__init__(*args, **kw)
+
+
 @pytest.fixture
 def db_session():
     config_file = os.path.join(BASE_DIR, "config", f"{ENV}.json")
@@ -33,7 +45,7 @@ def modaction_data():
     actions = []
     for filename in sorted(glob.glob(f"{TEST_DIR}/fixture_data/mod_actions*")):
         with open(filename, "r") as f:
-            actions += json.load(f)
+            actions += [MockRedditData(r) for r in json.load(f)]
     return actions
 
 

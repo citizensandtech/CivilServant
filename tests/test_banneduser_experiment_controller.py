@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from praw.objects import Redditor
 import pytest
+from conftest import DictObject
 
 # XXX: must come before app imports
 ENV = os.environ["CS_ENV"] = "test"
@@ -183,9 +184,13 @@ class TestPrivateMethods:
         experiment_controller.db_session.commit()
         assert experiment_controller._previously_enrolled_user_ids() == want
 
-    def test_find_eligible_newcomers(self, modaction_data, experiment_controller, static_now):
+    def test_find_eligible_newcomers(
+        self, modaction_data, experiment_controller, static_now
+    ):
         # NOTE: not using newcomer_modactions for extra clarity.
-        user_modactions = experiment_controller._find_eligible_newcomers(static_now, modaction_data)
+        user_modactions = experiment_controller._find_eligible_newcomers(
+            static_now, modaction_data
+        )
         assert len(user_modactions) > 0
 
     # update temp ban duration
@@ -219,13 +224,13 @@ class TestPrivateMethods:
         experiment_controller.enroll_new_participants(mod_controller)
 
         original = newcomer_modactions[0]
-        update = {**original, "action": action, "details": details}
+        update = DictObject({**original, "action": action, "details": details})
         experiment_controller._update_existing_participants([update])
 
         snap = (
             experiment_controller.db_session.query(ExperimentThingSnapshot)
             .filter(
-                ExperimentThingSnapshot.experiment_thing_id == original["target_author"]
+                ExperimentThingSnapshot.experiment_thing_id == original.target_author
             )
             .first()
         )
@@ -236,7 +241,7 @@ class TestPrivateMethods:
 
         user = (
             experiment_controller.db_session.query(ExperimentThing)
-            .filter(ExperimentThing.thing_id == original["target_author"])
+            .filter(ExperimentThing.thing_id == original.target_author)
             .one()
         )
         assert user is not None
@@ -250,10 +255,14 @@ class TestPrivateMethods:
     def test_get_condition(self, experiment_controller):
         experiment_controller._get_condition()
 
-    def test_assign_randomized_conditions(self, modaction_data, experiment_controller, static_now):
+    def test_assign_randomized_conditions(
+        self, modaction_data, experiment_controller, static_now
+    ):
         assert len(experiment_controller._previously_enrolled_user_ids()) == 0
 
-        user_modactions = experiment_controller._find_eligible_newcomers(static_now, modaction_data)
+        user_modactions = experiment_controller._find_eligible_newcomers(
+            static_now, modaction_data
+        )
         experiment_controller._assign_randomized_conditions(static_now, user_modactions)
 
         assert len(experiment_controller._previously_enrolled_user_ids()) > 1
@@ -268,7 +277,9 @@ class TestPrivateMethods:
         ],
     )
     def test_is_tempban(self, action, details, want, experiment_controller):
-        got = experiment_controller._is_tempban({"action": action, "details": details})
+        got = experiment_controller._is_tempban(
+            DictObject({"action": action, "details": details})
+        )
         assert got == want
 
     @pytest.mark.parametrize(
@@ -283,7 +294,7 @@ class TestPrivateMethods:
         ],
     )
     def test_is_valid_tempban_duration(self, action, details, want, experiment_controller):
-        got = experiment_controller._is_valid_tempban_duration({"action": action, "details": details})
+        got = experiment_controller._is_valid_tempban_duration(DictObject({"action": action, "details": details}))
         assert got == want
 
     @pytest.mark.parametrize(
@@ -295,7 +306,9 @@ class TestPrivateMethods:
         ],
     )
     def test_is_enrolled(self, username, choices, want, experiment_controller):
-        got = experiment_controller._is_enrolled({"target_author": username}, choices)
+        got = experiment_controller._is_enrolled(
+            DictObject({"target_author": username}), choices
+        )
         assert got == want
 
     @pytest.mark.parametrize(
@@ -309,7 +322,7 @@ class TestPrivateMethods:
         ],
     )
     def test_is_bot(self, username, want, experiment_controller):
-        got = experiment_controller._is_bot({"target_author": username})
+        got = experiment_controller._is_bot(DictObject({"target_author": username}))
         assert got == want
 
     @pytest.mark.parametrize(
@@ -330,12 +343,14 @@ class TestPrivateMethods:
     )
     def test_parse_temp_ban(self, details, want, experiment_controller):
         got = experiment_controller._parse_temp_ban(
-            {
-                "action": "banuser",
-                "created_utc": 33,
-                "description": "testing",
-                "details": details,
-            }
+            DictObject(
+                {
+                    "action": "banuser",
+                    "created_utc": 33,
+                    "description": "testing",
+                    "details": details,
+                }
+            )
         )
         assert got == want
 
@@ -349,7 +364,9 @@ class TestPrivateMethods:
         ],
     )
     def test_parse_days(self, action, details, want, experiment_controller):
-        got = experiment_controller._parse_days({"action": action, "details": details})
+        got = experiment_controller._parse_days(
+            DictObject({"action": action, "details": details})
+        )
         assert got == want
 
     def test_get_accounts_needing_interventions(

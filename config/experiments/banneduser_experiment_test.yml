@@ -1,4 +1,49 @@
 production:
+  subreddit: catlabtest
+  subreddit_id: cu3dxg
+  username: catlabreddit
+  conditions:
+    newcomer:
+      randomizations: banneduser_experiment_test.newcomer.randomizations.test.csv
+      next_randomization: 0
+      arms:
+        arm_0:
+          pm_subject: PM Subject Line for {username} (Newcomer Arm 0)
+          pm_text: Hello {username}, this is the message for arm 0 of the newcomer condition.
+        arm_1:
+          pm_subject: PM Subject Line for {username} (Newcomer Arm 1)
+          pm_text: Hello {username}, this is the message for arm 1 of the newcomer condition.
+        arm_2:
+          reason_text: This is arm 2 of the 1st condition
+          pm_subject: PM Subject Line for {username} (Newcomer Arm 2)
+          pm_text: Hello {username}, this is the message for arm 2 of the newcomer condition.
+    experienced:
+      randomizations: banneduser_experiment_test.experienced.randomizations.test.csv
+      next_randomization: 0
+      arms:
+        arm_0:
+          pm_subject: PM Subject Line for {username} (Experienced Arm 0)
+          pm_text: Hello {username}, this is the message for arm 0 of the experienced condition.
+        arm_1:
+          pm_subject: PM Subject Line for {username} (Experienced Arm 1)
+          pm_text: Hello {username}, this is the message for arm 1 of the experienced condition.
+        arm_2:
+          reason_text: This is arm 2 of the 1st condition
+          pm_subject: PM Subject Line for {username} (Experienced Arm 2)
+          pm_text: Hello {username}, this is the message for arm 2 of the experienced condition.
+  controller: BanneduserExperimentController
+  start_time: 07/02/2024 00:00:00 UTC
+  end_time: 07/02/3024 23:59:59 UTC
+  event_hooks:
+    test_after_comments:
+      is_active: True
+      call_when: EventWhen.AFTER
+      caller_controller: ModeratorController
+      caller_method: archive_mod_action_page
+      callee_module: app.controllers.banneduser_experiment_controller
+      callee_controller: BanneduserExperimentController
+      callee_method: enroll_new_participants
+test:
   subreddit: catlabreddit_testbu1
   subreddit_id: mouw
   username: catlabreddit
