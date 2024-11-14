@@ -113,6 +113,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             if (
                 self._is_enrolled(modaction, previously_enrolled_user_ids)
                 or not self._is_tempban(modaction)
+                or not self._is_valid_tempban_duration(modaction)
                 or self._is_bot(modaction)
             ):
                 continue
@@ -277,6 +278,10 @@ class BanneduserExperimentController(ModactionExperimentController):
         For temporary bans, we expect the number of days, e.g. "7 days".
         """
         return modaction["action"] == "banuser" and "days" in modaction["details"]
+
+    def _is_valid_tempban_duration(self, modaction):
+        """Return true if tempban duration is a valid duration (3, 7, 14, and 30) days."""
+        return self._parse_days(modaction) in [3, 7, 14, 30]
 
     def _is_enrolled(self, modaction, enrolled_user_ids):
         """Return true if the target of an admin action is already enrolled."""
