@@ -285,6 +285,20 @@ class TestPrivateMethods:
     @pytest.mark.parametrize(
         "action,details,want",
         [
+            ("banuser", "3 days", False),
+            ("banuser", "permanent", False),
+            ("removecomment", "remove", False),
+            ("banuser", "changed to 1 days", True),
+            ("banuser", "changed to 3 days", True),
+        ],
+    )
+    def test_is_tempban_edit(self, action, details, want, experiment_controller):
+        got = experiment_controller._is_tempban_edit(DictObject({"action": action, "details": details}))
+        assert got == want
+
+    @pytest.mark.parametrize(
+        "action,details,want",
+        [
             ("banuser", "1 days", False),
             ("banuser", "2 days", False),
             ("banuser", "3 days", True),
