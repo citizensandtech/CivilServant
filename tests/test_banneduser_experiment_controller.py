@@ -195,16 +195,17 @@ class TestPrivateMethods:
 
     # update temp ban duration
     @pytest.mark.parametrize(
-        "action,details,want_duration,want_query_index,want_type",
+        "action,details,want_duration,want_query_index,want_type,want_actual_ban_end_time",
         [
-            ("banuser", "999 days", 999, BannedUserQueryIndex.PENDING, "temporary"),
-            ("banuser", "permaban", None, BannedUserQueryIndex.IMPOSSIBLE, "permanent"),
+            ("banuser", "999 days", 999, BannedUserQueryIndex.PENDING, "temporary", None),
+            ("banuser", "permaban", None, BannedUserQueryIndex.IMPOSSIBLE, "permanent", -1),
             (
                 "unbanuser",
                 "whatever",
                 None,
                 BannedUserQueryIndex.IMPOSSIBLE,
                 "unbanned",
+                "static_now_placeholder", # placeholder, replaced in test code with value of static_now 
             ),
         ],
     )
@@ -216,16 +217,18 @@ class TestPrivateMethods:
         want_duration,
         want_query_index,
         want_type,
+        want_actual_ban_end_time,
         newcomer_modactions,
         experiment_controller,
         mod_controller,
+        static_now,
     ):
         helpers.load_mod_actions(mod_controller, experiment_controller)
         experiment_controller.enroll_new_participants(mod_controller)
 
         original = newcomer_modactions[0]
         update = DictObject({**original, "action": action, "details": details})
-        experiment_controller._update_existing_participants([update])
+        experiment_controller._update_existing_participants(static_now, [update])
 
         snap = (
             experiment_controller.db_session.query(ExperimentThingSnapshot)
@@ -251,6 +254,10 @@ class TestPrivateMethods:
         if want_duration:
             assert meta["ban_duration_days"] == want_duration
         assert meta["ban_type"] == want_type
+
+        if want_actual_ban_end_time == "static_now_placeholder":
+            want_actual_ban_end_time = static_now
+        assert meta["actual_ban_end_time"] == want_actual_ban_end_time
 
     def test_get_condition(self, experiment_controller):
         experiment_controller._get_condition()
@@ -335,7 +342,7 @@ class TestPrivateMethods:
                     "ban_reason": "testing",
                     "ban_start_time": 33,
                     "ban_type": "temporary",
-                    "ban_end_time": 172833,
+                    "actual_ban_end_time": None,
                 },
             ),
             ("bogus", {}),
