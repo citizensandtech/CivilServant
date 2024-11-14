@@ -294,7 +294,7 @@ class TestPrivateMethods:
         ],
     )
     def test_is_valid_tempban_duration(self, action, details, want, experiment_controller):
-        got = experiment_controller._is_valid_tempban_duration({"action": action, "details": details})
+        got = experiment_controller._is_valid_tempban_duration(DictObject({"action": action, "details": details}))
         assert got == want
 
     @pytest.mark.parametrize(
