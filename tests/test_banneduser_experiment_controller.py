@@ -282,7 +282,7 @@ class TestPrivateMethods:
         ],
     )
     def test_is_tempban_edit(self, action, details, want, experiment_controller):
-        got = experiment_controller._is_tempban_edit({"action": action, "details": details})
+        got = experiment_controller._is_tempban_edit(DictObject({"action": action, "details": details}))
         assert got == want
 
     @pytest.mark.parametrize(
