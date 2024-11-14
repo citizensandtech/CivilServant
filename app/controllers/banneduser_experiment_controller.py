@@ -287,7 +287,7 @@ class BanneduserExperimentController(ModactionExperimentController):
 
         This calls `_is_tempban`, even if redundant, as to be unambiguous and not assume that modaction is already a tempban.
         """
-        return self._is_tempban(modaction) and "changed to" in modaction["details"]
+        return self._is_tempban(modaction) and "changed to" in modaction.details
 
     def _is_valid_tempban_duration(self, modaction):
         """Return true if tempban duration is a valid duration (3, 7, 14, and 30) days."""
