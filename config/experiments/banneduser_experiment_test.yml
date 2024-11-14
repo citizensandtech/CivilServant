@@ -45,7 +45,7 @@ production:
       callee_method: enroll_new_participants
 test:
   subreddit: catlabreddit_testbu1
-  subreddit_id: ctveex
+  subreddit_id: mouw
   username: catlabreddit
   conditions:
     newcomer:

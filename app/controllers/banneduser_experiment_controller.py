@@ -138,7 +138,6 @@ class BanneduserExperimentController(ModactionExperimentController):
         previously_enrolled_user_ids = set(self._previously_enrolled_user_ids())
         updated_users = {}
         for modaction in modactions:
-
             # Skip mod actions that don't apply to a current participant.
             if not self._is_enrolled(modaction, previously_enrolled_user_ids):
                 continue
