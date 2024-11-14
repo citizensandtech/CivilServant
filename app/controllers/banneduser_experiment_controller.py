@@ -113,6 +113,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             if (
                 self._is_enrolled(modaction, previously_enrolled_user_ids)
                 or not self._is_tempban(modaction)
+                or self._is_tempban_edit(modaction) # this is a proxy for 'is user already banned', as already banned users will receive ban edits as tempbans as well
                 or not self._is_valid_tempban_duration(modaction)
                 or self._is_bot(modaction)
             ):
@@ -278,6 +279,15 @@ class BanneduserExperimentController(ModactionExperimentController):
         For temporary bans, we expect the number of days, e.g. "7 days".
         """
         return modaction["action"] == "banuser" and "days" in modaction["details"]
+
+    def _is_tempban_edit(self, modaction):
+        """Return true if an admin action is a temporary ban edit.
+
+        For temporary bans, we expect the string "changed to" in `details`. E.g. "changed to 1 days".
+
+        This calls `_is_tempban`, even if redundant, as to be unambiguous and not assume that modaction is already a tempban.
+        """
+        return self._is_tempban(modaction) and "changed to" in modaction["details"]
 
     def _is_valid_tempban_duration(self, modaction):
         """Return true if tempban duration is a valid duration (3, 7, 14, and 30) days."""
