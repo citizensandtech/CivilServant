@@ -79,7 +79,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         self._assign_randomized_conditions(now_utc, eligible_newcomers)
 
         self.log.info("Updating the ban state of existing participants")
-        self._update_existing_participants(instance.fetched_mod_actions)
+        self._update_existing_participants(now_utc, instance.fetched_mod_actions)
 
         self.log.info(
             f"Successfully Ran Event Hook to BanneduserExperimentController::enroll_new_participants. Caller: {instance}"
@@ -130,7 +130,7 @@ class BanneduserExperimentController(ModactionExperimentController):
 
         return eligible_newcomers
 
-    def _update_existing_participants(self, modactions):
+    def _update_existing_participants(self, now_utc, modactions):
         """Find mod actions that update the state of any current participants.
 
         Args:
@@ -183,11 +183,13 @@ class BanneduserExperimentController(ModactionExperimentController):
             elif modaction.action == "banuser":
                 # Escalated to permaban.
                 user_metadata["ban_type"] = "permanent"
+                user_metadata["actual_ban_end_time"] = -1 # spec from study
                 if user.query_index == BannedUserQueryIndex.PENDING:
                     user.query_index = BannedUserQueryIndex.IMPOSSIBLE
             elif modaction.action == "unbanuser":
                 # User was unbanned.
                 user_metadata["ban_type"] = "unbanned"
+                user_metadata["actual_ban_end_time"] = now_utc
                 if user.query_index == BannedUserQueryIndex.PENDING:
                     user.query_index = BannedUserQueryIndex.IMPOSSIBLE
 
@@ -320,15 +322,15 @@ class BanneduserExperimentController(ModactionExperimentController):
 
         Returns:
             A dict with details about the temporary ban, or empty dict if the action is not a temp ban.
-            Note that `ban_start_time` and `ban_end_time` are UNIX timestamps in UTC.
-
+            Note that `ban_start_time` and `actual_ban_end_time` are UNIX timestamps in UTC.
+            `actual_ban_end_time` is set to None on initialization, -1 upon permaban, and to timestamp when unban event occurs. 
         Example result:
             {
                 "ban_duration_days": 30,
                 "ban_reason": "Bad behavior",
                 "ban_type": "temporary",
                 "ban_start_time": 1704154715,
-                "ban_end_time": 1705277915,
+                "actual_ban_end_time": None,
             }
         """
         days = self._parse_days(modaction)
@@ -343,7 +345,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             "ban_reason": modaction.description,
             "ban_start_time": starts_at,
             "ban_type": "temporary",
-            "ban_end_time": ends_at,
+            "actual_ban_end_time": None,
         }
 
     def _parse_days(self, modaction):
