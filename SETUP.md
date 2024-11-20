@@ -78,7 +78,7 @@ To schedule jobs (such as fetching modactions, new posts, comments)
 
 - Load environment variables
   - `source config/environment_variables.sh`
-- Patch praw
+- Patch praw (first run only)
   - `CS_ENV=all PYTHONPATH=. python3 reddit/praw_patch.py --apply`
 
 - Start jobs
