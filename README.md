@@ -7,3 +7,7 @@ More information about our first set of experiments & replications can be found 
 If you are interested to do an experiment with Nathan, please contact him on Github or on reddit at [/u/natematias/](https://www.reddit.com/user/natematias).
 
 The CivilServant software is available under the MIT License, a permissive open source license.
+
+### Setup 
+
+Further documentation is at [SETUP.md](SETUP.md).
