@@ -22,7 +22,7 @@ This documentation assumes that civilservant is running in a production environm
 
 #### config/production.json
 - `cp config/development.json.example config/production.json`
-  - (NOTE: filename probably changes according to environment)  
+  - (NOTE: filename varies according to environment)
 - Fill out `host`/`database`/`user`/`password`
   - (client_id, client_secret, redirect_uri are most likely not used)
 
