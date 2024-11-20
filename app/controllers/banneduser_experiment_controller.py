@@ -80,8 +80,6 @@ class BanneduserExperimentController(ModactionExperimentController):
 
         self.log.info("Updating the ban state of existing participants")
         modactions = instance.fetched_mod_actions
-        # FIXME: hack for test
-        modactions = [m for m in modactions if m.created_utc > 1731693779]
         self._update_existing_participants(now_utc, modactions)
 
         self.log.info(
@@ -115,8 +113,6 @@ class BanneduserExperimentController(ModactionExperimentController):
         """
         previously_enrolled_user_ids = set(self._previously_enrolled_user_ids())
         eligible_newcomers = []
-        # FIXME: hack for test
-        modactions = [m for m in modactions if m.created_utc > 1731693779]
         for modaction in modactions:
             # Skip irrelevant mod actions.
             if (
