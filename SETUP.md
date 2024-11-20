@@ -52,7 +52,7 @@ This documentation assumes that civilservant is running in a production environm
 ## Services
 
 ### Redis-server 
- - Should already be running
+ - Should already be running (installed as a system service)
    
 ### Supervisor
 
