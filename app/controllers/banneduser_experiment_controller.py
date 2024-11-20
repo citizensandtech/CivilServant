@@ -79,7 +79,10 @@ class BanneduserExperimentController(ModactionExperimentController):
         self._assign_randomized_conditions(now_utc, eligible_newcomers)
 
         self.log.info("Updating the ban state of existing participants")
-        self._update_existing_participants(now_utc, instance.fetched_mod_actions)
+        modactions = instance.fetched_mod_actions
+        # FIXME: hack for test
+        modactions = [m for m in modactions if m.created_utc > 1731693779]
+        self._update_existing_participants(now_utc, modactions)
 
         self.log.info(
             f"Successfully Ran Event Hook to BanneduserExperimentController::enroll_new_participants. Caller: {instance}"
@@ -112,6 +115,8 @@ class BanneduserExperimentController(ModactionExperimentController):
         """
         previously_enrolled_user_ids = set(self._previously_enrolled_user_ids())
         eligible_newcomers = []
+        # FIXME: hack for test
+        modactions = [m for m in modactions if m.created_utc > 1731693779]
         for modaction in modactions:
             # Skip irrelevant mod actions.
             if (
@@ -137,31 +142,47 @@ class BanneduserExperimentController(ModactionExperimentController):
             modactions: A list of mod actions.
         """
         previously_enrolled_user_ids = set(self._previously_enrolled_user_ids())
-        updated_users = {}
+
+        # Find currently temporarily banned user records to update.
+        users_by_username = {}
+        for ut in self.db_session.query(ExperimentThing).filter(
+            ExperimentThing.object_type == ThingType.USER.value,
+            ExperimentThing.experiment_id == self.experiment.id,
+        ):
+            user_metadata = json.loads(ut.metadata_json)
+            if user_metadata['ban_type'] == 'temporary':
+                users_by_username[ut.thing_id] = ut
+
+        updated_users = []
         for modaction in modactions:
             # Skip mod actions that don't apply to a current participant.
             if not self._is_enrolled(modaction, previously_enrolled_user_ids):
                 continue
 
+
             # Update the details of the ban, upgrade to a permanent ban, or remove the ban.
             # Assume that actions are in chronological order (last action per user wins).
-            if modaction.action in ["banuser", "unbanuser"]:
-                updated_users[modaction.target_author] = modaction
+            if modaction.action not in ["banuser", "unbanuser"]:
+                continue
+
+            # filter for modactions that are temporarily banned
+            user = users_by_username.get(modaction.target_author)
+            if not user:
+                continue
+
+            user_metadata = json.loads(user.metadata_json)
+
+            # filter for modactions that haven't already been applied
+            if modaction.created_utc <= user_metadata.get('last_applied_modaction', 0):
+                continue
+
+            updated_users.append(modaction)
 
         if not updated_users:
             return
 
-        # Find user records to update.
-        users_by_username = {}
-        for ut in self.db_session.query(ExperimentThing).filter(
-            ExperimentThing.object_type == ThingType.USER.value,
-            ExperimentThing.experiment_id == self.experiment.id,
-            ExperimentThing.thing_id.in_(updated_users.keys()),
-        ):
-            users_by_username[ut.thing_id] = ut
-
         # Apply updates to corresponding `ExperimentThing`s.
-        for modaction in updated_users.values():
+        for modaction in updated_users:
             # NOTE: This could throw a KeyError, but it shouldn't according to how we build this dict.
             user = users_by_username[modaction.target_author]
             user_metadata = json.loads(user.metadata_json)
@@ -179,7 +200,6 @@ class BanneduserExperimentController(ModactionExperimentController):
             if self._is_tempban(modaction):
                 # Temp ban was updated.
                 user_metadata = {**user_metadata, **self._parse_temp_ban(modaction)}
-                self.db_session.add(user)
             elif modaction.action == "banuser":
                 # Escalated to permaban.
                 user_metadata["ban_type"] = "permanent"
@@ -189,12 +209,16 @@ class BanneduserExperimentController(ModactionExperimentController):
             elif modaction.action == "unbanuser":
                 # User was unbanned.
                 user_metadata["ban_type"] = "unbanned"
-                user_metadata["actual_ban_end_time"] = now_utc
+                user_metadata["actual_ban_end_time"] = int(now_utc)
                 if user.query_index == BannedUserQueryIndex.PENDING:
                     user.query_index = BannedUserQueryIndex.IMPOSSIBLE
 
+            user_metadata['last_applied_modaction'] = modaction.created_utc
             user.metadata_json = json.dumps(user_metadata)
+
             self.db_session.add(user)
+
+        self.db_session.commit()
 
     def _get_condition(self):
         condition = "experienced"
@@ -248,6 +272,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                     "condition": condition,
                     "randomization": randomization,
                     "arm": "arm_" + str(randomization["treatment"]),
+                    "last_applied_modaction": newcomer.created_utc,
                     **self._parse_temp_ban(newcomer),
                 }
                 user = {
