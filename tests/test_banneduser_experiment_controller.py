@@ -227,7 +227,7 @@ class TestPrivateMethods:
         experiment_controller.enroll_new_participants(mod_controller)
 
         original = newcomer_modactions[0]
-        update = DictObject({**original, "action": action, "details": details})
+        update = DictObject({**original, "action": action, "details": details, "created_utc": original.created_utc + 1})
         experiment_controller._update_existing_participants(static_now, [update])
 
         snap = (
