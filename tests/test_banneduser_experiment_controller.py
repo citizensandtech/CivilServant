@@ -69,7 +69,7 @@ def mod_controller(db_session, mock_reddit, logger, experiment_controller):
 
 @pytest.fixture
 def static_now():
-    return datetime.datetime.utcnow().timestamp()
+    return int(datetime.datetime.utcnow().timestamp())
 
 
 @pytest.fixture
