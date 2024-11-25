@@ -220,7 +220,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         mapping = {
             3: "threedays",
             7: "sevendays",
-            15: "fifteendays",
+            14: "fourteendays",
             30: "thirtydays"
         }
         condition = mapping.get(self._parse_days(newcomer), "unknown")

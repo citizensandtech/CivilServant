@@ -141,8 +141,10 @@ class TestExperimentController:
 
 class TestModactionPrivateMethods:
     def test_check_condition(self, experiment_controller):
-        experiment_controller._check_condition("newcomer")
-        experiment_controller._check_condition("experienced")
+        experiment_controller._check_condition("threedays")
+        experiment_controller._check_condition("sevendays")
+        experiment_controller._check_condition("fourteendays")
+        experiment_controller._check_condition("thirtydays")
         with pytest.raises(Exception):
             experiment_controller._check_condition("reanimated")
 
@@ -259,8 +261,23 @@ class TestPrivateMethods:
             want_actual_ban_end_time = static_now
         assert meta["actual_ban_end_time"] == want_actual_ban_end_time
 
-    def test_get_condition(self, experiment_controller):
-        experiment_controller._get_condition()
+    @pytest.mark.parametrize(
+        "action,details,want,want_error",
+        [
+            ("banuser", "3 days", "threedays", False),
+            ("banuser", "7 days", "sevendays", False),
+            ("banuser", "14 days", "fourteendays", False),
+            ("banuser", "30 days", "thirtydays", False),
+            ("banuser", "1 day", "", True),  # Unknown is default
+        ],
+    )
+    def test_get_condition(self, action, details, want, want_error, experiment_controller):
+        if(want_error):
+            with pytest.raises(Exception):
+                got = experiment_controller._get_condition(DictObject({"action": action, "details": details}))
+        else:
+            got = experiment_controller._get_condition(DictObject({"action": action, "details": details}))
+            assert got == want
 
     def test_assign_randomized_conditions(
         self, modaction_data, experiment_controller, static_now
@@ -408,23 +425,23 @@ class TestPrivateMethods:
             (
                 "12345",
                 {
-                    "condition": "newcomer",
+                    "condition": "threedays",
                     "arm": "arm_0",
                 },
                 {
-                    "subject": "PM Subject Line for 12345 (Newcomer Arm 0)",
-                    "message": "Hello 12345, this is the message for arm 0 of the newcomer condition.",
+                    "subject": "PM Subject Line for 12345 (Threedays Arm 0)",
+                    "message": "Hello 12345, this is the message for arm 0 of the threedays condition.",
                 },
             ),
             (
                 "MarlKarx18",
                 {
-                    "condition": "experienced",
+                    "condition": "fourteendays",
                     "arm": "arm_1",
                 },
                 {
-                    "subject": "PM Subject Line for MarlKarx18 (Experienced Arm 1)",
-                    "message": "Hello MarlKarx18, this is the message for arm 1 of the experienced condition.",
+                    "subject": "PM Subject Line for MarlKarx18 (Fourteendays Arm 1)",
+                    "message": "Hello MarlKarx18, this is the message for arm 1 of the fourteendays condition.",
                 },
             ),
         ],
@@ -446,7 +463,7 @@ class TestPrivateMethods:
     @pytest.mark.parametrize(
         "metadata_json",
         [
-            {"condition": "experienced", "arm": "arm_9999"},
+            {"condition": "threedays", "arm": "arm_9999"},
             {"condition": "invalid_condition", "arm": "arm_0"},
         ],
     )
@@ -470,7 +487,7 @@ class TestPrivateMethods:
             (
                 "ThusSpoke44",
                 {
-                    "condition": "newcomer",
+                    "condition": "threedays",
                     "arm": "arm_1",
                 },
                 False,
@@ -480,8 +497,8 @@ class TestPrivateMethods:
             (
                 "LaLaLatour47",
                 {
-                    "condition": "experienced",
-                    "arm": "arm_2",
+                    "condition": "fourteendays",
+                    "arm": "arm_0",
                 },
                 False,
                 BannedUserQueryIndex.COMPLETE,
@@ -490,7 +507,7 @@ class TestPrivateMethods:
             (
                 "ErrorWhoa99",
                 {
-                    "condition": "experienced",
+                    "condition": "thirtydays",
                     "arm": "arm_999999",
                 },
                 True,
