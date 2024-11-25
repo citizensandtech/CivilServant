@@ -209,7 +209,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                 if user.query_index == BannedUserQueryIndex.PENDING:
                     user.query_index = BannedUserQueryIndex.IMPOSSIBLE
 
-            user_metadata['last_applied_modaction'] = modaction.created_utc
+            user_metadata['last_applied_modaction'] = int(modaction.created_utc)
             user.metadata_json = json.dumps(user_metadata)
 
             self.db_session.add(user)
