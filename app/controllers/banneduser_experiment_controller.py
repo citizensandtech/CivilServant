@@ -216,8 +216,14 @@ class BanneduserExperimentController(ModactionExperimentController):
 
         self.db_session.commit()
 
-    def _get_condition(self):
-        condition = "experienced"
+    def _get_condition(self, newcomer):
+        mapping = {
+            3: "threedays",
+            7: "sevendays",
+            14: "fourteendays",
+            30: "thirtydays"
+        }
+        condition = mapping.get(self._parse_days(newcomer), "unknown")
         self._check_condition(condition)
         return condition
 
@@ -240,7 +246,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             newcomers_without_randomization = 0
 
             for newcomer in newcomers:
-                condition = self._get_condition()
+                condition = self._get_condition(newcomer)
 
                 # Get the next randomization, and ensure that it's valid.
                 next_randomization = self.experiment_settings["conditions"][condition][
