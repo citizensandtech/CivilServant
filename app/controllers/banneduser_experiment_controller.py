@@ -66,25 +66,23 @@ class BanneduserExperimentController(ModactionExperimentController):
             )
             return
 
-        self.log.info(
-            f"Experiment {self.experiment.name}: scanning modactions in subreddit {self.experiment_settings['subreddit_id']} to look for temporary bans"
-        )
-        eligible_newcomers = self._find_eligible_newcomers(
-            now_utc, instance.fetched_mod_actions
-        )
+        with self._new_modactions() as modactions:
+            self.log.info(
+                f"Experiment {self.experiment.name}: scanning {len(modactions)} modactions in subreddit {self.experiment_settings['subreddit_id']} to look for temporary bans"
+            )
 
-        self.log.info(f"Identified {len(eligible_newcomers)} eligible newcomers")
+            eligible_newcomers = self._find_eligible_newcomers(modactions)
+            self.log.info(f"Identified {len(eligible_newcomers)} eligible newcomers")
 
-        self.log.info("Assigning randomized conditions to eligible newcomers")
-        self._assign_randomized_conditions(now_utc, eligible_newcomers)
+            self.log.info("Assigning randomized conditions to eligible newcomers")
+            self._assign_randomized_conditions(now_utc, eligible_newcomers)
 
-        self.log.info("Updating the ban state of existing participants")
-        modactions = instance.fetched_mod_actions
-        self._update_existing_participants(now_utc, modactions)
+            self.log.info("Updating the ban state of existing participants")
+            self._update_existing_participants(now_utc, modactions)
 
-        self.log.info(
-            f"Successfully Ran Event Hook to BanneduserExperimentController::enroll_new_participants. Caller: {instance}"
-        )
+            self.log.info(
+                f"Successfully Ran Event Hook to BanneduserExperimentController::enroll_new_participants. Caller: {instance}"
+            )
 
     def update_experiment(self):
         """Update loop for the banned user experiment.
@@ -97,7 +95,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         )
         self._send_intervention_messages(accounts_needing_messages)
 
-    def _find_eligible_newcomers(self, now_utc, modactions):
+    def _find_eligible_newcomers(self, modactions):
         """Filter a list of mod actions to find newcomers to the experiment.
         Starting with a list of arbitrary mod actions, select mod actions that:
         - are not for users already in the study,
@@ -118,7 +116,9 @@ class BanneduserExperimentController(ModactionExperimentController):
             if (
                 self._is_enrolled(modaction, previously_enrolled_user_ids)
                 or not self._is_tempban(modaction)
-                or self._is_tempban_edit(modaction) # this is a proxy for 'is user already banned', as already banned users will receive ban edits as tempbans as well
+                or self._is_tempban_edit(
+                    modaction
+                )  # this is a proxy for 'is user already banned', as already banned users will receive ban edits as tempbans as well
                 or not self._is_valid_tempban_duration(modaction)
                 or self._is_bot(modaction)
             ):
@@ -146,7 +146,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             ExperimentThing.experiment_id == self.experiment.id,
         ):
             user_metadata = json.loads(ut.metadata_json)
-            if user_metadata['ban_type'] == 'temporary':
+            if user_metadata["ban_type"] == "temporary":
                 users_by_username[ut.thing_id] = ut
 
         updated_users = []
@@ -154,7 +154,6 @@ class BanneduserExperimentController(ModactionExperimentController):
             # Skip mod actions that don't apply to a current participant.
             if not self._is_enrolled(modaction, previously_enrolled_user_ids):
                 continue
-
 
             # Update the details of the ban, upgrade to a permanent ban, or remove the ban.
             # Assume that actions are in chronological order (last action per user wins).
@@ -167,10 +166,6 @@ class BanneduserExperimentController(ModactionExperimentController):
                 continue
 
             user_metadata = json.loads(user.metadata_json)
-
-            # filter for modactions that haven't already been applied
-            if modaction.created_utc <= user_metadata.get('last_applied_modaction', 0):
-                continue
 
             updated_users.append(modaction)
 
@@ -199,7 +194,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             elif modaction.action == "banuser":
                 # Escalated to permaban.
                 user_metadata["ban_type"] = "permanent"
-                user_metadata["actual_ban_end_time"] = -1 # spec from study
+                user_metadata["actual_ban_end_time"] = -1  # spec from study
                 if user.query_index == BannedUserQueryIndex.PENDING:
                     user.query_index = BannedUserQueryIndex.IMPOSSIBLE
             elif modaction.action == "unbanuser":
@@ -209,7 +204,6 @@ class BanneduserExperimentController(ModactionExperimentController):
                 if user.query_index == BannedUserQueryIndex.PENDING:
                     user.query_index = BannedUserQueryIndex.IMPOSSIBLE
 
-            user_metadata['last_applied_modaction'] = int(modaction.created_utc)
             user.metadata_json = json.dumps(user_metadata)
 
             self.db_session.add(user)
@@ -217,12 +211,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         self.db_session.commit()
 
     def _get_condition(self, newcomer):
-        mapping = {
-            3: "threedays",
-            7: "sevendays",
-            14: "fourteendays",
-            30: "thirtydays"
-        }
+        mapping = {3: "threedays", 7: "sevendays", 14: "fourteendays", 30: "thirtydays"}
         condition = mapping.get(self._parse_days(newcomer), "unknown")
         self._check_condition(condition)
         return condition
@@ -274,7 +263,6 @@ class BanneduserExperimentController(ModactionExperimentController):
                     "condition": condition,
                     "randomization": randomization,
                     "arm": "arm_" + str(randomization["treatment"]),
-                    "last_applied_modaction": newcomer.created_utc,
                     **self._parse_temp_ban(newcomer),
                 }
                 user = {
@@ -325,7 +313,6 @@ class BanneduserExperimentController(ModactionExperimentController):
         """
         return self._is_tempban(modaction) and "changed to" in modaction.details
 
-
     def _is_valid_tempban_duration(self, modaction):
         """Return true if tempban duration is a valid duration (3, 7, 14, and 30) days."""
         return self._parse_days(modaction) in [3, 7, 14, 30]
@@ -350,7 +337,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         Returns:
             A dict with details about the temporary ban, or empty dict if the action is not a temp ban.
             Note that `ban_start_time` and `actual_ban_end_time` are UNIX timestamps in UTC.
-            `actual_ban_end_time` is set to None on initialization, -1 upon permaban, and to timestamp when unban event occurs. 
+            `actual_ban_end_time` is set to None on initialization, -1 upon permaban, and to timestamp when unban event occurs.
         Example result:
             {
                 "ban_duration_days": 30,
@@ -364,8 +351,11 @@ class BanneduserExperimentController(ModactionExperimentController):
         if days is None:
             return {}
 
-        starts_at = int(modaction.created_utc)
-        ends_at = starts_at + (days * 86400)
+        # XXX: `created_utc` is sometimes a datetime and sometimes a timestamp!
+        starts_at = modaction.created_utc
+        if isinstance(starts_at, datetime):
+            starts_at = starts_at.timestamp()
+        starts_at = int(starts_at)
 
         return {
             "ban_duration_days": days,

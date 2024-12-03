@@ -14,6 +14,7 @@ from utils.common import DbEngine
 
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 TEST_DIR = os.path.join(BASE_DIR, "tests")
+TEST_ONLY_SUBREDDIT_ID = "TEST_ONLY"
 
 
 class DictObject(dict):
@@ -71,13 +72,12 @@ class Helpers:
 
     @staticmethod
     @contextmanager
-    def with_mock_reddit(modaction_data, create_redditor):
+    def with_mock_reddit(modaction_data):
         """Mock the `praw.Reddit` class so it does not touch the network.
         Note that this should be used as a context manager in your test fixtures.
 
         Args:
             modaction_data: paginated fixture records.
-            create_redditor: a function that takes a username and returns a `praw.Redditor`.
 
         Returns:
             A mocked `praw.Reddit` instance.
@@ -89,13 +89,16 @@ class Helpers:
             modaction_data[i : i + 100] for i in range(0, len(modaction_data), 100)
         ] + [[]]
 
+        for page in mod_log_pages:
+            for m in page:
+                m["json_dict"]["sr_id36"] = TEST_ONLY_SUBREDDIT_ID
+
         with patch("praw.Reddit", autospec=True, spec_set=True) as reddit:
             reddit.get_mod_log = MagicMock(side_effect=mod_log_pages)
-            reddit.get_redditor = MagicMock(side_effect=create_redditor)
             yield reddit
 
     @staticmethod
-    def load_mod_actions(mod_controller, experiment_controller):
+    def load_mod_actions(mod_controller):
         """Load all fixture data, like `controller.fetch_mod_action_history` does.
 
         We're reimplementing it here for clarity, so we don't have to mock the function.
@@ -106,12 +109,6 @@ class Helpers:
             after_id, num_actions_stored = mod_controller.archive_mod_action_page(
                 after_id
             )
-
-        # NOTE: this also may store a subreddit ID that we don't want, short-circuiting matching logic.
-        # To work around this, we hardcode it to always match.
-        mod_controller.fetched_subreddit_id = experiment_controller.experiment_settings[
-            "subreddit_id"
-        ]
 
 
 @pytest.fixture
