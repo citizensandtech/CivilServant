@@ -66,23 +66,36 @@ class BanneduserExperimentController(ModactionExperimentController):
             )
             return
 
-        with self._new_modactions() as modactions:
-            self.log.info(
-                f"Experiment {self.experiment.name}: scanning {len(modactions)} modactions in subreddit {self.experiment_settings['subreddit_id']} to look for temporary bans"
+        self.db_session.execute(
+            "LOCK TABLES experiments WRITE, experiment_things WRITE, experiment_thing_snapshots WRITE, mod_actions WRITE"
+        )
+        try:
+            with self._new_modactions() as modactions:
+                self.log.info(
+                    f"Experiment {self.experiment.name}: scanning {len(modactions)} modactions in subreddit {self.experiment_settings['subreddit_id']} to look for temporary bans"
+                )
+
+                eligible_newcomers = self._find_eligible_newcomers(modactions)
+                self.log.info(
+                    f"Identified {len(eligible_newcomers)} eligible newcomers"
+                )
+
+                self.log.info("Assigning randomized conditions to eligible newcomers")
+                self._assign_randomized_conditions(now_utc, eligible_newcomers)
+
+                self.log.info("Updating the ban state of existing participants")
+                self._update_existing_participants(now_utc, modactions)
+
+                self.log.info(
+                    f"Successfully Ran Event Hook to BanneduserExperimentController::enroll_new_participants. Caller: {instance}"
+                )
+        except Exception as e:
+            self.log.error(
+                "Error in BanneduserExperimentController::enroll_new_participants",
+                e,
             )
-
-            eligible_newcomers = self._find_eligible_newcomers(modactions)
-            self.log.info(f"Identified {len(eligible_newcomers)} eligible newcomers")
-
-            self.log.info("Assigning randomized conditions to eligible newcomers")
-            self._assign_randomized_conditions(now_utc, eligible_newcomers)
-
-            self.log.info("Updating the ban state of existing participants")
-            self._update_existing_participants(now_utc, modactions)
-
-            self.log.info(
-                f"Successfully Ran Event Hook to BanneduserExperimentController::enroll_new_participants. Caller: {instance}"
-            )
+        finally:
+            self.db_session.execute("UNLOCK TABLES")
 
     def update_experiment(self):
         """Update loop for the banned user experiment.
@@ -93,7 +106,20 @@ class BanneduserExperimentController(ModactionExperimentController):
         self.log.info(
             f"Experiment {self.experiment.name}: identified {len(accounts_needing_messages)} accounts needing interventions. Sending messages now..."
         )
-        self._send_intervention_messages(accounts_needing_messages)
+
+        self.db_session.execute(
+            "LOCK TABLES experiment_actions WRITE, experiment_things WRITE, message_logs WRITE"
+        )
+        try:
+            self._send_intervention_messages(accounts_needing_messages)
+        except Exception as e:
+            self.log.error(
+                "Error in BannedUserExperimentController::update_experiment",
+                extra=sys.exc_info()[0],
+            )
+            return []
+        finally:
+            self.db_session.execute("UNLOCK TABLES")
 
     def _find_eligible_newcomers(self, modactions):
         """Filter a list of mod actions to find newcomers to the experiment.
@@ -225,76 +251,62 @@ class BanneduserExperimentController(ModactionExperimentController):
             now_utc: the current datetime in UTC.
             newcomers: a list of tuples of `(mod action, redditor info)`.
         """
-        self.db_session.execute(
-            "LOCK TABLES experiments WRITE, experiment_things WRITE"
-        )
+        # list of newcomer experiment_things to be added to db
+        newcomer_ets = []
+        newcomers_without_randomization = 0
 
-        try:
-            # list of newcomer experiment_things to be added to db
-            newcomer_ets = []
-            newcomers_without_randomization = 0
+        for newcomer in newcomers:
+            condition = self._get_condition(newcomer)
 
-            for newcomer in newcomers:
-                condition = self._get_condition(newcomer)
+            # Get the next randomization, and ensure that it's valid.
+            next_randomization = self.experiment_settings["conditions"][condition][
+                "next_randomization"
+            ]
 
-                # Get the next randomization, and ensure that it's valid.
-                next_randomization = self.experiment_settings["conditions"][condition][
-                    "next_randomization"
-                ]
+            if next_randomization is not None and next_randomization >= len(
+                self.experiment_settings["conditions"][condition]["randomizations"]
+            ):
+                next_randomization = None
+                newcomers_without_randomization += 1
+            if next_randomization is None:
+                # If there's no valid randomization for this newcomer, skip it.
+                continue
 
-                if next_randomization is not None and next_randomization >= len(
-                    self.experiment_settings["conditions"][condition]["randomizations"]
-                ):
-                    next_randomization = None
-                    newcomers_without_randomization += 1
-                if next_randomization is None:
-                    # If there's no valid randomization for this newcomer, skip it.
-                    continue
+            # Get the current randomization and increment the experiment's counter.
+            randomization = self.experiment_settings["conditions"][condition][
+                "randomizations"
+            ][next_randomization]
+            self.experiment_settings["conditions"][condition]["next_randomization"] += 1
 
-                # Get the current randomization and increment the experiment's counter.
-                randomization = self.experiment_settings["conditions"][condition][
-                    "randomizations"
-                ][next_randomization]
-                self.experiment_settings["conditions"][condition][
-                    "next_randomization"
-                ] += 1
+            user_metadata = {
+                "condition": condition,
+                "randomization": randomization,
+                "arm": "arm_" + str(randomization["treatment"]),
+                **self._parse_temp_ban(newcomer),
+            }
+            user = {
+                "id": uuid.uuid4().hex,
+                "thing_id": newcomer.target_author,
+                "experiment_id": self.experiment.id,
+                "object_type": ThingType.USER.value,
+                "query_index": BannedUserQueryIndex.PENDING,
+                "metadata_json": json.dumps(user_metadata),
+            }
 
-                user_metadata = {
-                    "condition": condition,
-                    "randomization": randomization,
-                    "arm": "arm_" + str(randomization["treatment"]),
-                    **self._parse_temp_ban(newcomer),
-                }
-                user = {
-                    "id": uuid.uuid4().hex,
-                    "thing_id": newcomer.target_author,
-                    "experiment_id": self.experiment.id,
-                    "object_type": ThingType.USER.value,
-                    "query_index": BannedUserQueryIndex.PENDING,
-                    "metadata_json": json.dumps(user_metadata),
-                }
+            newcomer_ets.append(user)
 
-                newcomer_ets.append(user)
-
-            if newcomers_without_randomization > 0:
-                self.log.error(
-                    f"BanneduserExperimentController Experiment {self.experiment_name} has run out of randomizations from '{condition}' to assign."
-                )
-
-            if len(newcomer_ets) > 0:
-                self.db_session.insert_retryable(ExperimentThing, newcomer_ets)
-                self.experiment.settings_json = json.dumps(self.experiment_settings)
-
-            self.log.info(
-                f"Assigned randomizations to {len(newcomer_ets)} banned users: [{','.join([x['thing_id'] for x in newcomer_ets])}]"
-            )
-        except Exception as e:
+        if newcomers_without_randomization > 0:
             self.log.error(
-                "Error in BanneduserExperimentController::assign_randomized_conditions",
-                e,
+                f"BanneduserExperimentController Experiment {self.experiment_name} has run out of randomizations from '{condition}' to assign."
             )
-        finally:
-            self.db_session.execute("UNLOCK TABLES")
+
+        if len(newcomer_ets) > 0:
+            self.db_session.insert_retryable(ExperimentThing, newcomer_ets)
+            self.experiment.settings_json = json.dumps(self.experiment_settings)
+
+        self.log.info(
+            f"Assigned randomizations to {len(newcomer_ets)} banned users: [{','.join([x['thing_id'] for x in newcomer_ets])}]"
+        )
 
     def _is_tempban(self, modaction):
         """Return true if an admin action is a temporary ban.
@@ -458,100 +470,88 @@ class BanneduserExperimentController(ModactionExperimentController):
                 }
             }
         """
-        self.db_session.execute(
-            "Lock Tables experiment_actions WRITE, experiment_things WRITE, message_logs WRITE"
+        mc = MessagingController(self.db_session, self.r, self.log)
+        action = "SendMessage"
+        messages_to_send = []
+        for experiment_thing in experiment_things:
+            message = self._format_intervention_message(experiment_thing)
+            ## if it's a control group, log inaction
+            ## and do nothing, otherwise add to messages_to_send
+            if message is None:
+                metadata = json.loads(experiment_thing.metadata_json)
+                metadata["message_status"] = "sent"
+                ea = ExperimentAction(
+                    experiment_id=self.experiment.id,
+                    action=action,
+                    action_object_type=ThingType.USER.value,
+                    action_object_id=experiment_thing.id,
+                    metadata_json=json.dumps(metadata),
+                )
+                experiment_thing.query_index = BannedUserQueryIndex.COMPLETE
+                experiment_thing.metadata_json = json.dumps(metadata)
+                self.db_session.add(ea)
+            else:
+                message["account"] = experiment_thing.thing_id
+                messages_to_send.append(message)
+
+        # send messages_to_send
+        message_results = mc.send_messages(
+            messages_to_send,
+            f"BannedUserMessagingExperiment({self.experiment_name})::_send_intervention_messages",
         )
-        try:
-            mc = MessagingController(self.db_session, self.r, self.log)
-            action = "SendMessage"
-            messages_to_send = []
-            for experiment_thing in experiment_things:
-                message = self._format_intervention_message(experiment_thing)
-                ## if it's a control group, log inaction
-                ## and do nothing, otherwise add to messages_to_send
-                if message is None:
-                    metadata = json.loads(experiment_thing.metadata_json)
+
+        # iterate through message_result, linked with experiment_things
+        for experiment_thing in experiment_things:
+            if experiment_thing.thing_id in message_results.keys():
+                message_result = message_results[experiment_thing.thing_id]
+
+                metadata = json.loads(experiment_thing.metadata_json)
+                update_records = False
+
+                message_errors = 0
+                if "errors" in message_result:
+                    message_errors = len(message_result["errors"])
+
+                ## TAKE ACTION WITH INVALID USERNAME
+                ## (add an action and UPDATE THE EXPERIMENT_THING)
+                ## TO INDICATE THAT THE ACCOUNT DOESN'T EXIST
+                ## NOTE: THE MESSAGE ATTEMPT WILL BE LOGGED
+                ## SO YOU DON'T HAVE TO LOG AN ExperimentAction
+                ## Ignore other errors
+                ## (since you will want to retry in those cases)
+                if message_errors > 0:
+                    for error in message_result["errors"]:
+                        invalid_username = False
+                        if error["error"] == "invalid username":
+                            invalid_username = True
+
+                        if invalid_username:
+                            metadata["message_status"] = "nonexistent"
+                            metadata["survey_status"] = "nonexistent"
+                            experiment_thing.query_index = (
+                                BannedUserQueryIndex.IMPOSSIBLE
+                            )
+                            update_records = True
+                ## if there are no errors
+                ## add an ExperimentAction and
+                ## update the experiment_thing metadata
+                else:
                     metadata["message_status"] = "sent"
+                    experiment_thing.query_index = BannedUserQueryIndex.COMPLETE
+                    update_records = True
+
+                if update_records:
+                    metadata_json = json.dumps(metadata)
                     ea = ExperimentAction(
                         experiment_id=self.experiment.id,
                         action=action,
                         action_object_type=ThingType.USER.value,
                         action_object_id=experiment_thing.id,
-                        metadata_json=json.dumps(metadata),
+                        metadata_json=metadata_json,
                     )
-                    experiment_thing.query_index = BannedUserQueryIndex.COMPLETE
-                    experiment_thing.metadata_json = json.dumps(metadata)
                     self.db_session.add(ea)
-                else:
-                    message["account"] = experiment_thing.thing_id
-                    messages_to_send.append(message)
-
-            # send messages_to_send
-            message_results = mc.send_messages(
-                messages_to_send,
-                f"BannedUserMessagingExperiment({self.experiment_name})::_send_intervention_messages",
-            )
-
-            # iterate through message_result, linked with experiment_things
-            for experiment_thing in experiment_things:
-                if experiment_thing.thing_id in message_results.keys():
-                    message_result = message_results[experiment_thing.thing_id]
-
-                    metadata = json.loads(experiment_thing.metadata_json)
-                    update_records = False
-
-                    message_errors = 0
-                    if "errors" in message_result:
-                        message_errors = len(message_result["errors"])
-
-                    ## TAKE ACTION WITH INVALID USERNAME
-                    ## (add an action and UPDATE THE EXPERIMENT_THING)
-                    ## TO INDICATE THAT THE ACCOUNT DOESN'T EXIST
-                    ## NOTE: THE MESSAGE ATTEMPT WILL BE LOGGED
-                    ## SO YOU DON'T HAVE TO LOG AN ExperimentAction
-                    ## Ignore other errors
-                    ## (since you will want to retry in those cases)
-                    if message_errors > 0:
-                        for error in message_result["errors"]:
-                            invalid_username = False
-                            if error["error"] == "invalid username":
-                                invalid_username = True
-
-                            if invalid_username:
-                                metadata["message_status"] = "nonexistent"
-                                metadata["survey_status"] = "nonexistent"
-                                experiment_thing.query_index = (
-                                    BannedUserQueryIndex.IMPOSSIBLE
-                                )
-                                update_records = True
-                    ## if there are no errors
-                    ## add an ExperimentAction and
-                    ## update the experiment_thing metadata
-                    else:
-                        metadata["message_status"] = "sent"
-                        experiment_thing.query_index = BannedUserQueryIndex.COMPLETE
-                        update_records = True
-
-                    if update_records:
-                        metadata_json = json.dumps(metadata)
-                        ea = ExperimentAction(
-                            experiment_id=self.experiment.id,
-                            action=action,
-                            action_object_type=ThingType.USER.value,
-                            action_object_id=experiment_thing.id,
-                            metadata_json=metadata_json,
-                        )
-                        self.db_session.add(ea)
-                        experiment_thing.metadata_json = metadata_json
-            # NOTE: experiment_things also become updated in database with this commit method,
-            # as they are sqlalchemy objects
-            self.db_session.commit()
-        except Exception as e:
-            self.log.error(
-                "Error in BannedUserExperimentController::_send_intervention_messages",
-                extra=sys.exc_info()[0],
-            )
-            return []
-        finally:
-            self.db_session.execute("UNLOCK TABLES")
+                    experiment_thing.metadata_json = metadata_json
+        # NOTE: experiment_things also become updated in database with this commit method,
+        # as they are sqlalchemy objects
+        self.db_session.commit()
         return message_results
