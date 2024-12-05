@@ -1,8 +1,6 @@
 import datetime
 import os
-from unittest.mock import MagicMock, patch
 
-from praw.objects import Redditor
 import pytest
 from conftest import DictObject
 
@@ -27,15 +25,7 @@ def with_setup_and_teardown(helpers, db_session):
 
 @pytest.fixture
 def mock_reddit(helpers, modaction_data):
-    def create_redditor(username):
-        """Generate a Redditor based only on the username.
-        This could look up a record, but so far we don't need to do that.
-        """
-        user_data = {"created_utc": 9999}
-        user = Redditor(MagicMock(), user_name=username, json_dict=user_data)
-        return user
-
-    with helpers.with_mock_reddit(modaction_data, create_redditor) as reddit:
+    with helpers.with_mock_reddit(modaction_data) as reddit:
         yield reddit
 
 
@@ -73,8 +63,8 @@ def static_now():
 
 
 @pytest.fixture
-def newcomer_modactions(static_now, experiment_controller, modaction_data):
-    return experiment_controller._find_eligible_newcomers(static_now, modaction_data)
+def newcomer_modactions(experiment_controller, modaction_data):
+    return experiment_controller._find_eligible_newcomers(modaction_data)
 
 
 class TestRedditMock:
@@ -91,11 +81,6 @@ class TestRedditMock:
             page = mock_reddit.get_mod_log("fake_subreddit")
         assert len(page) == 0
 
-    def test_get_redditor(self, mock_reddit):
-        user = mock_reddit.get_redditor("uncivil")
-        assert user.created_utc > 0
-        assert user.name == "uncivil"
-
 
 class TestModeratorController:
     def test_archive_mod_action_page(self, db_session, mod_controller):
@@ -109,7 +94,7 @@ class TestModeratorController:
         assert db_session.query(ModAction).count() == 100
 
     def test_load_all_fixtures(
-        self, helpers, db_session, modaction_data, mod_controller, experiment_controller
+        self, helpers, db_session, modaction_data, mod_controller
     ):
         # Nothing is loaded yet.
         assert db_session.query(ModAction).count() == 0
@@ -117,10 +102,64 @@ class TestModeratorController:
         # We have multiple API result pages of fixtures.
         assert len(modaction_data) > 100
 
-        helpers.load_mod_actions(mod_controller, experiment_controller)
+        helpers.load_mod_actions(mod_controller)
 
         # All fixture records were loaded.
         assert db_session.query(ModAction).count() == len(modaction_data)
+
+
+class TestModactionExperimentController:
+    zero_time = datetime.datetime(1970, 1, 1, 0, 0)
+
+    def test_new_modactions_peek(self, helpers, experiment_controller, mod_controller):
+        helpers.load_mod_actions(mod_controller)
+
+        ids = []
+        with experiment_controller._new_modactions(
+            should_save_cursor=False
+        ) as modactions:
+            # Some mod actions are loaded
+            assert len(modactions) > 0
+            ids = [m.id for m in modactions]
+
+        # Cursor was not changed
+        assert experiment_controller._last_modaction_time() == self.zero_time
+
+        with experiment_controller._new_modactions(
+            should_save_cursor=False
+        ) as modactions:
+            # Some modactions were loaded, again
+            assert len(modactions) > 0
+            # It's the same list!
+            assert [m.id for m in modactions] == ids
+
+    def test_new_modactions_cursor(
+        self, helpers, experiment_controller, mod_controller
+    ):
+        helpers.load_mod_actions(mod_controller)
+
+        # Cursor starts out at zero
+        assert experiment_controller._last_modaction_time() == self.zero_time
+
+        ids = []
+        with experiment_controller._new_modactions(
+            should_save_cursor=True
+        ) as modactions:
+            # Mod actions are loaded, yay
+            assert len(modactions) > 0
+            ids = [m.id for m in modactions]
+
+        # Cursor was changed
+        assert experiment_controller._last_modaction_time() > self.zero_time
+
+        # Next page
+        with experiment_controller._new_modactions(
+            should_save_cursor=True
+        ) as modactions:
+            # More were loaded
+            assert len(modactions) > 0
+            # It's a new page of results this time
+            assert [m.id for m in modactions] != ids
 
 
 class TestExperimentController:
@@ -129,7 +168,7 @@ class TestExperimentController:
     ):
         assert len(experiment_controller._previously_enrolled_user_ids()) == 0
 
-        helpers.load_mod_actions(mod_controller, experiment_controller)
+        helpers.load_mod_actions(mod_controller)
         experiment_controller.enroll_new_participants(mod_controller)
 
         assert len(experiment_controller._previously_enrolled_user_ids()) > 0
@@ -186,28 +225,38 @@ class TestPrivateMethods:
         experiment_controller.db_session.commit()
         assert experiment_controller._previously_enrolled_user_ids() == want
 
-    def test_find_eligible_newcomers(
-        self, modaction_data, experiment_controller, static_now
-    ):
+    def test_find_eligible_newcomers(self, modaction_data, experiment_controller):
         # NOTE: not using newcomer_modactions for extra clarity.
-        user_modactions = experiment_controller._find_eligible_newcomers(
-            static_now, modaction_data
-        )
+        user_modactions = experiment_controller._find_eligible_newcomers(modaction_data)
         assert len(user_modactions) > 0
 
     # update temp ban duration
     @pytest.mark.parametrize(
         "action,details,want_duration,want_query_index,want_type,want_actual_ban_end_time",
         [
-            ("banuser", "999 days", 999, BannedUserQueryIndex.PENDING, "temporary", None),
-            ("banuser", "permaban", None, BannedUserQueryIndex.IMPOSSIBLE, "permanent", -1),
+            (
+                "banuser",
+                "999 days",
+                999,
+                BannedUserQueryIndex.PENDING,
+                "temporary",
+                None,
+            ),
+            (
+                "banuser",
+                "permaban",
+                None,
+                BannedUserQueryIndex.IMPOSSIBLE,
+                "permanent",
+                -1,
+            ),
             (
                 "unbanuser",
                 "whatever",
                 None,
                 BannedUserQueryIndex.IMPOSSIBLE,
                 "unbanned",
-                "static_now_placeholder", # placeholder, replaced in test code with value of static_now 
+                "static_now_placeholder",  # placeholder, replaced in test code with value of static_now
             ),
         ],
     )
@@ -225,11 +274,18 @@ class TestPrivateMethods:
         mod_controller,
         static_now,
     ):
-        helpers.load_mod_actions(mod_controller, experiment_controller)
+        helpers.load_mod_actions(mod_controller)
         experiment_controller.enroll_new_participants(mod_controller)
 
         original = newcomer_modactions[0]
-        update = DictObject({**original, "action": action, "details": details, "created_utc": original.created_utc + 1})
+        update = DictObject(
+            {
+                **original,
+                "action": action,
+                "details": details,
+                "created_utc": original.created_utc + 1,
+            }
+        )
         experiment_controller._update_existing_participants(static_now, [update])
 
         snap = (
@@ -239,6 +295,7 @@ class TestPrivateMethods:
             )
             .first()
         )
+        assert snap is not None
         assert snap.object_type == ThingType.USER.value
         assert snap.experiment_id == experiment_controller.experiment.id
         meta = json.loads(snap.metadata_json)
@@ -271,12 +328,18 @@ class TestPrivateMethods:
             ("banuser", "1 day", "", True),  # Unknown is default
         ],
     )
-    def test_get_condition(self, action, details, want, want_error, experiment_controller):
-        if(want_error):
+    def test_get_condition(
+        self, action, details, want, want_error, experiment_controller
+    ):
+        if want_error:
             with pytest.raises(Exception):
-                got = experiment_controller._get_condition(DictObject({"action": action, "details": details}))
+                got = experiment_controller._get_condition(
+                    DictObject({"action": action, "details": details})
+                )
         else:
-            got = experiment_controller._get_condition(DictObject({"action": action, "details": details}))
+            got = experiment_controller._get_condition(
+                DictObject({"action": action, "details": details})
+            )
             assert got == want
 
     def test_assign_randomized_conditions(
@@ -284,9 +347,7 @@ class TestPrivateMethods:
     ):
         assert len(experiment_controller._previously_enrolled_user_ids()) == 0
 
-        user_modactions = experiment_controller._find_eligible_newcomers(
-            static_now, modaction_data
-        )
+        user_modactions = experiment_controller._find_eligible_newcomers(modaction_data)
         experiment_controller._assign_randomized_conditions(static_now, user_modactions)
 
         assert len(experiment_controller._previously_enrolled_user_ids()) > 1
@@ -317,7 +378,9 @@ class TestPrivateMethods:
         ],
     )
     def test_is_tempban_edit(self, action, details, want, experiment_controller):
-        got = experiment_controller._is_tempban_edit(DictObject({"action": action, "details": details}))
+        got = experiment_controller._is_tempban_edit(
+            DictObject({"action": action, "details": details})
+        )
         assert got == want
 
     @pytest.mark.parametrize(
@@ -331,8 +394,12 @@ class TestPrivateMethods:
             ("banuser", "30 days", True),
         ],
     )
-    def test_is_valid_tempban_duration(self, action, details, want, experiment_controller):
-        got = experiment_controller._is_valid_tempban_duration(DictObject({"action": action, "details": details}))
+    def test_is_valid_tempban_duration(
+        self, action, details, want, experiment_controller
+    ):
+        got = experiment_controller._is_valid_tempban_duration(
+            DictObject({"action": action, "details": details})
+        )
         assert got == want
 
     @pytest.mark.parametrize(
@@ -413,7 +480,7 @@ class TestPrivateMethods:
         users = experiment_controller._get_accounts_needing_interventions()
         assert users == []
 
-        helpers.load_mod_actions(mod_controller, experiment_controller)
+        helpers.load_mod_actions(mod_controller)
         experiment_controller.enroll_new_participants(mod_controller)
 
         users = experiment_controller._get_accounts_needing_interventions()
