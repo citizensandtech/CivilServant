@@ -17,9 +17,11 @@ from app.controllers.messaging_controller import (
     MessagingController,
 )
 from app.models import (
+    Comment,
     ExperimentAction,
     ExperimentThing,
     ExperimentThingSnapshot,
+    ModAction,
     ThingType,
 )
 
@@ -67,7 +69,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             return
 
         self.db_session.execute(
-            "LOCK TABLES experiments WRITE, experiment_things WRITE, experiment_thing_snapshots WRITE, mod_actions WRITE"
+            "LOCK TABLES comments WRITE, experiments WRITE, experiment_things WRITE, experiment_thing_snapshots WRITE, mod_actions WRITE"
         )
         try:
             with self._new_modactions() as modactions:
@@ -238,9 +240,49 @@ class BanneduserExperimentController(ModactionExperimentController):
 
     def _get_condition(self, newcomer):
         mapping = {3: "threedays", 7: "sevendays", 14: "fourteendays", 30: "thirtydays"}
-        condition = mapping.get(self._parse_days(newcomer), "unknown")
+        ban_condition = mapping.get(self._parse_days(newcomer), "unknown")
+
+        activity_condition = self._get_activity_condition(newcomer)
+
+        condition = f"{activity_condition}_{ban_condition}"
         self._check_condition(condition)
         return condition
+
+    def _get_activity_condition(self, newcomer):
+        number_of_comments = (
+            self.db_session.query(Comment)
+            .filter(
+                Comment.subreddit_id == self.experiment_settings["subreddit_id"],
+                Comment.user_id == newcomer.target_author,
+            )
+            .count()
+        )
+        if number_of_comments == 0:
+            return "lurker"
+
+        modactions = (
+            self.db_session.query(ModAction)
+            .filter(
+                ModAction.subreddit_id == self.experiment_settings["subreddit_id"],
+                ModAction.target_author == newcomer.target_author,
+            )
+            .order_by(ModAction.created_utc)
+        )
+
+        comments = set()
+        for modaction in modactions():
+            comment_id = modaction.target_fullname
+            if modaction.action == "removecomment":
+                comments.add(comment_id)
+            elif modaction.action == "approvecomment":
+                comments.discard(comment_id)
+
+        number_of_removals = len(comments)
+        removal_ratio = number_of_removals / number_of_comments
+        if removal_ratio <= 0.3:
+            return "lowremoval"
+        else:
+            return "highremoval"
 
     def _assign_randomized_conditions(self, now_utc, newcomers):
         """Assign randomized conditions to newcomers.
