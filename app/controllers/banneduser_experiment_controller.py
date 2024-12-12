@@ -249,6 +249,12 @@ class BanneduserExperimentController(ModactionExperimentController):
         return condition
 
     def _get_activity_condition(self, newcomer):
+        """Categorize newcomers to the experiment based on comment history:
+        
+        `lurker` has not commented in known history
+        `lowremoval` has had relatively few comments removed by mods
+        `highremoval` has had comments removed by mods
+        """
         number_of_comments = (
             self.db_session.query(Comment)
             .filter(
