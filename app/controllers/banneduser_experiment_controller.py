@@ -7,7 +7,9 @@ import re
 import sys
 
 import uuid
-from sqlalchemy import and_
+from sqlalchemy import and_, func
+from sqlalchemy.dialects import mysql
+
 
 from app.controllers.experiment_controller import ExperimentConfigurationError
 from app.controllers.modaction_experiment_controller import (
@@ -255,14 +257,22 @@ class BanneduserExperimentController(ModactionExperimentController):
         `lowremoval` has had relatively few comments removed by mods
         `highremoval` has had comments removed by mods
         """
-        number_of_comments = (
-            self.db_session.query(Comment)
+
+        # Calculate the timestamp for six months ago
+        six_months_ago = datetime.utcnow() - timedelta(days=6 * 30)  # Approximation of 6 months
+        six_months_ago_timestamp = int(six_months_ago.timestamp())
+
+
+        number_of_comments_query = (
+            self.db_session.query(func.count(Comment.id))
             .filter(
                 Comment.subreddit_id == self.experiment_settings["subreddit_id"],
                 Comment.user_id == newcomer.target_author,
+                Comment.created_utc >= six_months_ago,
             )
-            .count()
         )
+
+        number_of_comments = number_of_comments_query.scalar()
         if number_of_comments == 0:
             return "lurker"
 
@@ -271,6 +281,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             .filter(
                 ModAction.subreddit_id == self.experiment_settings["subreddit_id"],
                 ModAction.target_author == newcomer.target_author,
+                ModAction.created_utc >= six_months_ago,
             )
             .order_by(ModAction.created_utc)
         )
