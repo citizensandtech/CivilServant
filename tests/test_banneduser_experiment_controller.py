@@ -180,10 +180,10 @@ class TestExperimentController:
 
 class TestModactionPrivateMethods:
     def test_check_condition(self, experiment_controller):
-        experiment_controller._check_condition("threedays")
-        experiment_controller._check_condition("sevendays")
-        experiment_controller._check_condition("fourteendays")
-        experiment_controller._check_condition("thirtydays")
+        experiment_controller._check_condition("lurker_threedays")
+        experiment_controller._check_condition("lowremoval_sevendays")
+        experiment_controller._check_condition("highremoval_fourteendays")
+        experiment_controller._check_condition("lurker_thirtydays")
         with pytest.raises(Exception):
             experiment_controller._check_condition("reanimated")
 
@@ -492,23 +492,23 @@ class TestPrivateMethods:
             (
                 "12345",
                 {
-                    "condition": "threedays",
+                    "condition": "highremoval_threedays",
                     "arm": "arm_0",
                 },
                 {
                     "subject": "PM Subject Line for 12345 (Threedays Arm 0)",
-                    "message": "Hello 12345, this is the message for arm 0 of the threedays condition.",
+                    "message": "Hello 12345, this is the message for arm 0 of the highremoval_threedays condition.",
                 },
             ),
             (
                 "MarlKarx18",
                 {
-                    "condition": "fourteendays",
+                    "condition": "lurker_fourteendays",
                     "arm": "arm_1",
                 },
                 {
                     "subject": "PM Subject Line for MarlKarx18 (Fourteendays Arm 1)",
-                    "message": "Hello MarlKarx18, this is the message for arm 1 of the fourteendays condition.",
+                    "message": "Hello MarlKarx18, this is the message for arm 1 of the lurker_fourteendays condition.",
                 },
             ),
         ],
@@ -530,7 +530,7 @@ class TestPrivateMethods:
     @pytest.mark.parametrize(
         "metadata_json",
         [
-            {"condition": "threedays", "arm": "arm_9999"},
+            {"condition": "lurker_threedays", "arm": "arm_9999"},
             {"condition": "invalid_condition", "arm": "arm_0"},
         ],
     )
@@ -554,7 +554,7 @@ class TestPrivateMethods:
             (
                 "ThusSpoke44",
                 {
-                    "condition": "threedays",
+                    "condition": "lowremoval_threedays",
                     "arm": "arm_1",
                 },
                 False,
@@ -564,7 +564,7 @@ class TestPrivateMethods:
             (
                 "LaLaLatour47",
                 {
-                    "condition": "fourteendays",
+                    "condition": "lurker_fourteendays",
                     "arm": "arm_0",
                 },
                 False,
@@ -574,7 +574,7 @@ class TestPrivateMethods:
             (
                 "ErrorWhoa99",
                 {
-                    "condition": "thirtydays",
+                    "condition": "lurker_thirtydays",
                     "arm": "arm_999999",
                 },
                 True,
