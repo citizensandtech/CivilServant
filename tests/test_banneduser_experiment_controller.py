@@ -319,28 +319,25 @@ class TestPrivateMethods:
         assert meta["actual_ban_end_time"] == want_actual_ban_end_time
 
     @pytest.mark.parametrize(
-        "action,details,want,want_error",
+        "details,want",
         [
-            ("banuser", "3 days", "threedays", False),
-            ("banuser", "7 days", "sevendays", False),
-            ("banuser", "14 days", "fourteendays", False),
-            ("banuser", "30 days", "thirtydays", False),
-            ("banuser", "1 day", "", True),  # Unknown is default
+            ("3 days", "threedays"),
+            ("7 days", "sevendays"),
+            ("14 days", "fourteendays"),
+            ("30 days", "thirtydays"),
+            ("1 day", "unknown"),  # Unknown is default
+            ("5 days", "unknown"),  # Irregular numbers of days are errors
         ],
     )
-    def test_get_condition(
-        self, action, details, want, want_error, experiment_controller
-    ):
-        if want_error:
-            with pytest.raises(Exception):
-                got = experiment_controller._get_condition(
-                    DictObject({"action": action, "details": details})
-                )
-        else:
-            got = experiment_controller._get_condition(
-                DictObject({"action": action, "details": details})
-            )
-            assert got == want
+    def test_get_ban_condition(self, details, want, experiment_controller):
+        got = experiment_controller._get_ban_condition(
+            DictObject({"action": "banuser", "details": details})
+        )
+        assert got == want
+
+    def test_get_activity_condition(self, static_now, experiment_controller):
+        got = experiment_controller._get_activity_condition(DictObject({}), static_now)
+        assert got == "lurker"
 
     def test_assign_randomized_conditions(
         self, modaction_data, experiment_controller, static_now

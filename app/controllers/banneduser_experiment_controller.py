@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 import inspect
 import json
@@ -8,7 +8,6 @@ import sys
 
 import uuid
 from sqlalchemy import and_, func
-from sqlalchemy.dialects import mysql
 
 
 from app.controllers.experiment_controller import ExperimentConfigurationError
@@ -34,6 +33,8 @@ BASE_DIR = os.path.join(
 )
 ENV = os.environ["CS_ENV"]
 
+SIX_MONTHS_IN_SECONDS = 6 * 30 * 24 * 60 * 60
+
 
 class BannedUserQueryIndex(str, Enum):
     """Possible states of a banned user's query_index."""
@@ -57,7 +58,9 @@ class BanneduserExperimentController(ModactionExperimentController):
     ):
         super().__init__(experiment_name, db_session, r, log, required_keys)
 
-    def enroll_new_participants(self, instance, now_utc=datetime.utcnow().timestamp()):
+    def enroll_new_participants(
+        self, instance, now_utc=int(datetime.utcnow().timestamp())
+    ):
         """Enroll new participants in the experiment.
 
         This is a callback that will be invoked declaratively.
@@ -240,36 +243,53 @@ class BanneduserExperimentController(ModactionExperimentController):
 
         self.db_session.commit()
 
-    def _get_condition(self, newcomer):
-        mapping = {3: "threedays", 7: "sevendays", 14: "fourteendays", 30: "thirtydays"}
-        ban_condition = mapping.get(self._parse_days(newcomer), "unknown")
+    def _get_condition(self, newcomer, now_utc):
+        """Get the categorical condition for this new participant.
 
-        activity_condition = self._get_activity_condition(newcomer)
+        Args:
+            newcomer (ModAction): The `banuser` action that enters the user into the study.
+            now_utc: Current timestamp in UTC.
 
+        Returns: A named category for this participant.
+        """
+        ban_condition = self._get_ban_condition(newcomer)
+        activity_condition = self._get_activity_condition(newcomer, now_utc)
         condition = f"{activity_condition}_{ban_condition}"
         self._check_condition(condition)
         return condition
 
-    def _get_activity_condition(self, newcomer):
+    def _get_ban_condition(self, newcomer):
+        """Categorize newcomers to the experiment based on ban duration.
+
+        Args:
+            newcomer (ModAction): The `banuser` action that enters the user into the study.
+
+        Returns: A category representing the length of the ban.
+        """
+        mapping = {3: "threedays", 7: "sevendays", 14: "fourteendays", 30: "thirtydays"}
+        ban_condition = mapping.get(self._parse_days(newcomer), "unknown")
+        return ban_condition
+
+    def _get_activity_condition(self, newcomer, now_utc):
         """Categorize newcomers to the experiment based on comment history:
-        
-        `lurker` has not commented in known history
-        `lowremoval` has had relatively few comments removed by mods
-        `highremoval` has had comments removed by mods
+
+        Args:
+            newcomer (ModAction): The `banuser` action that enters the user into the study.
+            now_utc: Current timestamp in UTC.
+
+        Returns: A category based on the user's comment history.
+            - `lurker` has not commented in known history
+            - `lowremoval` has had relatively few comments removed by mods
+            - `highremoval` has had comments removed by mods
         """
 
-        # Calculate the timestamp for six months ago
-        six_months_ago = datetime.utcnow() - timedelta(days=6 * 30)  # Approximation of 6 months
-        six_months_ago_timestamp = int(six_months_ago.timestamp())
+        # Calculate the timestamp for six months ago.
+        six_months_ago_timestamp = int(now_utc - SIX_MONTHS_IN_SECONDS)
 
-
-        number_of_comments_query = (
-            self.db_session.query(func.count(Comment.id))
-            .filter(
-                Comment.subreddit_id == self.experiment_settings["subreddit_id"],
-                Comment.user_id == newcomer.target_author,
-                Comment.created_utc >= six_months_ago,
-            )
+        number_of_comments_query = self.db_session.query(func.count(Comment.id)).filter(
+            Comment.subreddit_id == self.experiment_settings["subreddit_id"],
+            Comment.user_id == newcomer.target_author,
+            Comment.created_utc >= six_months_ago_timestamp,
         )
 
         number_of_comments = number_of_comments_query.scalar()
@@ -286,6 +306,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             .order_by(ModAction.created_utc)
         )
 
+        # Ignore comments that are removed and later approved.
         comments = set()
         for modaction in modactions():
             comment_id = modaction.target_fullname
@@ -297,8 +318,9 @@ class BanneduserExperimentController(ModactionExperimentController):
         number_of_removals = len(comments)
         removal_ratio = number_of_removals / number_of_comments
 
-
-        removal_ratio_threshold = self.experiment_settings["participant_activity_condition_removal_ratio_threshold"]
+        removal_ratio_threshold = self.experiment_settings[
+            "participant_activity_condition_removal_ratio_threshold"
+        ]
 
         if removal_ratio <= removal_ratio_threshold:
             return "lowremoval"
@@ -311,7 +333,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         If there are no available randomizations, throw an error.
 
         Args:
-            now_utc: the current datetime in UTC.
+            now_utc (int): the current datetime in UTC.
             newcomers: a list of tuples of `(mod action, redditor info)`.
         """
         # list of newcomer experiment_things to be added to db
@@ -319,7 +341,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         newcomers_without_randomization = 0
 
         for newcomer in newcomers:
-            condition = self._get_condition(newcomer)
+            condition = self._get_condition(newcomer, now_utc)
 
             # Get the next randomization, and ensure that it's valid.
             next_randomization = self.experiment_settings["conditions"][condition][
