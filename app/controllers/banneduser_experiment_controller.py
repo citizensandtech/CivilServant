@@ -296,7 +296,11 @@ class BanneduserExperimentController(ModactionExperimentController):
 
         number_of_removals = len(comments)
         removal_ratio = number_of_removals / number_of_comments
-        if removal_ratio <= 0.3:
+
+
+        removal_ratio_threshold = self.experiment_settings["participant_activity_condition_removal_ratio_threshold"]
+
+        if removal_ratio <= removal_ratio_threshold:
             return "lowremoval"
         else:
             return "highremoval"

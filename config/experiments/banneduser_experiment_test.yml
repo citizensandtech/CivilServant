@@ -2,6 +2,7 @@ production:
   subreddit: catlabtest
   subreddit_id: cu3dxg
   username: catlabreddit
+  participant_activity_condition_removal_ratio_threshold: 0.3
   conditions:
     lurker_threedays:
       randomizations: banneduser_experiment_test.lurker_threedays.randomizations.test.csv
@@ -139,6 +140,7 @@ test:
   subreddit: catlabreddit_testbu1
   subreddit_id: TEST_ONLY
   username: catlabreddit
+  participant_activity_condition_removal_ratio_threshold: 0.3
   conditions:
     lurker_threedays:
       randomizations: banneduser_experiment_test.lurker_threedays.randomizations.test.csv
