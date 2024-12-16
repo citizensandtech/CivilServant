@@ -301,7 +301,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             .filter(
                 ModAction.subreddit_id == self.experiment_settings["subreddit_id"],
                 ModAction.target_author == newcomer.target_author,
-                ModAction.created_utc >= six_months_ago,
+                ModAction.created_utc >= six_months_ago_timestamp,
             )
             .order_by(ModAction.created_utc)
         )
