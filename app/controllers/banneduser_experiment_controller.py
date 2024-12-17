@@ -308,7 +308,7 @@ class BanneduserExperimentController(ModactionExperimentController):
 
         # Ignore comments that are removed and later approved.
         comments = set()
-        for modaction in modactions():
+        for modaction in modactions:
             comment_id = modaction.target_fullname
             if modaction.action == "removecomment":
                 comments.add(comment_id)
