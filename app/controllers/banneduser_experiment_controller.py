@@ -136,7 +136,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             A filtered list of mod actions.
         """
         previously_enrolled_user_ids = set(self._previously_enrolled_user_ids())
-        eligible_newcomers = []
+        eligible_newcomers = {}
         for modaction in modactions:
             # Skip irrelevant mod actions.
             if (
@@ -153,9 +153,9 @@ class BanneduserExperimentController(ModactionExperimentController):
             # NOTE: If there are multiple mod actions for the same user who isn't yet enrolled,
             # we overwrite the previous action with the latest one.
             # This assumes that they are processed in order.
-            eligible_newcomers.append(modaction)
+            eligible_newcomers[modaction.target_author] = modaction
 
-        return eligible_newcomers
+        return list(eligible_newcomers.values())
 
     def _update_existing_participants(self, now_utc, modactions):
         """Find mod actions that update the state of any current participants.
