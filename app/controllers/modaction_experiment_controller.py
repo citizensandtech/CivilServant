@@ -72,7 +72,7 @@ class ModactionExperimentController(ExperimentController, abc.ABC):
 
         # XXX: parse `action_data` and set *ephemeral* values on the model instance.
         for m in modactions:
-            meta = json.loads(m.action_data).get("json_dict", {})
+            meta = json.loads(m.action_data)
             for k, v in meta.items():
                 if not hasattr(m, k):
                     setattr(m, k, v)

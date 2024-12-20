@@ -2,47 +2,128 @@ production:
   subreddit: catlabtest
   subreddit_id: cu3dxg
   username: catlabreddit
+  participant_activity_condition_removal_ratio_threshold: 0.3
   conditions:
-    threedays:
-      randomizations: banneduser_experiment_test.threedays.randomizations.test.csv
+    lurker_threedays:
+      randomizations: banneduser_experiment_newcomer3_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: PM Subject Line for {username} (Threedays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the threedays condition.
+          pm_text: Hello {username}, this is the message for arm 0 of the lurker_threedays condition.
         arm_1:
           pm_subject: PM Subject Line for {username} (Threedays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the threedays condition.
-    sevendays:
-      randomizations: banneduser_experiment_test.sevendays.randomizations.test.csv
+          pm_text: Hello {username}, this is the message for arm 1 of the lurker_threedays condition.
+    lurker_sevendays:
+      randomizations: banneduser_experiment_newcomer7_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: PM Subject Line for {username} (Sevendays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the sevendays condition.
+          pm_text: Hello {username}, this is the message for arm 0 of the lurker_sevendays condition.
         arm_1:
           pm_subject: PM Subject Line for {username} (Sevendays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the sevendays condition.
-    fourteendays:
-      randomizations: banneduser_experiment_test.fourteendays.randomizations.test.csv
+          pm_text: Hello {username}, this is the message for arm 1 of the lurker_sevendays condition.
+    lurker_fourteendays:
+      randomizations: banneduser_experiment_newcomer14_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: PM Subject Line for {username} (Fourteendays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the fourteendays condition.
+          pm_text: Hello {username}, this is the message for arm 0 of the lurker_fourteendays condition.
         arm_1:
           pm_subject: PM Subject Line for {username} (Fourteendays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the fourteendays condition.
-    thirtydays:
-      randomizations: banneduser_experiment_test.thirtydays.randomizations.test.csv
+          pm_text: Hello {username}, this is the message for arm 1 of the lurker_fourteendays condition.
+    lurker_thirtydays:
+      randomizations: banneduser_experiment_newcomer30_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: PM Subject Line for {username} (Thirtydays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the thirtydays condition.
+          pm_text: Hello {username}, this is the message for arm 0 of the lurker_thirtydays condition.
         arm_1:
           pm_subject: PM Subject Line for {username} (Thirtydays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the thirtydays condition.
+          pm_text: Hello {username}, this is the message for arm 1 of the lurker_thirtydays condition.
+    lowremoval_threedays:
+      randomizations: banneduser_experiment_low3_messaging_randomizations-AITA-12.16.2024.csv
+      next_randomization: 0
+      arms:
+        arm_0:
+          pm_subject: PM Subject Line for {username} (Threedays Arm 0)
+          pm_text: Hello {username}, this is the message for arm 0 of the lowremoval_threedays condition.
+        arm_1:
+          pm_subject: PM Subject Line for {username} (Threedays Arm 1)
+          pm_text: Hello {username}, this is the message for arm 1 of the lowremoval_threedays condition.
+    lowremoval_sevendays:
+      randomizations: banneduser_experiment_low7_messaging_randomizations-AITA-12.16.2024.csv
+      next_randomization: 0
+      arms:
+        arm_0:
+          pm_subject: PM Subject Line for {username} (Sevendays Arm 0)
+          pm_text: Hello {username}, this is the message for arm 0 of the lowremoval_sevendays condition.
+        arm_1:
+          pm_subject: PM Subject Line for {username} (Sevendays Arm 1)
+          pm_text: Hello {username}, this is the message for arm 1 of the lowremoval_sevendays condition.
+    lowremoval_fourteendays:
+      randomizations: banneduser_experiment_low14_messaging_randomizations-AITA-12.16.2024.csv
+      next_randomization: 0
+      arms:
+        arm_0:
+          pm_subject: PM Subject Line for {username} (Fourteendays Arm 0)
+          pm_text: Hello {username}, this is the message for arm 0 of the lowremoval_fourteendays condition.
+        arm_1:
+          pm_subject: PM Subject Line for {username} (Fourteendays Arm 1)
+          pm_text: Hello {username}, this is the message for arm 1 of the lowremoval_fourteendays condition.
+    lowremoval_thirtydays:
+      randomizations: banneduser_experiment_low30_messaging_randomizations-AITA-12.16.2024.csv
+      next_randomization: 0
+      arms:
+        arm_0:
+          pm_subject: PM Subject Line for {username} (Thirtydays Arm 0)
+          pm_text: Hello {username}, this is the message for arm 0 of the lowremoval_thirtydays condition.
+        arm_1:
+          pm_subject: PM Subject Line for {username} (Thirtydays Arm 1)
+          pm_text: Hello {username}, this is the message for arm 1 of the lowremoval_thirtydays condition.
+    highremoval_threedays:
+      randomizations: banneduser_experiment_high3_messaging_randomizations-AITA-12.16.2024.csv
+      next_randomization: 0
+      arms:
+        arm_0:
+          pm_subject: PM Subject Line for {username} (Threedays Arm 0)
+          pm_text: Hello {username}, this is the message for arm 0 of the highremoval_threedays condition.
+        arm_1:
+          pm_subject: PM Subject Line for {username} (Threedays Arm 1)
+          pm_text: Hello {username}, this is the message for arm 1 of the highremoval_threedays condition.
+    highremoval_sevendays:
+      randomizations: banneduser_experiment_high7_messaging_randomizations-AITA-12.16.2024.csv
+      next_randomization: 0
+      arms:
+        arm_0:
+          pm_subject: PM Subject Line for {username} (Sevendays Arm 0)
+          pm_text: Hello {username}, this is the message for arm 0 of the highremoval_sevendays condition.
+        arm_1:
+          pm_subject: PM Subject Line for {username} (Sevendays Arm 1)
+          pm_text: Hello {username}, this is the message for arm 1 of the highremoval_sevendays condition.
+    highremoval_fourteendays:
+      randomizations: banneduser_experiment_high14_messaging_randomizations-AITA-12.16.2024.csv
+      next_randomization: 0
+      arms:
+        arm_0:
+          pm_subject: PM Subject Line for {username} (Fourteendays Arm 0)
+          pm_text: Hello {username}, this is the message for arm 0 of the highremoval_fourteendays condition.
+        arm_1:
+          pm_subject: PM Subject Line for {username} (Fourteendays Arm 1)
+          pm_text: Hello {username}, this is the message for arm 1 of the highremoval_fourteendays condition.
+    highremoval_thirtydays:
+      randomizations: banneduser_experiment_high30_messaging_randomizations-AITA-12.16.2024.csv
+      next_randomization: 0
+      arms:
+        arm_0:
+          pm_subject: PM Subject Line for {username} (Thirtydays Arm 0)
+          pm_text: Hello {username}, this is the message for arm 0 of the highremoval_thirtydays condition.
+        arm_1:
+          pm_subject: PM Subject Line for {username} (Thirtydays Arm 1)
+          pm_text: Hello {username}, this is the message for arm 1 of the highremoval_thirtydays condition.
   controller: BanneduserExperimentController
   start_time: 07/02/2000 00:00:00 UTC
   end_time: 07/02/3000 23:59:59 UTC
@@ -59,47 +140,128 @@ test:
   subreddit: catlabreddit_testbu1
   subreddit_id: TEST_ONLY
   username: catlabreddit
+  participant_activity_condition_removal_ratio_threshold: 0.3
   conditions:
-    threedays:
-      randomizations: banneduser_experiment_test.threedays.randomizations.test.csv
+    lurker_threedays:
+      randomizations: banneduser_experiment_newcomer3_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: PM Subject Line for {username} (Threedays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the threedays condition.
+          pm_text: Hello {username}, this is the message for arm 0 of the lurker_threedays condition.
         arm_1:
           pm_subject: PM Subject Line for {username} (Threedays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the threedays condition.
-    sevendays:
-      randomizations: banneduser_experiment_test.sevendays.randomizations.test.csv
+          pm_text: Hello {username}, this is the message for arm 1 of the lurker_threedays condition.
+    lurker_sevendays:
+      randomizations: banneduser_experiment_newcomer7_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: PM Subject Line for {username} (Sevendays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the sevendays condition.
+          pm_text: Hello {username}, this is the message for arm 0 of the lurker_sevendays condition.
         arm_1:
           pm_subject: PM Subject Line for {username} (Sevendays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the sevendays condition.
-    fourteendays:
-      randomizations: banneduser_experiment_test.fourteendays.randomizations.test.csv
+          pm_text: Hello {username}, this is the message for arm 1 of the lurker_sevendays condition.
+    lurker_fourteendays:
+      randomizations: banneduser_experiment_newcomer14_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: PM Subject Line for {username} (Fourteendays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the fourteendays condition.
+          pm_text: Hello {username}, this is the message for arm 0 of the lurker_fourteendays condition.
         arm_1:
           pm_subject: PM Subject Line for {username} (Fourteendays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the fourteendays condition.
-    thirtydays:
-      randomizations: banneduser_experiment_test.thirtydays.randomizations.test.csv
+          pm_text: Hello {username}, this is the message for arm 1 of the lurker_fourteendays condition.
+    lurker_thirtydays:
+      randomizations: banneduser_experiment_newcomer30_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: PM Subject Line for {username} (Thirtydays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the thirtydays condition.
+          pm_text: Hello {username}, this is the message for arm 0 of the lurker_thirtydays condition.
         arm_1:
           pm_subject: PM Subject Line for {username} (Thirtydays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the thirtydays condition.
+          pm_text: Hello {username}, this is the message for arm 1 of the lurker_thirtydays condition.
+    lowremoval_threedays:
+      randomizations: banneduser_experiment_low3_messaging_randomizations-AITA-12.16.2024.csv
+      next_randomization: 0
+      arms:
+        arm_0:
+          pm_subject: PM Subject Line for {username} (Threedays Arm 0)
+          pm_text: Hello {username}, this is the message for arm 0 of the lowremoval_threedays condition.
+        arm_1:
+          pm_subject: PM Subject Line for {username} (Threedays Arm 1)
+          pm_text: Hello {username}, this is the message for arm 1 of the lowremoval_threedays condition.
+    lowremoval_sevendays:
+      randomizations: banneduser_experiment_low7_messaging_randomizations-AITA-12.16.2024.csv
+      next_randomization: 0
+      arms:
+        arm_0:
+          pm_subject: PM Subject Line for {username} (Sevendays Arm 0)
+          pm_text: Hello {username}, this is the message for arm 0 of the lowremoval_sevendays condition.
+        arm_1:
+          pm_subject: PM Subject Line for {username} (Sevendays Arm 1)
+          pm_text: Hello {username}, this is the message for arm 1 of the lowremoval_sevendays condition.
+    lowremoval_fourteendays:
+      randomizations: banneduser_experiment_low14_messaging_randomizations-AITA-12.16.2024.csv
+      next_randomization: 0
+      arms:
+        arm_0:
+          pm_subject: PM Subject Line for {username} (Fourteendays Arm 0)
+          pm_text: Hello {username}, this is the message for arm 0 of the lowremoval_fourteendays condition.
+        arm_1:
+          pm_subject: PM Subject Line for {username} (Fourteendays Arm 1)
+          pm_text: Hello {username}, this is the message for arm 1 of the lowremoval_fourteendays condition.
+    lowremoval_thirtydays:
+      randomizations: banneduser_experiment_low30_messaging_randomizations-AITA-12.16.2024.csv
+      next_randomization: 0
+      arms:
+        arm_0:
+          pm_subject: PM Subject Line for {username} (Thirtydays Arm 0)
+          pm_text: Hello {username}, this is the message for arm 0 of the lowremoval_thirtydays condition.
+        arm_1:
+          pm_subject: PM Subject Line for {username} (Thirtydays Arm 1)
+          pm_text: Hello {username}, this is the message for arm 1 of the lowremoval_thirtydays condition.
+    highremoval_threedays:
+      randomizations: banneduser_experiment_high3_messaging_randomizations-AITA-12.16.2024.csv
+      next_randomization: 0
+      arms:
+        arm_0:
+          pm_subject: PM Subject Line for {username} (Threedays Arm 0)
+          pm_text: Hello {username}, this is the message for arm 0 of the highremoval_threedays condition.
+        arm_1:
+          pm_subject: PM Subject Line for {username} (Threedays Arm 1)
+          pm_text: Hello {username}, this is the message for arm 1 of the highremoval_threedays condition.
+    highremoval_sevendays:
+      randomizations: banneduser_experiment_high7_messaging_randomizations-AITA-12.16.2024.csv
+      next_randomization: 0
+      arms:
+        arm_0:
+          pm_subject: PM Subject Line for {username} (Sevendays Arm 0)
+          pm_text: Hello {username}, this is the message for arm 0 of the highremoval_sevendays condition.
+        arm_1:
+          pm_subject: PM Subject Line for {username} (Sevendays Arm 1)
+          pm_text: Hello {username}, this is the message for arm 1 of the highremoval_sevendays condition.
+    highremoval_fourteendays:
+      randomizations: banneduser_experiment_high14_messaging_randomizations-AITA-12.16.2024.csv
+      next_randomization: 0
+      arms:
+        arm_0:
+          pm_subject: PM Subject Line for {username} (Fourteendays Arm 0)
+          pm_text: Hello {username}, this is the message for arm 0 of the highremoval_fourteendays condition.
+        arm_1:
+          pm_subject: PM Subject Line for {username} (Fourteendays Arm 1)
+          pm_text: Hello {username}, this is the message for arm 1 of the highremoval_fourteendays condition.
+    highremoval_thirtydays:
+      randomizations: banneduser_experiment_high30_messaging_randomizations-AITA-12.16.2024.csv
+      next_randomization: 0
+      arms:
+        arm_0:
+          pm_subject: PM Subject Line for {username} (Thirtydays Arm 0)
+          pm_text: Hello {username}, this is the message for arm 0 of the highremoval_thirtydays condition.
+        arm_1:
+          pm_subject: PM Subject Line for {username} (Thirtydays Arm 1)
+          pm_text: Hello {username}, this is the message for arm 1 of the highremoval_thirtydays condition.
   controller: BanneduserExperimentController
   start_time: 07/02/2000 00:00:00 UTC
   end_time: 07/02/3000 23:59:59 UTC
