@@ -25,7 +25,7 @@ def main():
                         default = 120, # default 2 minutes
                         help="Interval between tasks in seconds (default 2 minutes)")
     parser.add_argument("-e", '--env',
-                        choices=['development', 'test', 'production'],
+                        choices=['development', 'test', 'production', 'serialized'],
                         required = False,
                         help="Run within a specific environment. Otherwise run under the environment defined in the environment variable CS_ENV")
     parser.add_argument("-p", "--profile",
@@ -36,11 +36,13 @@ def main():
     args = parser.parse_args()
 
     # if the user specified the environment, set it here
-    if args.env!=None:
+    if args.env!=None and args.env != 'serialized':
         os.environ['CS_ENV'] = args.env
     
-    queue_name = os.environ['CS_ENV']
-    scheduler = Scheduler(queue_name = os.environ['CS_ENV'], connection=Redis())
+    # "serialized" will put the job on a queue that will only have one dedicated worker
+    # and assumes CS_ENV was set before running this script
+    queue_name = os.environ['CS_ENV'] if args.env != 'serialized' else 'serialized'
+    scheduler = Scheduler(queue_name = queue_name, connection=Redis())
 
 
     timeout_seconds = 172800 ## two days in seconds

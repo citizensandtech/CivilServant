@@ -66,6 +66,7 @@ def import_experiment_controller_class(class_name, module_path):
 
 
 def get_experiment_controller_class(experiment_name):
+    """Get an experiment controller class from the appropriate module."""
     try:
         experiment_config = load_experiment_config(experiment_name)
         controller_name = experiment_config[ENV]['controller']

@@ -13,8 +13,8 @@ from utils.common import ThingType
 from collections import defaultdict, Counter
 
 ENV = os.environ["CS_ENV"]
-SURVEY_LOG_PATH = Path(__file__) / ".." / ".." / ".." / "logs" / ("surveyed_users_%s.log" % ENV)
-SURVEY_LOG_PATH = str(SURVEY_LOG_PATH.resolve())
+MESSAGE_LOG_PATH = Path(__file__) / ".." / ".." / ".." / "logs" / ("{prefix}ed_users_%s.log" % ENV)
+MESSAGE_LOG_PATH = str(MESSAGE_LOG_PATH.resolve())
 
 class MessageError(Exception):
     def __init__(self, message, errors = []):
@@ -123,19 +123,42 @@ class MessagingController:
         pass
 
 class SurveyController:
-    def __init__(self, db_session, r, log, experiment_controller):
+    def __init__(self, db_session, r, log, experiment_controller,
+                 action="SendSurvey", prefix="survey", batch_size=None):
         self.db_session = db_session
         self.log = log
         self.r = r
         self.experiment_controller = experiment_controller
+        self.action = action
+        self.prefix = prefix
+        self.batch_size = batch_size
+        self.message_log_path = MESSAGE_LOG_PATH.format(prefix=prefix)
         
+        # TODO remove this
+        #import yaml
+        ##y = yaml.load(open("/usr/local/civilservant/platform/config/experiments/newcomer_messaging_experiment-feminism-01.2020.yml"))
+        #y = yaml.load(open("/usr/local/civilservant/platform/config/experiments/newcomer_messaging_experiment-feminism-07.2018.yml"))
+        #y = y["production"]
+        #exp = experiment_controller.experiment
+        #settings_json = json.loads(exp.settings_json)
+        #settings_json["debrief_fixed_link_users_path"] = y["debrief_fixed_link_users_path"]
+        #settings_json["debrief_fixed_link_url"] = y["debrief_fixed_link_url"]
+        #settings_json["debrief_fixed_link_message_subject"] = y["debrief_fixed_link_message_subject"]
+        #settings_json["debrief_fixed_link_message_text"] = y["debrief_fixed_link_message_text"]
+        #exp.settings_json = json.dumps(settings_json)
+        #db_session.commit()
+        #print("COMMITED")
+        #import sys; sys.exit()
+
+        # TODO Refactor survey_* prefixes etc since this now handles
+        # debriefing (and other message types) as well
         settings = experiment_controller.experiment_settings
-        self.survey_subject = settings["survey_message_subject"]
-        self.survey_text = settings["survey_message_text"]
-        self.survey_url = settings["survey_url"]
+        self.survey_subject = settings["%s_message_subject" % prefix]
+        self.survey_text = settings["%s_message_text" % prefix]
+        self.survey_url = settings["%s_url" % prefix]
         self.survey_task_id = "SurveyController(name)".format(
             name=experiment_controller.experiment_name)
-        
+
         self.messaging_controller = MessagingController(
             db_session = db_session,
             r = r,
@@ -149,7 +172,7 @@ class SurveyController:
         metadata[key] = value
         exp_object.metadata_json = json.dumps(metadata)
 
-    def append_surveyed_user_log(self, username, response):
+    def append_messaged_user_log(self, username, response):
         invalid_username = False
         sent_status = True
         url = self.survey_url.format(username=username)
@@ -166,7 +189,7 @@ class SurveyController:
                  sent_status
         ]
         entry = ",".join([str(col) for col in entry]) + "\n"
-        with open(SURVEY_LOG_PATH, "a+") as f:
+        with open(self.message_log_path, "a+") as f:
             f.write(entry)
                     
     def get_unique_recipient_message_dicts(self, user_things):
@@ -186,15 +209,25 @@ class SurveyController:
             }
         return list(unique_recipients.values())
 
-    def send_surveys(self):
+    def send(self):
         experiment_id = self.experiment_controller.experiment.id
         experiment_name = self.experiment_controller.experiment.name
-        
+
         try:
+            status_key = "%s_status" % self.prefix
+            get_messageable_user_things = getattr(self.experiment_controller,
+                "get_%sable_user_things" % self.prefix)
             with self.db_session.cooplock(self.survey_task_id, experiment_id):
-                user_things = self.experiment_controller.get_surveyable_user_things()
-                self.log.info("Experiment {0}: identified {1} surveyable users.".format(
-                    experiment_name, len(user_things)))
+                user_things = get_messageable_user_things()
+                self.log.info("Experiment {0}: identified {1} {2}able users.".format(
+                    experiment_name, len(user_things), self.prefix))
+                if not self.batch_size:
+                    self.log.info("Experiment {0}: no batch size specified, messaging all {1} {2}able users.".format(
+                        experiment_name, len(user_things), self.prefix))
+                else:
+                    self.log.info("Experiment {0}: using a batch size of {1} {2}able users.".format(
+                        experiment_name, self.batch_size, self.prefix))
+                    user_things = user_things[:self.batch_size]
                 self.log.info("Experiment {0}: messaging users: {1}".format(
                     experiment_name, [user_thing.thing_id for user_thing in user_things]))
                 message_dicts = self.get_unique_recipient_message_dicts(user_things)
@@ -204,28 +237,28 @@ class SurveyController:
                 for user_thing in user_things:
                     if user_thing.thing_id in responses.keys():
                         response = responses[user_thing.thing_id]
-                        self.append_surveyed_user_log(user_thing.thing_id, response)
+                        self.append_messaged_user_log(user_thing.thing_id, response)
                         if len(response.get("errors", {})) > 0:
-                            self.log.info("Experiment {0}: failed to survey user {1}: {2}".format(
-                                experiment_name, user_thing.thing_id, str(response)))
-                            self._update_metadata(user_thing, "survey_status", "failed")
+                            self.log.info("Experiment {0}: failed to {1} user {2}: {3}".format(
+                                experiment_name, self.prefix, user_thing.thing_id, str(response)))
+                            self._update_metadata(user_thing, status_key, "failed")
                             updates.append(user_thing)
                         else:
-                            self.log.info("Experiment {0}: successfully surveyed user {1}: {2}".format(
-                                experiment_name, user_thing.thing_id, str(response)))
-                            survey_action = ExperimentAction(
+                            self.log.info("Experiment {0}: successfully {1}ed user {2}: {3}".format(
+                                experiment_name, self.prefix, user_thing.thing_id, str(response)))
+                            message_action = ExperimentAction(
                                 experiment_id = experiment_id,
-                                action = "SendSurvey",
+                                action = self.action,
                                 action_object_type = ThingType.USER.value,
                                 action_object_id = user_thing.thing_id
                             )
-                            self._update_metadata(survey_action, "survey_status", "sent")
-                            self._update_metadata(user_thing, "survey_status", "sent")
-                            updates.append(survey_action)
+                            self._update_metadata(message_action, status_key, "sent")
+                            self._update_metadata(user_thing, status_key, "sent")
+                            updates.append(message_action)
                             updates.append(user_thing)
                 if updates:
                     self.db_session.add_retryable(updates)
         except Exception as e:
-            self.log.exception("Experiment {0}: error occurred while sending surveys: ".format(
-                experiment_name))
+            self.log.exception("Experiment {0}: error occurred while sending {1}s: ".format(
+                experiment_name, self.prefix))
 
