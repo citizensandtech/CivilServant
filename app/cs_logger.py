@@ -9,6 +9,7 @@ def get_logger(ENV, BASE_DIR):
   is_email_script = pathlib.Path(sys.argv[0]).name == "email_db_report.py"
   if ENV == "production" and not is_email_script:
     log = airbrake.getLogger()
+    #log = logging.getLogger(__name__)
     log.setLevel(logging.INFO)
   else:
     log = logging.getLogger(__name__)

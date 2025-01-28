@@ -77,6 +77,12 @@ def retryable(fn=None, retry=RETRY, backoff=BACKOFF, retry_wait=RETRY_WAIT,
                 return result
             except Exception as e:
                 _retry._retryable_last_exception = e
+
+                import sys
+                _log.error("Manual stack frame trace 1: " + str(sys._getframe(1).f_code.co_name))
+                _log.error("Manual stack frame trace 2: " + str(sys._getframe(2).f_code.co_name))
+                _log.error("Manual stack frame trace 3: " + str(sys._getframe(3).f_code.co_name))
+
                 _log.exception("Exception encountered in a retryable function")
                 if session and rollback:
                     msg = "Calling rollback on retryable session %s."

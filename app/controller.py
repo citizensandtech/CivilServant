@@ -163,10 +163,10 @@ def update_newcomer_messaging_experiment(experiment_name):
     mec.update_experiment()
 
 @profilable
-def send_surveys(experiment_name):
+def send_surveys(experiment_name, action="SendSurvey", prefix="survey", batch_size=None):
     r = conn.connect(controller=experiment_name)
-    #c = get_experiment_class(experiment_name)
-    e = app.controllers.messaging_experiment_controller.NewcomerMessagingExperimentController(
+    #e = app.controllers.messaging_experiment_controller.NewcomerMessagingExperimentController(
+    e = app.controllers.sticky_comment_experiment_controller.StickyCommentMessagingExperimentController(
         experiment_name = experiment_name,
         db_session = db_session,
         r = r,
@@ -176,8 +176,11 @@ def send_surveys(experiment_name):
         db_session = db_session,
         r = r,
         log = log,
-        experiment_controller = e)
-    survey_controller.send_surveys()
+        experiment_controller = e,
+        action = action,
+        prefix = prefix,
+        batch_size = batch_size)
+    survey_controller.send()
 
 if __name__ == "__main__":
     fnc = sys.argv[1]

@@ -12,7 +12,7 @@ from utils.common import *
 from app.models import Base, SubredditPage, Subreddit, Post, ModAction, PrawKey, Comment, User
 from app.models import Experiment, ExperimentThing, ExperimentAction, ExperimentThingSnapshot
 from app.models import EventHook
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, not_
 from app.controllers.subreddit_controller import SubredditPageController
 import numpy as np
 
@@ -913,7 +913,7 @@ class StickyCommentMessagingExperimentController(StickyCommentExperimentControll
             guestbook_url = 'https://reddit.com/r/{subreddit}/comments/{post_id}/_/{comment_id}'.format(
                 subreddit = self.experiment_settings['subreddit'],
                 post_id = post_id,
-                comment_id = self.sticky_comment_things[post_id]
+                comment_id = self.sticky_comment_things[post_id].id
             )
             message = self.experiment_settings[arm_config['pm_text_key']].format(
                 username = user_thing.thing_id,
@@ -1038,6 +1038,53 @@ class StickyCommentMessagingExperimentController(StickyCommentExperimentControll
             return 'full_guestbook'
         elif treatment == 2:
             return 'within_guestbook'
+
+    def get_surveyable_user_things(self):
+        followup = self.experiment_settings["survey_followup_in_days"]
+        cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=followup)
+
+        post_things = self.db_session.query(ExperimentThing).filter(
+            ExperimentThing.experiment_id == self.experiment.id,
+            ExperimentThing.created_at < cutoff,
+            ExperimentThing.object_type == ThingType.SUBMISSION.value,
+            not_(ExperimentThing.metadata_json.contains("\"survey_status\": \"sent\""))
+        ).all()
+        #TODO: Determine why adding this constraint fails:
+        #      ExperimentThing.query_index != "Intervention Impossible"
+        
+        post_ids = [thing.id for thing in post_things]
+        posts = self.db_session.query(Post).filter(Post.id.in_(post_ids)).all()
+        posts_dict = {post.id:post for post in posts}
+
+        # TODO Remove this temp helper function after the issue with retryable
+        # rollbacks not always being able to retry updates (only inserts)
+        # has been resolved
+        def _remove_post_things_with_survey_actions(post_things, posts_dict):
+            post_authors = set()
+            for post_thing in post_things:
+                post = posts_dict[post_thing.id]
+                post_authors.add(json.loads(post.post_data)["author"])
+            
+            survey_actions = self.db_session.query(ExperimentAction).filter(
+                ExperimentAction.experiment_id == self.experiment.id,
+                ExperimentAction.action == "SendSurvey",
+                ExperimentAction.action_object_id.in_(post_authors)
+            ).all()
+            surveyed_post_authors = set(action.action_object_id
+                for action in survey_actions)
+            
+            for post_thing in post_things.copy():
+                post = posts_dict[post_thing.id]
+                author = json.loads(post.post_data)["author"]
+                if author in surveyed_post_authors:
+                    post_things.remove(post_thing)
+            return post_things
+
+        post_things = _remove_post_things_with_survey_actions(post_things, posts_dict)
+        for post_thing in post_things:
+            post = posts_dict[post_thing.id]
+            post_thing.thing_id = json.loads(post.post_data)["author"]
+        return post_things
 
     def identify_ama_post(self, submission):
         # This is accurate for r/iama as of 2020-05
