@@ -274,6 +274,44 @@ class NewcomerMessagingExperimentController(MessagingExperimentController):
             ExperimentThing.query_index == "Intervention TBD"
             )).order_by(ExperimentThing.created_at).all()
 
+    def get_debrief_fixed_linkable_user_things(self):
+        return self.get_debriefable_user_things()
+
+    def get_debriefable_user_things(self):
+        debrief_users_path = self.experiment_settings["debrief_fixed_link_users_path"]
+        with open(debrief_users_path) as f:
+            debriefable_users = list(row[0] for row in csv.reader(f))
+
+        debrief_actions = self.db_session.query(ExperimentAction).filter(
+            ExperimentAction.experiment_id == self.experiment.id,
+            ExperimentAction.action == "SendDebriefFixedLink",
+            ExperimentAction.action_object_id.in_(debriefable_users)
+        ).all()
+        debriefed_users = set(action.action_object_id
+            for action in debrief_actions)
+
+        debriefable_users = [user for user in debriefable_users
+            if user not in debriefed_users]
+
+        user_things = self.db_session.query(ExperimentThing).filter(
+            ExperimentThing.experiment_id == self.experiment.id,
+            ExperimentThing.object_type == ThingType.USER.value,
+            ExperimentThing.thing_id.in_(debriefable_users),
+            not_(ExperimentThing.metadata_json.contains("\"debrief_fixed_link_status\": \"sent\"")),
+            not_(ExperimentThing.metadata_json.contains("\"debrief_fixed_link_status\": \"failed\""))
+        ).order_by(ExperimentThing.created_at).all()
+        #TODO: Determine why adding this constraint fails:
+        #      ExperimentThing.query_index != "Intervention Impossible"
+
+        #print("DEBRIEF_ACTIONS: " + str(len(debrief_actions)))
+        #print("DEBRIEFED_USERS: " + str(len(debriefed_users)))
+        #print("DEBRIEFABLE_USERS (filtered): " + str(len(debriefable_users)))
+        #print("USER_THINGS: " + str(len(user_things)))
+        #print("so far so good")
+        #import sys; sys.exit()
+        
+        return user_things
+
     def get_surveyable_user_things(self):
         followup = self.experiment_settings["survey_followup_in_days"]
         cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=followup)
