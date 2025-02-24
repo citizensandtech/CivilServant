@@ -74,7 +74,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             return
 
         self.db_session.execute(
-            "LOCK TABLES comments WRITE, experiments WRITE, experiment_things WRITE, experiment_thing_snapshots WRITE, mod_actions WRITE"
+            "LOCK TABLES comments READ, experiments WRITE, experiment_things WRITE, experiment_thing_snapshots WRITE, mod_actions READ"
         )
         try:
             with self._new_modactions() as modactions:
@@ -218,7 +218,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                 experiment_id=user.experiment_id,
                 metadata_json=user.metadata_json,
             )
-            self.db_session.add(snapshot)
+            self.db_session.add_retryable(snapshot)
 
             # Update the user based on the mod action taken.
             if self._is_tempban(modaction):
@@ -239,7 +239,7 @@ class BanneduserExperimentController(ModactionExperimentController):
 
             user.metadata_json = json.dumps(user_metadata)
 
-            self.db_session.add(user)
+            self.db_session.add_retryable(user)
 
         self.db_session.commit()
 
@@ -574,7 +574,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                 )
                 experiment_thing.query_index = BannedUserQueryIndex.COMPLETE
                 experiment_thing.metadata_json = json.dumps(metadata)
-                self.db_session.add(ea)
+                self.db_session.add_retryable(ea)
             else:
                 message["account"] = experiment_thing.thing_id
                 messages_to_send.append(message)
@@ -634,7 +634,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                         action_object_id=experiment_thing.id,
                         metadata_json=metadata_json,
                     )
-                    self.db_session.add(ea)
+                    self.db_session.add_retryable(ea, commit=False)
                     experiment_thing.metadata_json = metadata_json
         # NOTE: experiment_things also become updated in database with this commit method,
         # as they are sqlalchemy objects
