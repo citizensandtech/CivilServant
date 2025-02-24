@@ -57,6 +57,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         self, experiment_name, db_session, r, log, required_keys=["event_hooks"]
     ):
         super().__init__(experiment_name, db_session, r, log, required_keys)
+        self.log_prefix = '{0} Experiment {1}:'.format(self.__class__.__name__, experiment_name)
 
     def enroll_new_participants(
         self, instance, now_utc=int(datetime.utcnow().timestamp())
@@ -68,8 +69,9 @@ class BanneduserExperimentController(ModactionExperimentController):
         The `now_utc` timestamp may be set as a parameter for testing or replay purposes.
         """
         if instance.fetched_subreddit_id != self.experiment_settings["subreddit_id"]:
-            self.log.error(
-                f"subreddit mismatch. fetched: {instance.fetched_subreddit_id}, experiment: {self.experiment_settings['subreddit_id']}"
+            # Callback enroll_new_participants called due to modactions fetched from subreddit
+            self.log.info(
+                f"{self.log_prefix} Callback enroll_new_participants called but not needed for subreddit {instance.fetched_subreddit_id}"
             )
             return
 
@@ -79,25 +81,26 @@ class BanneduserExperimentController(ModactionExperimentController):
         try:
             with self._new_modactions() as modactions:
                 self.log.info(
-                    f"Experiment {self.experiment.name}: scanning {len(modactions)} modactions in subreddit {self.experiment_settings['subreddit_id']} to look for temporary bans"
+                    f"{self.log_prefix} Scanning {len(modactions)} modactions in subreddit {self.experiment_settings['subreddit_id']} to look for temporary bans"
                 )
 
                 eligible_newcomers = self._find_eligible_newcomers(modactions)
                 self.log.info(
-                    f"Identified {len(eligible_newcomers)} eligible newcomers"
+                    f"{self.log_prefix} Identified {len(eligible_newcomers)} eligible newcomers"
                 )
 
-                self.log.info("Assigning randomized conditions to eligible newcomers")
+                self.log.info(f"{self.log_prefix} Assigning randomized conditions to eligible newcomers")
                 self._assign_randomized_conditions(now_utc, eligible_newcomers)
 
-                self.log.info("Updating the ban state of existing participants")
+                self.log.info(f"{self.log_prefix} Updating the ban state of existing participants")
                 self._update_existing_participants(now_utc, modactions)
 
                 self.log.info(
-                    f"Successfully Ran Event Hook to BanneduserExperimentController::enroll_new_participants. Caller: {instance}"
+                    f"{self.log_prefix} Successfully Ran Event Hook to BanneduserExperimentController::enroll_new_participants. Caller: {instance}"
                 )
         except Exception as e:
             self.log.error(
+                self.log_prefix,
                 "Error in BanneduserExperimentController::enroll_new_participants",
                 e,
             )
@@ -111,7 +114,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         """
         accounts_needing_messages = self._get_accounts_needing_interventions()
         self.log.info(
-            f"Experiment {self.experiment.name}: identified {len(accounts_needing_messages)} accounts needing interventions. Sending messages now..."
+            f"{self.log_prefix} Experiment {self.experiment.name}: identified {len(accounts_needing_messages)} accounts needing interventions. Sending messages now..."
         )
 
         self.db_session.execute(
@@ -121,6 +124,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             self._send_intervention_messages(accounts_needing_messages)
         except Exception as e:
             self.log.error(
+                self.log_prefix,
                 "Error in BannedUserExperimentController::update_experiment",
                 extra=sys.exc_info()[0],
             )
@@ -382,7 +386,7 @@ class BanneduserExperimentController(ModactionExperimentController):
 
         if newcomers_without_randomization > 0:
             self.log.error(
-                f"BanneduserExperimentController Experiment {self.experiment_name} has run out of randomizations from '{condition}' to assign."
+                f"{self.log_prefix} BanneduserExperimentController Experiment {self.experiment_name} has run out of randomizations from '{condition}' to assign."
             )
 
         if len(newcomer_ets) > 0:
@@ -390,7 +394,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             self.experiment.settings_json = json.dumps(self.experiment_settings)
 
         self.log.info(
-            f"Assigned randomizations to {len(newcomer_ets)} banned users: [{','.join([x['thing_id'] for x in newcomer_ets])}]"
+            f"{self.log_prefix} Assigned randomizations to {len(newcomer_ets)} banned users: [{','.join([x['thing_id'] for x in newcomer_ets])}]"
         )
 
     def _is_tempban(self, modaction):
@@ -579,6 +583,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                 message["account"] = experiment_thing.thing_id
                 messages_to_send.append(message)
 
+        self.log.info(f"{self.log_prefix} Sending messages to {len(messages_to_send)} users: [{','.join([x['account'] for x in messages_to_send])}]")
         # send messages_to_send
         message_results = mc.send_messages(
             messages_to_send,
