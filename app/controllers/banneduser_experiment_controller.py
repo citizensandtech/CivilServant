@@ -57,7 +57,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         self, experiment_name, db_session, r, log, required_keys=["event_hooks"]
     ):
         super().__init__(experiment_name, db_session, r, log, required_keys)
-        self.log_prefix = '{0} Experiment {1}:'.format(self.__class__.__name__, experiment_name)
+        self.log_prefix = f'{self.__class__.__name__} Experiment {experiment_name}:'
 
     def enroll_new_participants(
         self, instance, now_utc=int(datetime.utcnow().timestamp())
