@@ -101,13 +101,15 @@ def get_experiment_class(experiment_name):
     return c
 
 
-# for sticky comment experiments that are NOT using event_handler+callbacks
+# for banned user experiments that are NOT using event_handler+callbacks
+# NOTE: The following was used to send interventions for the banneduser experiment.
+#       The update_experiment method is now called as part of the callback from archiving mod actions.
 @profilable
 def conduct_banuser_experiment(experiment_name):
     bue = initialize_banuser_experiment(experiment_name)
     bue.update_experiment()
 
-# not to be run as a job, just to store and get a sce object
+# not to be run as a job, just to store and get a bue object
 @profilable
 def initialize_banuser_experiment(experiment_name):
     c = get_experiment_class(experiment_name) 

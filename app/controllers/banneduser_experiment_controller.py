@@ -57,16 +57,22 @@ class BanneduserExperimentController(ModactionExperimentController):
         self, experiment_name, db_session, r, log, required_keys=["event_hooks"]
     ):
         super().__init__(experiment_name, db_session, r, log, required_keys)
-        self.log_prefix = f'{self.__class__.__name__} Experiment {experiment_name}:'
+        self.log_prefix = f"{self.__class__.__name__} Experiment {experiment_name}:"
 
     def enroll_new_participants(
-        self, instance, now_utc=int(datetime.utcnow().timestamp())
+        self,
+        instance,
+        now_utc=int(datetime.utcnow().timestamp()),
     ):
         """Enroll new participants in the experiment.
 
         This is a callback that will be invoked declaratively.
         It is called by ModeratorController while running archive_mod_action_page, as noted in the experiment config YAML File.
         The `now_utc` timestamp may be set as a parameter for testing or replay purposes.
+
+        Args:
+            instance (Controller): the controller instance (standard for civilservant)
+            now_utc (int): the current UNIX timestamp in seconds
         """
         if instance.fetched_subreddit_id != self.experiment_settings["subreddit_id"]:
             # Callback enroll_new_participants called due to modactions fetched from subreddit
@@ -89,10 +95,14 @@ class BanneduserExperimentController(ModactionExperimentController):
                     f"{self.log_prefix} Identified {len(eligible_newcomers)} eligible newcomers"
                 )
 
-                self.log.info(f"{self.log_prefix} Assigning randomized conditions to eligible newcomers")
+                self.log.info(
+                    f"{self.log_prefix} Assigning randomized conditions to eligible newcomers"
+                )
                 self._assign_randomized_conditions(now_utc, eligible_newcomers)
 
-                self.log.info(f"{self.log_prefix} Updating the ban state of existing participants")
+                self.log.info(
+                    f"{self.log_prefix} Updating the ban state of existing participants"
+                )
                 self._update_existing_participants(now_utc, modactions)
 
                 self.log.info(
@@ -106,6 +116,9 @@ class BanneduserExperimentController(ModactionExperimentController):
             )
         finally:
             self.db_session.execute("UNLOCK TABLES")
+
+        # To minimize latency, trigger interventions immediately after enrolling new participants.
+        self.update_experiment()
 
     def update_experiment(self):
         """Update loop for the banned user experiment.
@@ -588,7 +601,9 @@ class BanneduserExperimentController(ModactionExperimentController):
                 message["account"] = experiment_thing.thing_id
                 messages_to_send.append(message)
 
-        self.log.info(f"{self.log_prefix} Sending messages to {len(messages_to_send)} users: [{','.join([x['account'] for x in messages_to_send])}]")
+        self.log.info(
+            f"{self.log_prefix} Sending messages to {len(messages_to_send)} users: [{','.join([x['account'] for x in messages_to_send])}]"
+        )
         # send messages_to_send
         message_results = mc.send_messages(
             messages_to_send,
