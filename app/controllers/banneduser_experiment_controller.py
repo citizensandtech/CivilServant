@@ -158,6 +158,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                 )  # this is a proxy for 'is user already banned', as already banned users will receive ban edits as tempbans as well
                 or not self._is_valid_tempban_duration(modaction)
                 or self._is_bot(modaction)
+                or self._is_deleted(modaction)
             ):
                 continue
 
@@ -428,6 +429,10 @@ class BanneduserExperimentController(ModactionExperimentController):
         This is currently a rudimentary approach. Account age is typically a better indicator.
         """
         return re.match(r".+bot$", modaction.target_author, re.IGNORECASE) != None
+
+    def _is_deleted(self, modaction):
+        """Return true if the target of a mod action is deleted."""
+        return modaction.target_author == '[deleted]'
 
     def _parse_temp_ban(self, modaction):
         """Get details about the ban.
