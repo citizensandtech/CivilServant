@@ -76,7 +76,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             return
 
         self.db_session.execute(
-            "LOCK TABLES experiments WRITE, experiment_things WRITE, experiment_thing_snapshots WRITE"
+            "LOCK TABLES comments READ, experiments WRITE, experiment_things WRITE, experiment_thing_snapshots WRITE, mod_actions READ"
         )
         try:
             with self._new_modactions() as modactions:
