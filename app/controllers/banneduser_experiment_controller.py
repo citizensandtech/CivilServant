@@ -81,9 +81,6 @@ class BanneduserExperimentController(ModactionExperimentController):
             )
             return
 
-        self.db_session.execute(
-            "LOCK TABLES comments READ, experiments WRITE, experiment_things WRITE, experiment_thing_snapshots WRITE, mod_actions READ"
-        )
         try:
             with self._new_modactions() as modactions:
                 self.log.info(
@@ -108,17 +105,16 @@ class BanneduserExperimentController(ModactionExperimentController):
                 self.log.info(
                     f"{self.log_prefix} Successfully Ran Event Hook to BanneduserExperimentController::enroll_new_participants. Caller: {instance}"
                 )
+
+                # To minimize latency, trigger interventions immediately after enrolling new participants.
+                self.update_experiment()
         except Exception as e:
             self.log.error(
                 self.log_prefix,
                 "Error in BanneduserExperimentController::enroll_new_participants",
                 e,
             )
-        finally:
-            self.db_session.execute("UNLOCK TABLES")
 
-        # To minimize latency, trigger interventions immediately after enrolling new participants.
-        self.update_experiment()
 
     def update_experiment(self):
         """Update loop for the banned user experiment.
@@ -130,9 +126,6 @@ class BanneduserExperimentController(ModactionExperimentController):
             f"{self.log_prefix} Experiment {self.experiment.name}: identified {len(accounts_needing_messages)} accounts needing interventions. Sending messages now..."
         )
 
-        self.db_session.execute(
-            "LOCK TABLES experiment_actions WRITE, experiment_things WRITE, message_logs WRITE"
-        )
         try:
             self._send_intervention_messages(accounts_needing_messages)
         except Exception as e:
@@ -142,8 +135,6 @@ class BanneduserExperimentController(ModactionExperimentController):
                 extra=sys.exc_info()[0],
             )
             return []
-        finally:
-            self.db_session.execute("UNLOCK TABLES")
 
     def _find_eligible_newcomers(self, modactions):
         """Filter a list of mod actions to find newcomers to the experiment.
