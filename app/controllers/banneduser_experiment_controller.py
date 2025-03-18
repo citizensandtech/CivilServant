@@ -149,23 +149,31 @@ class BanneduserExperimentController(ModactionExperimentController):
         previously_enrolled_user_ids = set(self._previously_enrolled_user_ids())
         eligible_newcomers = {}
         for modaction in modactions:
-            # Skip irrelevant mod actions.
+
             if (
-                self._is_enrolled(modaction, previously_enrolled_user_ids)
-                or not self._is_tempban(modaction)
-                or self._is_tempban_edit(
+                not self._is_enrolled(modaction, previously_enrolled_user_ids)
+                and self._is_tempban(modaction)
+                and not self._is_tempban_edit(
                     modaction
                 )  # this is a proxy for 'is user already banned', as already banned users will receive ban edits as tempbans as well
-                or not self._is_valid_tempban_duration(modaction)
-                or self._is_bot(modaction)
-                or self._is_deleted(modaction)
+                and self._is_valid_tempban_duration(modaction)
+                and not self._is_bot(modaction)
+                and not self._is_deleted(modaction)
             ):
-                continue
+                eligible_newcomers[modaction.target_author] = modaction
+
+            # if an unbanuser happens immediately after a banuser is logged and before user is enrolled...
+            if (
+                not self._is_enrolled(modaction, previously_enrolled_user_ids)
+                and self._is_unban(modaction)
+            ):
+                #  ... treat this as an accidental ban/unban by a mod, and don't enroll this ban/user in experiment
+                if(modaction.target_author in eligible_newcomers):
+                    del(eligible_newcomers[modaction.target_author])
 
             # NOTE: If there are multiple mod actions for the same user who isn't yet enrolled,
             # we overwrite the previous action with the latest one.
             # This assumes that they are processed in order.
-            eligible_newcomers[modaction.target_author] = modaction
 
         return list(eligible_newcomers.values())
 
@@ -405,6 +413,13 @@ class BanneduserExperimentController(ModactionExperimentController):
         For temporary bans, we expect the number of days, e.g. "7 days".
         """
         return modaction.action == "banuser" and "days" in modaction.details
+
+    def _is_unban(self, modaction):
+        """Return true if an admin action is an unban.
+
+        Unbanuser messages are sent BOTH upon automatic ban expire as well as manual ban end.
+        """
+        return modaction.action == "unbanuser"
 
     def _is_tempban_edit(self, modaction):
         """Return true if an admin action is a temporary ban edit.
