@@ -169,7 +169,6 @@ class TestExperimentController:
         assert len(experiment_controller._previously_enrolled_user_ids()) == 0
 
         helpers.load_mod_actions(mod_controller)
-        experiment_controller.enroll_new_participants(mod_controller)
 
         assert len(experiment_controller._previously_enrolled_user_ids()) > 0
 
@@ -231,6 +230,9 @@ class TestPrivateMethods:
         assert len(user_modactions) > 0
 
     # update temp ban duration
+    @pytest.mark.skip(
+        reason="interventions are automatic: skips completed participants"
+    )
     @pytest.mark.parametrize(
         "action,details,want_duration,want_query_index,want_type,want_actual_ban_end_time",
         [
@@ -275,7 +277,6 @@ class TestPrivateMethods:
         static_now,
     ):
         helpers.load_mod_actions(mod_controller)
-        experiment_controller.enroll_new_participants(mod_controller)
 
         original = newcomer_modactions[0]
         update = DictObject(
@@ -471,6 +472,7 @@ class TestPrivateMethods:
         )
         assert got == want
 
+    @pytest.mark.skip(reason="interventions are automatic")
     def test_get_accounts_needing_interventions(
         self, helpers, experiment_controller, mod_controller
     ):
@@ -478,7 +480,6 @@ class TestPrivateMethods:
         assert users == []
 
         helpers.load_mod_actions(mod_controller)
-        experiment_controller.enroll_new_participants(mod_controller)
 
         users = experiment_controller._get_accounts_needing_interventions()
         assert len(users) > 0

@@ -57,16 +57,22 @@ class BanneduserExperimentController(ModactionExperimentController):
         self, experiment_name, db_session, r, log, required_keys=["event_hooks"]
     ):
         super().__init__(experiment_name, db_session, r, log, required_keys)
-        self.log_prefix = f'{self.__class__.__name__} Experiment {experiment_name}:'
+        self.log_prefix = f"{self.__class__.__name__} Experiment {experiment_name}:"
 
     def enroll_new_participants(
-        self, instance, now_utc=int(datetime.utcnow().timestamp())
+        self,
+        instance,
+        now_utc=int(datetime.utcnow().timestamp()),
     ):
         """Enroll new participants in the experiment.
 
         This is a callback that will be invoked declaratively.
         It is called by ModeratorController while running archive_mod_action_page, as noted in the experiment config YAML File.
         The `now_utc` timestamp may be set as a parameter for testing or replay purposes.
+
+        Args:
+            instance (Controller): the controller instance (standard for civilservant)
+            now_utc (int): the current UNIX timestamp in seconds
         """
         if instance.fetched_subreddit_id != self.experiment_settings["subreddit_id"]:
             # Callback enroll_new_participants called due to modactions fetched from subreddit
@@ -75,37 +81,42 @@ class BanneduserExperimentController(ModactionExperimentController):
             )
             return
 
-        self.db_session.execute(
-            "LOCK TABLES comments READ, experiments WRITE, experiment_things WRITE, experiment_thing_snapshots WRITE, mod_actions READ"
-        )
         try:
-            with self._new_modactions() as modactions:
-                self.log.info(
-                    f"{self.log_prefix} Scanning {len(modactions)} modactions in subreddit {self.experiment_settings['subreddit_id']} to look for temporary bans"
-                )
+            lock_id = f"{self.__class__.__name__}({self.experiment_name})::enroll_new_participants"
+            with self.db_session.cooplock(lock_id, self.experiment.id):
+                with self._new_modactions() as modactions:
+                    self.log.info(
+                        f"{self.log_prefix} Scanning {len(modactions)} modactions in subreddit {self.experiment_settings['subreddit_id']} to look for temporary bans"
+                    )
 
-                eligible_newcomers = self._find_eligible_newcomers(modactions)
-                self.log.info(
-                    f"{self.log_prefix} Identified {len(eligible_newcomers)} eligible newcomers"
-                )
+                    eligible_newcomers = self._find_eligible_newcomers(modactions)
+                    self.log.info(
+                        f"{self.log_prefix} Identified {len(eligible_newcomers)} eligible newcomers"
+                    )
 
-                self.log.info(f"{self.log_prefix} Assigning randomized conditions to eligible newcomers")
-                self._assign_randomized_conditions(now_utc, eligible_newcomers)
+                    self.log.info(
+                        f"{self.log_prefix} Assigning randomized conditions to eligible newcomers"
+                    )
+                    self._assign_randomized_conditions(now_utc, eligible_newcomers)
 
-                self.log.info(f"{self.log_prefix} Updating the ban state of existing participants")
-                self._update_existing_participants(now_utc, modactions)
+                    self.log.info(
+                        f"{self.log_prefix} Updating the ban state of existing participants"
+                    )
+                    self._update_existing_participants(now_utc, modactions)
 
-                self.log.info(
-                    f"{self.log_prefix} Successfully Ran Event Hook to BanneduserExperimentController::enroll_new_participants. Caller: {instance}"
-                )
+                    self.log.info(
+                        f"{self.log_prefix} Successfully Ran Event Hook to BanneduserExperimentController::enroll_new_participants. Caller: {instance}"
+                    )
+
+            # To minimize latency, trigger interventions immediately after enrolling new participants.
+            self.update_experiment()
         except Exception as e:
             self.log.error(
                 self.log_prefix,
                 "Error in BanneduserExperimentController::enroll_new_participants",
                 e,
             )
-        finally:
-            self.db_session.execute("UNLOCK TABLES")
+            self.db_session.rollback()
 
     def update_experiment(self):
         """Update loop for the banned user experiment.
@@ -117,20 +128,18 @@ class BanneduserExperimentController(ModactionExperimentController):
             f"{self.log_prefix} Experiment {self.experiment.name}: identified {len(accounts_needing_messages)} accounts needing interventions. Sending messages now..."
         )
 
-        self.db_session.execute(
-            "LOCK TABLES experiment_actions WRITE, experiment_things WRITE, message_logs WRITE"
-        )
         try:
-            self._send_intervention_messages(accounts_needing_messages)
+            lock_id = f"{self.__class__.__name__}({self.experiment_name})::update_experiment"
+            with self.db_session.cooplock(lock_id, self.experiment.id):
+                self._send_intervention_messages(accounts_needing_messages)
         except Exception as e:
             self.log.error(
                 self.log_prefix,
                 "Error in BannedUserExperimentController::update_experiment",
                 extra=sys.exc_info()[0],
             )
+            self.db_session.rollback()
             return []
-        finally:
-            self.db_session.execute("UNLOCK TABLES")
 
     def _find_eligible_newcomers(self, modactions):
         """Filter a list of mod actions to find newcomers to the experiment.
@@ -432,7 +441,7 @@ class BanneduserExperimentController(ModactionExperimentController):
 
     def _is_deleted(self, modaction):
         """Return true if the target of a mod action is deleted."""
-        return modaction.target_author == '[deleted]'
+        return modaction.target_author == "[deleted]"
 
     def _parse_temp_ban(self, modaction):
         """Get details about the ban.
@@ -588,7 +597,9 @@ class BanneduserExperimentController(ModactionExperimentController):
                 message["account"] = experiment_thing.thing_id
                 messages_to_send.append(message)
 
-        self.log.info(f"{self.log_prefix} Sending messages to {len(messages_to_send)} users: [{','.join([x['account'] for x in messages_to_send])}]")
+        self.log.info(
+            f"{self.log_prefix} Sending messages to {len(messages_to_send)} users: [{','.join([x['account'] for x in messages_to_send])}]"
+        )
         # send messages_to_send
         message_results = mc.send_messages(
             messages_to_send,
