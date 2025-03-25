@@ -366,6 +366,20 @@ class TestPrivateMethods:
         assert got == want
 
     @pytest.mark.parametrize(
+        "action,want",
+        [
+            ("unbanuser", True),
+            ("banuser", False),
+            ("removecomment", False),
+        ],
+    )
+    def test_is_unban(self, action, want, experiment_controller):
+        got = experiment_controller._is_unban(
+            DictObject({"action": action})
+        )
+        assert got == want
+
+    @pytest.mark.parametrize(
         "action,details,want",
         [
             ("banuser", "3 days", False),
