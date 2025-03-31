@@ -42,7 +42,12 @@ class BannedUserQueryIndex(str, Enum):
     PENDING = "Intervention Pending"
     COMPLETE = "Intervention Complete"
     IMPOSSIBLE = "Intervention Impossible"
-
+    FIRST_BANSTART_PENDING = "First Banstart Intervention Pending"
+    FIRST_BANSTART_COMPLETE= "First Banstart Intervention Complete"
+    FIRST_BANSTART_IMPOSSIBLE = "First Banstart Intervention Impossible"
+    SECOND_BANOVER_PENDING = "Second Banover Intervention Pending"
+    SECOND_BANOVER_COMPLETE  = "Second Banover Intervention Complete"
+    SECOND_BANOVER_IMPOSSIBLE  = "Second Banover Intervention Impossible"
 
 class BanneduserExperimentController(ModactionExperimentController):
     """Banned user experiment controller.
@@ -92,16 +97,30 @@ class BanneduserExperimentController(ModactionExperimentController):
 
                     eligible_newcomers = self._find_first_banstart_candidates(modactions)
                     self.log.info(
-                        f"{self.log_prefix} Identified {len(eligible_newcomers)} eligible newcomers"
+                        f"{self.log_prefix} Identified {len(eligible_newcomers)} eligible newcomers / first_banstart candidates"
                     )
 
                     self.log.info(
-                        f"{self.log_prefix} Assigning randomized conditions to eligible newcomers"
+                        f"{self.log_prefix} Assigning randomized conditions to eligible newcomers / first_banstart candidates"
                     )
                     self._assign_randomized_conditions(now_utc, eligible_newcomers)
 
+
                     self.log.info(
-                        f"{self.log_prefix} Updating the ban state of existing participants"
+                        f"{self.log_prefix} Scanning {len(modactions)} modactions in subreddit {self.experiment_settings['subreddit_id']} to look for unbans for second_banover candidates"
+                    )
+                    second_banover_candidates = self._find_second_banover_candidates(modactions)
+                    self.log.info(
+                        f"{self.log_prefix} Identified {len(second_banover_candidates)} second_banover candidates"
+                    )
+
+                    self.log.info(
+                        f"{self.log_prefix} Assigning/designating second_banover candidates as candidates"
+                    )
+                    self._assign_second_banover_candidates(now_utc, second_banover_candidates)
+
+                    self.log.info(
+                        f"{self.log_prefix} Updating the state of existing participants"
                     )
                     self._update_existing_participants(now_utc, modactions)
 
@@ -188,6 +207,34 @@ class BanneduserExperimentController(ModactionExperimentController):
 
 
         return list(eligible_newcomers.values())
+
+
+    def _find_second_banover_candidates(self, modactions):
+        """Filter a list of mod actions to find second_banover_candidates.
+        Starting with a list of arbitrary mod actions, select mod actions that:
+        - are for users already in the study,
+        - temporary bans are over
+
+        Args:
+            modactions: A list of mod actions.
+
+        Returns:
+            A filtered list of mod actions.
+        """
+        previously_enrolled_user_ids = set(self._previously_enrolled_user_ids())
+        first_banstart_complete_user_ids = set(self._get_first_banstart_complete_user_ids())
+        second_banover_candidates = {}
+        for modaction in modactions:
+
+            # if an unbanuser happens immediately after a banuser is logged and before user is enrolled...
+            if (
+                self._is_enrolled(modaction, previously_enrolled_user_ids)
+                and self._is_unban(modaction)
+                and modaction.target_author in first_banstart_complete_user_ids # first_banstart intervention is complete. TODO: should this be in its own method?
+            ):
+                second_banover_candidates[modaction.target_author] = modaction
+
+        return list(second_banover_candidates.values())
 
     def _update_existing_participants(self, now_utc, modactions):
         """Find mod actions that update the state of any current participants.
@@ -419,6 +466,19 @@ class BanneduserExperimentController(ModactionExperimentController):
             f"{self.log_prefix} Assigned randomizations to {len(newcomer_ets)} banned users: [{','.join([x['thing_id'] for x in newcomer_ets])}]"
         )
 
+    def _assign_second_banover_candidates(self, now_utc, candidates):
+        """Assign/update database for second_banover candidates.
+        (If randomization is needed, it would happen here!)
+        Log an ExperimentAction with the assignments.
+        If there are no available randomizations, throw an error.
+
+        Args:
+            now_utc (int): the current datetime in UTC.
+            candidates: a list of tuples of `(mod action, redditor info)`.
+        """
+ 
+
+
     def _is_tempban(self, modaction):
         """Return true if an admin action is a temporary ban.
 
@@ -433,6 +493,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         Unbanuser messages are sent BOTH upon automatic ban expire as well as manual ban end.
         """
         return modaction.action == "unbanuser"
+    
 
     def _is_tempban_edit(self, modaction):
         """Return true if an admin action is a temporary ban edit.
@@ -461,6 +522,22 @@ class BanneduserExperimentController(ModactionExperimentController):
     def _is_deleted(self, modaction):
         """Return true if the target of a mod action is deleted."""
         return modaction.target_author == "[deleted]"
+
+    
+    def _get_first_banstart_complete_user_ids(self):
+        """Get user IDs that have their first intervention complete.
+
+        Returns:
+            A list of user IDs.
+        """
+        user_ids = self.db_session.query(ExperimentThing.thing_id).filter(
+            and_(
+                ExperimentThing.experiment_id == self.experiment.id,
+                ExperimentThing.object_type == ThingType.USER.value,
+                ExperimentThing.query_index == BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+            )
+        )
+        return [u[0] for u in user_ids]
 
     def _parse_temp_ban(self, modaction):
         """Get details about the ban.

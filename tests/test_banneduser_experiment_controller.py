@@ -163,7 +163,7 @@ class TestModactionExperimentController:
 
 
 class TestExperimentController:
-    def test_find_intervention_targetes(
+    def test_find_intervention_targets(
         self, helpers, experiment_controller, mod_controller
     ):
         assert len(experiment_controller._previously_enrolled_user_ids()) == 0
