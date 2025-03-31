@@ -135,7 +135,7 @@ production:
       caller_method: archive_mod_action_page
       callee_module: app.controllers.banneduser_experiment_controller
       callee_controller: BanneduserExperimentController
-      callee_method: enroll_new_participants
+      callee_method: find_intervention_targets
 test:
   subreddit: catlabreddit_testbu1
   subreddit_id: TEST_ONLY
@@ -273,4 +273,4 @@ test:
       caller_method: archive_mod_action_page
       callee_module: app.controllers.banneduser_experiment_controller
       callee_controller: BanneduserExperimentController
-      callee_method: enroll_new_participants
+      callee_method: find_intervention_targets

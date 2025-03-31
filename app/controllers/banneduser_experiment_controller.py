@@ -59,12 +59,12 @@ class BanneduserExperimentController(ModactionExperimentController):
         super().__init__(experiment_name, db_session, r, log, required_keys)
         self.log_prefix = f"{self.__class__.__name__} Experiment {experiment_name}:"
 
-    def enroll_new_participants(
+    def find_intervention_targets(
         self,
         instance,
         now_utc=int(datetime.utcnow().timestamp()),
     ):
-        """Enroll new participants in the experiment.
+        """Find intervention targets -- enroll new (banstart) participants in the experiment, assign banover intervention candidates.
 
         This is a callback that will be invoked declaratively.
         It is called by ModeratorController while running archive_mod_action_page, as noted in the experiment config YAML File.
@@ -75,21 +75,22 @@ class BanneduserExperimentController(ModactionExperimentController):
             now_utc (int): the current UNIX timestamp in seconds
         """
         if instance.fetched_subreddit_id != self.experiment_settings["subreddit_id"]:
-            # Callback enroll_new_participants called due to modactions fetched from subreddit
+            # Callback find_intervention_targets called due to modactions fetched from subreddit
             self.log.info(
-                f"{self.log_prefix} Callback enroll_new_participants called but not needed for subreddit {instance.fetched_subreddit_id}"
+                f"{self.log_prefix} Callback find_intervention_targets called but not needed for subreddit {instance.fetched_subreddit_id}"
             )
             return
 
         try:
-            lock_id = f"{self.__class__.__name__}({self.experiment_name})::enroll_new_participants"
+            lock_id = f"{self.__class__.__name__}({self.experiment_name})::find_intervention_targets"
             with self.db_session.cooplock(lock_id, self.experiment.id):
                 with self._new_modactions() as modactions:
+                    
                     self.log.info(
                         f"{self.log_prefix} Scanning {len(modactions)} modactions in subreddit {self.experiment_settings['subreddit_id']} to look for temporary bans"
                     )
 
-                    eligible_newcomers = self._find_eligible_newcomers(modactions)
+                    eligible_newcomers = self._find_first_banstart_candidates(modactions)
                     self.log.info(
                         f"{self.log_prefix} Identified {len(eligible_newcomers)} eligible newcomers"
                     )
@@ -105,7 +106,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                     self._update_existing_participants(now_utc, modactions)
 
                     self.log.info(
-                        f"{self.log_prefix} Successfully Ran Event Hook to BanneduserExperimentController::enroll_new_participants. Caller: {instance}"
+                        f"{self.log_prefix} Successfully Ran Event Hook to BanneduserExperimentController::find_intervention_targets. Caller: {instance}"
                     )
 
             # To minimize latency, trigger interventions immediately after enrolling new participants.
@@ -113,7 +114,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         except Exception as e:
             self.log.error(
                 self.log_prefix,
-                "Error in BanneduserExperimentController::enroll_new_participants",
+                "Error in BanneduserExperimentController::find_intervention_targets",
                 e,
             )
             self.db_session.rollback()
@@ -141,7 +142,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             self.db_session.rollback()
             return []
 
-    def _find_eligible_newcomers(self, modactions):
+    def _find_first_banstart_candidates(self, modactions):
         """Filter a list of mod actions to find newcomers to the experiment.
         Starting with a list of arbitrary mod actions, select mod actions that:
         - are not for users already in the study,
@@ -171,6 +172,11 @@ class BanneduserExperimentController(ModactionExperimentController):
             ):
                 eligible_newcomers[modaction.target_author] = modaction
 
+            # NOTE: If there are multiple mod actions for the same user who isn't yet enrolled,
+            # we overwrite the previous action with the latest one.
+            # This assumes that they are processed in order.
+
+
             # if an unbanuser happens immediately after a banuser is logged and before user is enrolled...
             if (
                 not self._is_enrolled(modaction, previously_enrolled_user_ids)
@@ -180,14 +186,12 @@ class BanneduserExperimentController(ModactionExperimentController):
                 if(modaction.target_author in eligible_newcomers):
                     del(eligible_newcomers[modaction.target_author])
 
-            # NOTE: If there are multiple mod actions for the same user who isn't yet enrolled,
-            # we overwrite the previous action with the latest one.
-            # This assumes that they are processed in order.
 
         return list(eligible_newcomers.values())
 
     def _update_existing_participants(self, now_utc, modactions):
         """Find mod actions that update the state of any current participants.
+        This is for the sake of tracking participants in the database, not for performing interventions.
 
         Args:
             modactions: A list of mod actions.

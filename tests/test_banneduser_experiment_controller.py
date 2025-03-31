@@ -64,7 +64,7 @@ def static_now():
 
 @pytest.fixture
 def newcomer_modactions(experiment_controller, modaction_data):
-    return experiment_controller._find_eligible_newcomers(modaction_data)
+    return experiment_controller._find_first_banstart_candidates(modaction_data)
 
 
 class TestRedditMock:
@@ -163,7 +163,7 @@ class TestModactionExperimentController:
 
 
 class TestExperimentController:
-    def test_enroll_new_participants(
+    def test_find_intervention_targetes(
         self, helpers, experiment_controller, mod_controller
     ):
         assert len(experiment_controller._previously_enrolled_user_ids()) == 0
@@ -224,9 +224,9 @@ class TestPrivateMethods:
         experiment_controller.db_session.commit()
         assert experiment_controller._previously_enrolled_user_ids() == want
 
-    def test_find_eligible_newcomers(self, modaction_data, experiment_controller):
+    def test_find_first_banstart_candidates(self, modaction_data, experiment_controller):
         # NOTE: not using newcomer_modactions for extra clarity.
-        user_modactions = experiment_controller._find_eligible_newcomers(modaction_data)
+        user_modactions = experiment_controller._find_first_banstart_candidates(modaction_data)
         assert len(user_modactions) > 0
 
     # update temp ban duration
@@ -345,7 +345,7 @@ class TestPrivateMethods:
     ):
         assert len(experiment_controller._previously_enrolled_user_ids()) == 0
 
-        user_modactions = experiment_controller._find_eligible_newcomers(modaction_data)
+        user_modactions = experiment_controller._find_first_banstart_candidates(modaction_data)
         experiment_controller._assign_randomized_conditions(static_now, user_modactions)
 
         assert len(experiment_controller._previously_enrolled_user_ids()) > 1

@@ -28,7 +28,7 @@ class ModactionExperimentController(ExperimentController, abc.ABC):
         super().__init__(experiment_name, db_session, r, log, required_keys)
 
     @abc.abstractmethod
-    def enroll_new_participants(self, instance):
+    def find_intervention_targets(self, instance):
         """Implement this method in a subclass for the experiment."""
 
     @abc.abstractmethod
