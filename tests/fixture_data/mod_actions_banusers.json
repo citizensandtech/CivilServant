@@ -6305,5 +6305,22 @@
         "sr_id36": "2cneq",
         "id": "ModAction_wdkac1py6h1a74x2w773fm5i74z93htso5e7jo8ro1d5chityv29q5u9",
         "mod": "wil_3tgqkah39oisc"
+    },
+    {
+        "description": "was temporary",
+        "target_body": null,
+        "mod_id36": "q7l8l",
+        "created_utc": 1585863922.0,
+        "subreddit": "anonymized",
+        "target_title": null,
+        "target_permalink": null,
+        "subreddit_name_prefixed": "r/anonymized",
+        "details": null,
+        "action": "unbanuser",
+        "target_author": "raa624p",
+        "target_fullname": "t1_y3ubfm9y0v9",
+        "sr_id36": "2cneq",
+        "id": "ModAction_kisbqw7fiued9a79c6cmbavs3qnsllehjlh9wyqj17o8gwzh0b3n85dp__was_duplicated_and_modified_manually_for_testing_purposes",
+        "mod": "wil_kz4veclb9urtpd"
     }
 ]

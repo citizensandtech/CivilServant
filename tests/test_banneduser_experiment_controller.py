@@ -7,6 +7,8 @@ from conftest import DictObject
 # XXX: must come before app imports
 ENV = os.environ["CS_ENV"] = "test"
 
+from sqlalchemy import and_
+
 from app.controllers.banneduser_experiment_controller import (
     BanneduserExperimentController,
     BannedUserQueryIndex,
@@ -229,6 +231,11 @@ class TestPrivateMethods:
         user_modactions = experiment_controller._find_first_banstart_candidates(modaction_data)
         assert len(user_modactions) > 0
 
+    def test_find_second_banover_candidates(self, modaction_data, experiment_controller):
+        # NOTE: not using newcomer_modactions for extra clarity.
+        user_modactions = experiment_controller._find_second_banover_candidates(modaction_data)
+        assert len(user_modactions) > 0
+
     # update temp ban duration
     @pytest.mark.skip(
         reason="interventions are automatic: skips completed participants"
@@ -319,6 +326,7 @@ class TestPrivateMethods:
             want_actual_ban_end_time = static_now
         assert meta["actual_ban_end_time"] == want_actual_ban_end_time
 
+
     @pytest.mark.parametrize(
         "details,want",
         [
@@ -349,6 +357,28 @@ class TestPrivateMethods:
         experiment_controller._enroll_first_banstart_candidates_with_randomized_conditions(static_now, user_modactions)
 
         assert len(experiment_controller._previously_enrolled_user_ids()) > 1
+
+    def test_assign_second_banover_candidates(
+        self, modaction_data, experiment_controller, static_now
+    ):
+        assert self._count_second_banover_pending(experiment_controller) == 0
+
+        user_modactions = experiment_controller._find_second_banover_candidates(modaction_data)
+
+        assert len(user_modactions) > 1
+        experiment_controller._assign_second_banover_candidates(static_now, user_modactions)
+
+        assert self._count_second_banover_pending(experiment_controller) > 1
+
+    def _count_second_banover_pending(self, controller):
+        """Helper method to count users with SECOND_BANOVER_PENDING status"""
+        return controller.db_session.query(ExperimentThing).filter(
+            and_(
+                ExperimentThing.experiment_id == controller.experiment.id,
+                ExperimentThing.object_type == ThingType.USER.value,
+                ExperimentThing.query_index == BannedUserQueryIndex.SECOND_BANOVER_PENDING,
+            )
+        ).count()
 
     @pytest.mark.parametrize(
         "action,details,want",

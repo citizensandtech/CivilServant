@@ -229,9 +229,10 @@ class BanneduserExperimentController(ModactionExperimentController):
 
             # if an unbanuser happens immediately after a banuser is logged and before user is enrolled...
             if (
-                self._is_enrolled(modaction, previously_enrolled_user_ids)
-                and self._is_unban(modaction)
-                and modaction.target_author in first_banstart_complete_user_ids # first_banstart intervention is complete. TODO: should this be in its own method?
+                    #self._is_enrolled(modaction, previously_enrolled_user_ids)
+                    #and self._is_unban(modaction)
+                self._is_unban(modaction)
+                #and modaction.target_author in first_banstart_complete_user_ids # first_banstart intervention is complete. TODO: should this be in its own method?
             ):
                 second_banover_candidates[modaction.target_author] = modaction
 
@@ -312,7 +313,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                 user_metadata["actual_ban_end_time"] = int(now_utc)
                 if user.query_index == BannedUserQueryIndex.FIRST_BANSTART_PENDING:
                     user.query_index = BannedUserQueryIndex.FIRST_BANSTART_IMPOSSIBLE
-                # NOTE: upon an unban, _assign_second_banover_candidates will set query_index to SECOND_BANOVER_PENDING. So do not alter such values, otherwise banover interventions will not trigger.
+                # NOTE: upon an unban, _assign_second_banover_candidates will set query_index to SECOND_BANOVER_PENDING. So do not alter SECOND_BANOVER_PENDING values, otherwise banover interventions will not trigger.
 
             user.metadata_json = json.dumps(user_metadata)
 
@@ -496,7 +497,7 @@ class BanneduserExperimentController(ModactionExperimentController):
 
             if not candidate_et:
                 self.log.error(
-                    "Mismatch between _find_second_banover_candidates and _assign_second_banover_candidates. This shouldn't happen."
+                    "Mismatch between _find_second_banover_candidates and _assign_second_banover_candidates. This shouldn't happen. This means that, somehow between querying  in _find_second_banover_candidates and this query, there's a difference. Maybe you're testing incorrectly?"
                 )
                 continue
 
