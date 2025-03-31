@@ -308,8 +308,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                 user_metadata["actual_ban_end_time"] = int(now_utc)
                 if user.query_index == BannedUserQueryIndex.FIRST_BANSTART_PENDING:
                     user.query_index = BannedUserQueryIndex.FIRST_BANSTART_IMPOSSIBLE
-                if user.query_index == BannedUserQueryIndex.SECOND_BANOVER_PENDING:
-                    user.query_index = BannedUserQueryIndex.SECOND_BANOVER_IMPOSSIBLE
+                # NOTE: upon an unban, _assign_second_banover_candidates will set query_index to SECOND_BANOVER_PENDING. So do not alter such values, otherwise banover interventions will not trigger.
 
             user.metadata_json = json.dumps(user_metadata)
 
@@ -500,7 +499,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             # update query_index of ExperimentThing to SECOND_BANOVER_PENDING
             candidate_et.query_index = BannedUserQueryIndex.SECOND_BANOVER_PENDING
 
-            # update database with new ExperimentThing
+            # update database with new ExperimentThing, but don't commit yet since we're in a loop
             self.db_session.add_retryable(candidate_et, commit=False)
 
             candidate_ets.append(candidate_et)
