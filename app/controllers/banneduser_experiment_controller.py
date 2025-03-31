@@ -497,15 +497,6 @@ class BanneduserExperimentController(ModactionExperimentController):
                 )
                 continue
 
-            # take an ExperimentThingSnapshot
-            snapshot = ExperimentThingSnapshot(
-                experiment_thing_id=candidate_et.thing_id,
-                object_type=candidate_et.object_type,
-                experiment_id=candidate_et.experiment_id,
-                metadata_json=candidate_et.metadata_json
-            )
-            self.db_session.add_retryable(snapshot, commit=False)
-
             # update query_index of ExperimentThing to SECOND_BANOVER_PENDING
             candidate_et.query_index = BannedUserQueryIndex.SECOND_BANOVER_PENDING
 
