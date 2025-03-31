@@ -100,7 +100,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                     self.log.info(
                         f"{self.log_prefix} Assigning randomized conditions to eligible newcomers / first_banstart candidates"
                     )
-                    self._assign_randomized_conditions(now_utc, eligible_newcomers)
+                    self._enroll_first_banstart_candidates_with_randomized_conditions(now_utc, eligible_newcomers)
 
 
                     self.log.info(
@@ -401,9 +401,9 @@ class BanneduserExperimentController(ModactionExperimentController):
         else:
             return "highremoval"
 
-    def _assign_randomized_conditions(self, now_utc, newcomers):
+    def _enroll_first_banstart_candidates_with_randomized_conditions(self, now_utc, newcomers):
         """Assign randomized conditions to newcomers.
-        Log an ExperimentAction with the assignments.
+        Log an ExperimentAction with the assignments. (Messages will get sent later in update_experiment.)
         If there are no available randomizations, throw an error.
 
         Args:
@@ -470,14 +470,56 @@ class BanneduserExperimentController(ModactionExperimentController):
     def _assign_second_banover_candidates(self, now_utc, candidates):
         """Assign/update database for second_banover candidates.
         (If randomization is needed, it would happen here!)
-        Log an ExperimentAction with the assignments.
+        Log an ExperimentAction with the assignments. (Messages will get sent later in update_experiment.)
         If there are no available randomizations, throw an error.
 
         Args:
             now_utc (int): the current datetime in UTC.
             candidates: a list of tuples of `(mod action, redditor info)`.
         """
- 
+
+        candidate_ets = []
+        for candidate in candidates:
+
+            # get experiment_thing of candidate
+            candidate_et = self.db_session.query(ExperimentThing).filter(
+                and_(
+                    ExperimentThing.experiment_id == self.experiment.id,
+                    ExperimentThing.object_type == ThingType.USER.value,
+                    ExperimentThing.thing_id == candidate.target_author,
+                    ExperimentThing.query_index == BannedUserQueryIndex.FIRST_BANSTART_COMPLETE, # this is redundant but we do it anyways
+                )
+            ).first()
+
+            if not candidate_et:
+                self.log.error(
+                    "Mismatch between _find_second_banover_candidates and _assign_second_banover_candidates. This shouldn't happen."
+                )
+                continue
+
+            # take an ExperimentThingSnapshot
+            snapshot = ExperimentThingSnapshot(
+                experiment_thing_id=candidate_et.thing_id,
+                object_type=candidate_et.object_type,
+                experiment_id=candidate_et.experiment_id,
+                metadata_json=candidate_et.metadata_json
+            )
+            self.db_session.add_retryable(snapshot, commit=False)
+
+            # update query_index of ExperimentThing to SECOND_BANOVER_PENDING
+            candidate_et.query_index = BannedUserQueryIndex.SECOND_BANOVER_PENDING
+
+            # update database with new ExperimentThing
+            self.db_session.add_retryable(candidate_et, commit=False)
+
+            candidate_ets.append(candidate_et)
+
+        self.db_session.commit()
+
+        self.log.info(
+            f"{self.log_prefix} Assigned second_banover pending status to {len(candidate_ets)} unbanned users: [{','.join([x['thing_id'] for x in candidate_ets])}]"
+        )
+
 
 
     def _is_tempban(self, modaction):

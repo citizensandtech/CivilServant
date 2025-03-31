@@ -340,13 +340,13 @@ class TestPrivateMethods:
         got = experiment_controller._get_activity_condition(DictObject({}), static_now)
         assert got == "lurker"
 
-    def test_assign_randomized_conditions(
+    def test_enroll_first_banstart_candidates_with_randomized_conditions(
         self, modaction_data, experiment_controller, static_now
     ):
         assert len(experiment_controller._previously_enrolled_user_ids()) == 0
 
         user_modactions = experiment_controller._find_first_banstart_candidates(modaction_data)
-        experiment_controller._assign_randomized_conditions(static_now, user_modactions)
+        experiment_controller._enroll_first_banstart_candidates_with_randomized_conditions(static_now, user_modactions)
 
         assert len(experiment_controller._previously_enrolled_user_ids()) > 1
 
