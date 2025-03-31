@@ -532,6 +532,61 @@ class TestPrivateMethods:
         [
             (
                 [{
+                    "thing_id": "OlaminaEarthSeedXxX",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+                }],
+                ["OlaminaEarthSeedXxX"],
+            ),            
+            (
+                [{
+                    "thing_id": "marieLVF",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_PENDING,
+                }],
+                [],
+            ),            
+            (
+                [{
+                    "thing_id": "edwardsaid35",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+                },
+                {
+                    "thing_id": "user_pending",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_PENDING,
+                }],
+                ["edwardsaid35"],
+            ),
+        ],
+    )
+    def test_get_first_banstart_complete_user_ids(
+        self, test_users, want, helpers, experiment_controller, mod_controller
+    ):
+
+        user_ids = experiment_controller._get_first_banstart_complete_user_ids()
+        assert user_ids == []
+
+
+        for user in test_users:
+            et = ExperimentThing(
+                id=user["thing_id"],
+                thing_id=user["thing_id"],
+                experiment_id=experiment_controller.experiment.id,
+                object_type=ThingType.USER.value,
+                query_index=user["query_index"],
+                metadata_json=json.dumps({"ban_type": "temporary"}),
+            )
+            experiment_controller.db_session.add(et)
+        experiment_controller.db_session.commit()
+
+        user_ids = experiment_controller._get_first_banstart_complete_user_ids()
+        assert user_ids == want
+
+
+
+    @pytest.mark.parametrize(
+        "test_users,want",
+        [
+            (
+                [{
                     "thing_id": "user_pending",
                     "query_index": BannedUserQueryIndex.SECOND_BANOVER_PENDING,
                 }],

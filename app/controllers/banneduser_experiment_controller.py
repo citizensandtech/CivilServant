@@ -561,21 +561,6 @@ class BanneduserExperimentController(ModactionExperimentController):
         """Return true if the target of a mod action is deleted."""
         return modaction.target_author == "[deleted]"
 
-    
-    def _get_first_banstart_complete_user_ids(self):
-        """Get user IDs that have their first intervention complete.
-
-        Returns:
-            A list of user IDs.
-        """
-        user_ids = self.db_session.query(ExperimentThing.thing_id).filter(
-            and_(
-                ExperimentThing.experiment_id == self.experiment.id,
-                ExperimentThing.object_type == ThingType.USER.value,
-                ExperimentThing.query_index == BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
-            )
-        )
-        return [u[0] for u in user_ids]
 
     def _parse_temp_ban(self, modaction):
         """Get details about the ban.
@@ -631,6 +616,22 @@ class BanneduserExperimentController(ModactionExperimentController):
         m = re.search(r"(\d+) days", modaction.details, re.IGNORECASE)
         return int(m.group(1)) if m else None
 
+    
+    def _get_first_banstart_complete_user_ids(self):
+        """Get user IDs that have their first intervention complete.
+
+        Returns:
+            A list of user IDs.
+        """
+        user_ids = self.db_session.query(ExperimentThing.thing_id).filter(
+            and_(
+                ExperimentThing.experiment_id == self.experiment.id,
+                ExperimentThing.object_type == ThingType.USER.value,
+                ExperimentThing.query_index == BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+            )
+        )
+        return [u[0] for u in user_ids]
+
     def _get_accounts_needing_first_banstart_interventions(self):
         """Gets accounts that need first_banstart interventions.
 
@@ -670,6 +671,8 @@ class BanneduserExperimentController(ModactionExperimentController):
             .order_by(ExperimentThing.created_at)
             .all()
         )
+
+
 
     ## TODO: this is the same as format_message in NewcomerMessagingExperimentController in messaging_experiment_controller.. should this be abstracted out into the parent class? Should this be abstracted out? or not touch working code?
     def _format_intervention_message(self, experiment_thing, intervention_type):
