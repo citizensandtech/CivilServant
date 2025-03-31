@@ -527,17 +527,60 @@ class TestPrivateMethods:
         )
         assert got == want
 
-    @pytest.mark.skip(reason="interventions are automatic")
-    def test_get_accounts_needing_interventions(
-        self, helpers, experiment_controller, mod_controller
+    @pytest.mark.parametrize(
+        "test_users,want",
+        [
+            (
+                [{
+                    "thing_id": "user_pending",
+                    "query_index": BannedUserQueryIndex.SECOND_BANOVER_PENDING,
+                }],
+                0,
+            ),            
+            (
+                [{
+                    "thing_id": "user_pending",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_PENDING,
+                }],
+                1,
+            ),            
+            (
+                [{
+                    "thing_id": "user_complete",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+                },
+                {
+                    "thing_id": "user_pending",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_PENDING,
+                }],
+                1,
+            ),
+        ],
+    )
+    def test_get_accounts_needing_first_banstart_interventions(
+        self, test_users, want, helpers, experiment_controller, mod_controller
     ):
-        users = experiment_controller._get_accounts_needing_interventions()
+
+        users = experiment_controller._get_accounts_needing_first_banstart_interventions()
         assert users == []
 
-        helpers.load_mod_actions(mod_controller)
 
-        users = experiment_controller._get_accounts_needing_interventions()
-        assert len(users) > 0
+        for user in test_users:
+            print(user)
+            et = ExperimentThing(
+                id=user["thing_id"],
+                thing_id=user["thing_id"],
+                experiment_id=experiment_controller.experiment.id,
+                object_type=ThingType.USER.value,
+                query_index=user["query_index"],
+                metadata_json=json.dumps({"ban_type": "temporary"}),
+            )
+            experiment_controller.db_session.add(et)
+        experiment_controller.db_session.commit()
+
+        users = experiment_controller._get_accounts_needing_first_banstart_interventions()
+
+        assert len(users) == want
 
     @pytest.mark.parametrize(
         "thing_id,metadata_json,want",
