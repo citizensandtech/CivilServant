@@ -39,9 +39,6 @@ SIX_MONTHS_IN_SECONDS = 6 * 30 * 24 * 60 * 60
 class BannedUserQueryIndex(str, Enum):
     """Possible states of a banned user's query_index."""
 
-    PENDING = "Intervention Pending"
-    COMPLETE = "Intervention Complete"
-    IMPOSSIBLE = "Intervention Impossible"
     FIRST_BANSTART_PENDING = "First Banstart Intervention Pending"
     FIRST_BANSTART_COMPLETE= "First Banstart Intervention Complete"
     FIRST_BANSTART_IMPOSSIBLE = "First Banstart Intervention Impossible"
@@ -301,14 +298,18 @@ class BanneduserExperimentController(ModactionExperimentController):
                 # Escalated to permaban.
                 user_metadata["ban_type"] = "permanent"
                 user_metadata["actual_ban_end_time"] = -1  # spec from study
-                if user.query_index == BannedUserQueryIndex.PENDING:
-                    user.query_index = BannedUserQueryIndex.IMPOSSIBLE
+                if user.query_index == BannedUserQueryIndex.FIRST_BANSTART_PENDING:
+                    user.query_index = BannedUserQueryIndex.FIRST_BANSTART_IMPOSSIBLE
+                if user.query_index == BannedUserQueryIndex.SECOND_BANOVER_PENDING:
+                    user.query_index = BannedUserQueryIndex.SECOND_BANOVER_IMPOSSIBLE
             elif modaction.action == "unbanuser":
                 # User was unbanned.
                 user_metadata["ban_type"] = "unbanned"
                 user_metadata["actual_ban_end_time"] = int(now_utc)
-                if user.query_index == BannedUserQueryIndex.PENDING:
-                    user.query_index = BannedUserQueryIndex.IMPOSSIBLE
+                if user.query_index == BannedUserQueryIndex.FIRST_BANSTART_PENDING:
+                    user.query_index = BannedUserQueryIndex.FIRST_BANSTART_IMPOSSIBLE
+                if user.query_index == BannedUserQueryIndex.SECOND_BANOVER_PENDING:
+                    user.query_index = BannedUserQueryIndex.SECOND_BANOVER_IMPOSSIBLE
 
             user.metadata_json = json.dumps(user_metadata)
 
@@ -447,7 +448,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                 "thing_id": newcomer.target_author,
                 "experiment_id": self.experiment.id,
                 "object_type": ThingType.USER.value,
-                "query_index": BannedUserQueryIndex.PENDING,
+                "query_index": BannedUserQueryIndex.FIRST_BANSTART_PENDING,
                 "metadata_json": json.dumps(user_metadata),
             }
 
@@ -607,7 +608,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                 and_(
                     ExperimentThing.object_type == ThingType.USER.value,
                     ExperimentThing.experiment_id == self.experiment.id,
-                    ExperimentThing.query_index == BannedUserQueryIndex.PENDING,
+                    ExperimentThing.query_index == BannedUserQueryIndex.FIRST_BANSTART_PENDING,
                 )
             )
             .order_by(ExperimentThing.created_at)
@@ -686,7 +687,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                     action_object_id=experiment_thing.id,
                     metadata_json=json.dumps(metadata),
                 )
-                experiment_thing.query_index = BannedUserQueryIndex.COMPLETE
+                experiment_thing.query_index = BannedUserQueryIndex.FIRST_BANSTART_COMPLETE
                 experiment_thing.metadata_json = json.dumps(metadata)
                 self.db_session.add_retryable(ea)
             else:
@@ -731,7 +732,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                             metadata["message_status"] = "nonexistent"
                             metadata["survey_status"] = "nonexistent"
                             experiment_thing.query_index = (
-                                BannedUserQueryIndex.IMPOSSIBLE
+                                BannedUserQueryIndex.FIRST_BANSTART_IMPOSSIBLE ## TODO: to designate correct IMPOSSIBLE one (first or second)
                             )
                             update_records = True
                 ## if there are no errors
@@ -739,7 +740,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                 ## update the experiment_thing metadata
                 else:
                     metadata["message_status"] = "sent"
-                    experiment_thing.query_index = BannedUserQueryIndex.COMPLETE
+                    experiment_thing.query_index = BannedUserQueryIndex.FIRST_BANSTART_COMPLETE
                     update_records = True
 
                 if update_records:
