@@ -674,7 +674,6 @@ class BanneduserExperimentController(ModactionExperimentController):
 
 
 
-    ## TODO: this is the same as format_message in NewcomerMessagingExperimentController in messaging_experiment_controller.. should this be abstracted out into the parent class? Should this be abstracted out? or not touch working code?
     def _format_intervention_message(self, experiment_thing, intervention_type):
         """Format intervention message for an thing, given the arm that it is in. This reads from the experiment_settings (the YAML file in /config/experiments/.
 
@@ -715,7 +714,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             message_body = yml_cond["arms"][arm]["pm_text"].format(**account_info)
 
         else:  # second_banover
-            if second_banover_message not in self.experiment_settings:
+            if "second_banover_message" not in self.experiment_settings:
                 raise ExperimentConfigurationError(
                     f"In the experiment '{self.experiment_name}', the 'second_banover_message' entry fails to exist in the configuration"
                 )

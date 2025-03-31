@@ -718,7 +718,7 @@ class TestPrivateMethods:
             ),
         ],
     )
-    def test_format_first_banstart_intervention_message(
+    def test_format_intervention_message__first_banstart(
         self, thing_id, metadata_json, want, experiment_controller
     ):
         et = ExperimentThing(
@@ -739,7 +739,7 @@ class TestPrivateMethods:
             {"condition": "invalid_condition", "arm": "arm_0"},
         ],
     )
-    def test_format_first_banstart_intervention_message_raises_error(
+    def test_format_intervention_message__first_banstart__raises_error(
         self, metadata_json, experiment_controller
     ):
         et = ExperimentThing(
@@ -752,6 +752,46 @@ class TestPrivateMethods:
 
         with pytest.raises(ExperimentConfigurationError):
             experiment_controller._format_intervention_message(et, "first_banstart")
+
+
+
+    @pytest.mark.parametrize(
+        "thing_id,metadata_json,want",
+        [
+            (
+                "12345",
+                {
+                },
+                {
+                    "subject": "PM Subject Line for 12345 (Banover)",
+                    "message": "Hello 12345, your ban is over.",
+                },
+            ),
+            (
+                "MarlKarx18",
+                {
+                },
+                {
+                    "subject": "PM Subject Line for MarlKarx18 (Banover)",
+                    "message": "Hello MarlKarx18, your ban is over.",
+                },
+            ),
+        ],
+    )
+    def test_format_intervention_message__second_banover(
+        self, thing_id, metadata_json, want, experiment_controller
+    ):
+        et = ExperimentThing(
+            id=12345,
+            thing_id=thing_id,
+            experiment_id=experiment_controller.experiment.id,
+            object_type=ThingType.USER.value,
+            metadata_json=json.dumps(metadata_json),
+        )
+
+        got = experiment_controller._format_intervention_message(et, "second_banover")
+        assert got == want
+
 
     @pytest.mark.parametrize(
         "thing_id,metadata_json,want_error,want_user_query_index,want_user_message_status",
