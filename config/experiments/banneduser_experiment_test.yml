@@ -124,6 +124,9 @@ production:
         arm_1:
           pm_subject: PM Subject Line for {username} (Thirtydays Arm 1)
           pm_text: Hello {username}, this is the message for arm 1 of the highremoval_thirtydays condition.
+  second_banover_message:
+    pm_subject: PM Subject Line for {username} (Banover)
+    pm_text: Hello {username}, your ban is over.
   controller: BanneduserExperimentController
   start_time: 07/02/2000 00:00:00 UTC
   end_time: 07/02/3000 23:59:59 UTC
@@ -262,6 +265,9 @@ test:
         arm_1:
           pm_subject: PM Subject Line for {username} (Thirtydays Arm 1)
           pm_text: Hello {username}, this is the message for arm 1 of the highremoval_thirtydays condition.
+  second_banover_message:
+    pm_subject: PM Subject Line for {username} (Banover)
+    pm_text: Hello {username}, your ban is over.
   controller: BanneduserExperimentController
   start_time: 07/02/2000 00:00:00 UTC
   end_time: 07/02/3000 23:59:59 UTC

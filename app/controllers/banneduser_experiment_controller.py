@@ -140,15 +140,19 @@ class BanneduserExperimentController(ModactionExperimentController):
 
         Check for freshly enrolled accounts, and send messages to them.
         """
-        accounts_needing_messages = self._get_accounts_needing_interventions()
+        first_banstart_accounts_needing_messages = self._get_accounts_needing_first_banstart_interventions()
+        second_banover_accounts_needing_messages = self._get_accounts_needing_second_banover_interventions()
         self.log.info(
-            f"{self.log_prefix} Experiment {self.experiment.name}: identified {len(accounts_needing_messages)} accounts needing interventions. Sending messages now..."
+            f"{self.log_prefix} Experiment {self.experiment.name}: identified {len(first_banstart_accounts_needing_messages)} accounts needing first banstart interventions and {len(second_banover_accounts_needing_messages)} accounts needing second banover interventions."
         )
 
         try:
             lock_id = f"{self.__class__.__name__}({self.experiment_name})::update_experiment"
             with self.db_session.cooplock(lock_id, self.experiment.id):
-                self._send_intervention_messages(accounts_needing_messages)
+                self.log.info("{self.log_prefix} Sending first_banstart intervention messages...")
+                self._send_first_banstart_intervention_messages(first_banstart_accounts_needing_messages)
+                self.log.info("{self.log_prefix} Sending second_banover intervention messages...")
+                self._send_second_banover_intervention_messages(second_banover_accounts_needing_messages)
         except Exception as e:
             self.log.error(
                 self.log_prefix,
@@ -626,9 +630,8 @@ class BanneduserExperimentController(ModactionExperimentController):
         m = re.search(r"(\d+) days", modaction.details, re.IGNORECASE)
         return int(m.group(1)) if m else None
 
-    def _get_accounts_needing_interventions(self):
-        """Gets accounts that need interventions
-        details about the ban.
+    def _get_accounts_needing_first_banstart_interventions(self):
+        """Gets accounts that need first_banstart interventions.
 
         Returns:
             A list of users that are enrolled in the study, that have not had messages sent yet.
@@ -647,12 +650,33 @@ class BanneduserExperimentController(ModactionExperimentController):
             .all()
         )
 
+    def _get_accounts_needing_second_banover_interventions(self):
+        """Gets accounts that need second_banover interventions.
+
+        Returns:
+            A list of users that are enrolled in the study, that were recently unbanned and need a banover message sent.
+        """
+
+        return (
+            self.db_session.query(ExperimentThing)
+            .filter(
+                and_(
+                    ExperimentThing.object_type == ThingType.USER.value,
+                    ExperimentThing.experiment_id == self.experiment.id,
+                    ExperimentThing.query_index == BannedUserQueryIndex.SECOND_BANOVER_PENDING,
+                )
+            )
+            .order_by(ExperimentThing.created_at)
+            .all()
+        )
+
     ## TODO: this is the same as format_message in NewcomerMessagingExperimentController in messaging_experiment_controller.. should this be abstracted out into the parent class? Should this be abstracted out? or not touch working code?
-    def _format_intervention_message(self, experiment_thing):
+    def _format_intervention_message(self, experiment_thing, intervention_type):
         """Format intervention message for an thing, given the arm that it is in. This reads from the experiment_settings (the YAML file in /config/experiments/.
 
         Args:
             experiment_thing: The ExperimentThing for a tempbanned user.
+            intervention_type: String indicating type of intervention. Either 'first_banstart' or 'second_banover'.
 
         Returns:
             A dict with message subject and body.
@@ -666,30 +690,74 @@ class BanneduserExperimentController(ModactionExperimentController):
         metadata_json = json.loads(experiment_thing.metadata_json)
         account_info = {"username": experiment_thing.thing_id}
 
-        condition = metadata_json["condition"]
-        arm = metadata_json["arm"]
+        if(intervention_type == "first_banstart"):
 
-        if condition not in self.experiment_settings["conditions"]:
-            raise ExperimentConfigurationError(
-                f"In the experiment '{self.experiment_name}', the '{condition}' condition fails to exist in the configuration"
-            )
+            condition = metadata_json["condition"]
+            arm = metadata_json["arm"]
 
-        yml_cond = self.experiment_settings["conditions"][condition]
-        if arm not in yml_cond["arms"]:
-            raise ExperimentConfigurationError(
-                f"In the experiment '{self.experiment_name}', the '{condition}' condition fails to include information about the '{arm}' arm, despite having randomizations assigned to it"
-            )
-        if yml_cond["arms"][arm] is None:
-            return None
-        message_subject = yml_cond["arms"][arm]["pm_subject"].format(**account_info)
-        message_body = yml_cond["arms"][arm]["pm_text"].format(**account_info)
+            if condition not in self.experiment_settings["conditions"]:
+                raise ExperimentConfigurationError(
+                    f"In the experiment '{self.experiment_name}', the '{condition}' condition fails to exist in the configuration"
+                )
+
+            yml_cond = self.experiment_settings["conditions"][condition]
+            if arm not in yml_cond["arms"]:
+                raise ExperimentConfigurationError(
+                    f"In the experiment '{self.experiment_name}', the '{condition}' condition fails to include information about the '{arm}' arm, despite having randomizations assigned to it"
+                )
+            if yml_cond["arms"][arm] is None:
+                return None
+            message_subject = yml_cond["arms"][arm]["pm_subject"].format(**account_info)
+            message_body = yml_cond["arms"][arm]["pm_text"].format(**account_info)
+
+        else:  # second_banover
+            if second_banover_message not in self.experiment_settings:
+                raise ExperimentConfigurationError(
+                    f"In the experiment '{self.experiment_name}', the 'second_banover_message' entry fails to exist in the configuration"
+                )
+            message_subject = self.experiment_settings["second_banover_message"]["pm_subject"].format(**account_info)
+            message_body = self.experiment_settings["second_banover_message"]["pm_text"].format(**account_info)
+
         return {"subject": message_subject, "message": message_body}
 
-    def _send_intervention_messages(self, experiment_things):
+
+    def _send_first_banstart_intervention_messages(self, experiment_things):
+        """Sends first banstart intervention messages.
+        This is for users who have just been banned.
+
+        Args:
+            experiment_things: A list of ExperimentThings for users needing first_banstart interventions.
+        """
+        return self._send_intervention_messages(
+            experiment_things,
+            complete_status=BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+            impossible_status=BannedUserQueryIndex.FIRST_BANSTART_IMPOSSIBLE,
+            intervention_type="first_banstart"
+        )
+
+    def _send_second_banover_intervention_messages(self, experiment_things):
+        """Sends second banover intervention messages.
+        This is for users whose ban has just ended.
+
+        Args:
+            experiment_things: A list of ExperimentThings for users needing second_banover interventions.
+        """
+        return self._send_intervention_messages(
+            experiment_things,
+            complete_status=BannedUserQueryIndex.SECOND_BANOVER_COMPLETE,
+            impossible_status=BannedUserQueryIndex.SECOND_BANOVER_IMPOSSIBLE,
+            intervention_type="second_banover"
+        )
+    
+
+    def _send_intervention_messages(self, experiment_things, complete_status, impossible_status, intervention_type):
         """Sends appropriate intervention messages for a list of experiment things.
 
         Args:
             experiment_things: A list of ExperimentThings representing tempbanned users.
+            complete_status: The BannedUserQueryIndex to use when message is sent successfully
+            impossible_status: The BannedUserQueryIndex to use when message cannot be sent
+            intervention_type: String indicating type of intervention. Either 'first_banstart' or 'second_banover'.
 
         Returns:
             A dict with server response from praw's send_message,
@@ -706,7 +774,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         action = "SendMessage"
         messages_to_send = []
         for experiment_thing in experiment_things:
-            message = self._format_intervention_message(experiment_thing)
+            message = self._format_intervention_message(experiment_thing, intervention_type)
             ## if it's a control group, log inaction
             ## and do nothing, otherwise add to messages_to_send
             if message is None:
@@ -719,7 +787,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                     action_object_id=experiment_thing.id,
                     metadata_json=json.dumps(metadata),
                 )
-                experiment_thing.query_index = BannedUserQueryIndex.FIRST_BANSTART_COMPLETE
+                experiment_thing.query_index = complete_status
                 experiment_thing.metadata_json = json.dumps(metadata)
                 self.db_session.add_retryable(ea)
             else:
@@ -727,12 +795,12 @@ class BanneduserExperimentController(ModactionExperimentController):
                 messages_to_send.append(message)
 
         self.log.info(
-            f"{self.log_prefix} Sending messages to {len(messages_to_send)} users: [{','.join([x['account'] for x in messages_to_send])}]"
+            f"{self.log_prefix} Sending {intervention_type} messages to {len(messages_to_send)} users: [{','.join([x['account'] for x in messages_to_send])}]"
         )
         # send messages_to_send
         message_results = mc.send_messages(
             messages_to_send,
-            f"BannedUserMessagingExperiment({self.experiment_name})::_send_intervention_messages",
+            f"BannedUserMessagingExperiment({self.experiment_name})::_send_{intervention_type}_intervention_messages",
         )
 
         # iterate through message_result, linked with experiment_things
@@ -763,16 +831,14 @@ class BanneduserExperimentController(ModactionExperimentController):
                         if invalid_username:
                             metadata["message_status"] = "nonexistent"
                             metadata["survey_status"] = "nonexistent"
-                            experiment_thing.query_index = (
-                                BannedUserQueryIndex.FIRST_BANSTART_IMPOSSIBLE ## TODO: to designate correct IMPOSSIBLE one (first or second)
-                            )
+                            experiment_thing.query_index = impossible_status
                             update_records = True
                 ## if there are no errors
                 ## add an ExperimentAction and
                 ## update the experiment_thing metadata
                 else:
                     metadata["message_status"] = "sent"
-                    experiment_thing.query_index = BannedUserQueryIndex.FIRST_BANSTART_COMPLETE
+                    experiment_thing.query_index = complete_status
                     update_records = True
 
                 if update_records:

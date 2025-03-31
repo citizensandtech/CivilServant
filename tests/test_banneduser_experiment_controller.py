@@ -525,7 +525,7 @@ class TestPrivateMethods:
             ),
         ],
     )
-    def test_format_intervention_message(
+    def test_format_first_banstart_intervention_message(
         self, thing_id, metadata_json, want, experiment_controller
     ):
         et = ExperimentThing(
@@ -536,7 +536,7 @@ class TestPrivateMethods:
             metadata_json=json.dumps(metadata_json),
         )
 
-        got = experiment_controller._format_intervention_message(et)
+        got = experiment_controller._format_intervention_message(et, "first_banstart")
         assert got == want
 
     @pytest.mark.parametrize(
@@ -546,7 +546,7 @@ class TestPrivateMethods:
             {"condition": "invalid_condition", "arm": "arm_0"},
         ],
     )
-    def test_format_intervention_message_raises_error(
+    def test_format_first_banstart_intervention_message_raises_error(
         self, metadata_json, experiment_controller
     ):
         et = ExperimentThing(
@@ -558,7 +558,7 @@ class TestPrivateMethods:
         )
 
         with pytest.raises(ExperimentConfigurationError):
-            experiment_controller._format_intervention_message(et)
+            experiment_controller._format_intervention_message(et, "first_banstart")
 
     @pytest.mark.parametrize(
         "thing_id,metadata_json,want_error,want_user_query_index,want_user_message_status",
@@ -605,7 +605,7 @@ class TestPrivateMethods:
             ),
         ],
     )
-    def test_send_intervention_messages(
+    def test_send_first_banstart_intervention_messages(
         self,
         thing_id,
         metadata_json,
@@ -628,10 +628,10 @@ class TestPrivateMethods:
 
         if want_error:
             with pytest.raises(Exception):
-                experiment_controller._send_intervention_messages([et])
+                experiment_controller._send_first_banstart_intervention_messages([et])
 
         else:
-            experiment_controller._send_intervention_messages([et])
+            experiment_controller._send_first_banstart_intervention_messages([et])
 
             ea = (
                 experiment_controller.db_session.query(ExperimentAction)
