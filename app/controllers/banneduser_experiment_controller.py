@@ -232,7 +232,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                     #self._is_enrolled(modaction, previously_enrolled_user_ids)
                     #and self._is_unban(modaction)
                 self._is_unban(modaction)
-                #and modaction.target_author in first_banstart_complete_user_ids # first_banstart intervention is complete. TODO: should this be in its own method?
+                #and modaction.target_author in first_banstart_complete_user_ids # first_banstart intervention is complete. 
             ):
                 second_banover_candidates[modaction.target_author] = modaction
 

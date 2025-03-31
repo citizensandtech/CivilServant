@@ -358,17 +358,62 @@ class TestPrivateMethods:
 
         assert len(experiment_controller._previously_enrolled_user_ids()) > 1
 
+    ## TODO: This is failing! Figure out why
+    @pytest.mark.parametrize(
+        "test_users,want",
+        [
+            (
+                [{
+                    "target_author": "OlaminaEarthSeedXxX",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+                }],
+                1
+            ),            
+            (
+                [{
+                    "target_author": "marieLVF",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_PENDING,
+                }],
+                0
+            ),            
+            (
+                [{
+                    "target_author": "edwardsaid35",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+                },
+                {
+                    "target_author": "user_pending",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_PENDING,
+                }],
+                1
+            ),
+        ])
     def test_assign_second_banover_candidates(
-        self, modaction_data, experiment_controller, static_now
+        self, test_users, want, experiment_controller, static_now
     ):
         assert self._count_second_banover_pending(experiment_controller) == 0
 
-        user_modactions = experiment_controller._find_second_banover_candidates(modaction_data)
+        # first, insert experiment things into database
+        for user in test_users:
+            et = ExperimentThing(
+                id=user["target_author"],
+                thing_id=user["target_author"],
+                experiment_id=experiment_controller.experiment.id,
+                object_type=ThingType.USER.value,
+                query_index=user["query_index"],
+                metadata_json=json.dumps({"ban_type": "temporary"}),
+            )
+            experiment_controller.db_session.add(et)
+        experiment_controller.db_session.commit()
 
-        assert len(user_modactions) > 1
-        experiment_controller._assign_second_banover_candidates(static_now, user_modactions)
+#        user_modactions = experiment_controller._find_second_banover_candidates(test_users)
+        test_user_objects = [DictObject(user) for user in test_users]
 
-        assert self._count_second_banover_pending(experiment_controller) > 1
+        experiment_controller._assign_second_banover_candidates(static_now, test_user_objects)
+
+
+        assert self._count_second_banover_pending(experiment_controller) == want
+
 
     def _count_second_banover_pending(self, controller):
         """Helper method to count users with SECOND_BANOVER_PENDING status"""
