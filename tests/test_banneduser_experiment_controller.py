@@ -473,6 +473,17 @@ class TestPrivateMethods:
         assert got == want
 
     @pytest.mark.parametrize(
+        "username,want",
+        [
+            ("innocent_user", False),
+            ("[deleted]", True),
+        ],
+    )
+    def test_is_deleted(self, username, want, experiment_controller):
+        got = experiment_controller._is_deleted(DictObject({"target_author": username}))
+        assert got == want
+
+    @pytest.mark.parametrize(
         "details,want",
         [
             (
