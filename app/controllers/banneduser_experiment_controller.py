@@ -512,7 +512,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         self.db_session.commit()
 
         self.log.info(
-            f"{self.log_prefix} Assigned second_banover pending status to {len(candidate_ets)} unbanned users: [{','.join([x['thing_id'] for x in candidate_ets])}]"
+            f"{self.log_prefix} Assigned second_banover pending status to {len(candidate_ets)} unbanned users: [{','.join([x.thing_id for x in candidate_ets])}]"
         )
 
 
