@@ -87,6 +87,8 @@ class BanneduserExperimentController(ModactionExperimentController):
             lock_id = f"{self.__class__.__name__}({self.experiment_name})::find_intervention_targets"
             with self.db_session.cooplock(lock_id, self.experiment.id):
                 with self._new_modactions() as modactions:
+
+                    ### FIRST BANSTART INTERVENTION
                     
                     self.log.info(
                         f"{self.log_prefix} Scanning {len(modactions)} modactions in subreddit {self.experiment_settings['subreddit_id']} to look for temporary bans"
@@ -102,6 +104,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                     )
                     self._enroll_first_banstart_candidates_with_randomized_conditions(now_utc, eligible_newcomers)
 
+                    ### SECOND BANOVER INTERVENTION
 
                     self.log.info(
                         f"{self.log_prefix} Scanning {len(modactions)} modactions in subreddit {self.experiment_settings['subreddit_id']} to look for unbans for second_banover candidates"
@@ -115,6 +118,8 @@ class BanneduserExperimentController(ModactionExperimentController):
                         f"{self.log_prefix} Assigning/designating second_banover candidates as candidates"
                     )
                     self._assign_second_banover_candidates(now_utc, second_banover_candidates)
+
+                    ### UPDATE DATABASE OF PARTICIPANTS 
 
                     self.log.info(
                         f"{self.log_prefix} Updating the state of existing participants"
@@ -227,12 +232,9 @@ class BanneduserExperimentController(ModactionExperimentController):
         second_banover_candidates = {}
         for modaction in modactions:
 
-            # if an unbanuser happens immediately after a banuser is logged and before user is enrolled...
             if (
-                    #self._is_enrolled(modaction, previously_enrolled_user_ids)
-                    #and self._is_unban(modaction)
                 self._is_unban(modaction)
-                #and modaction.target_author in first_banstart_complete_user_ids # first_banstart intervention is complete. 
+                and modaction.target_author in first_banstart_complete_user_ids # first_banstart intervention is complete. 
             ):
                 second_banover_candidates[modaction.target_author] = modaction
 

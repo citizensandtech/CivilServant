@@ -231,10 +231,87 @@ class TestPrivateMethods:
         user_modactions = experiment_controller._find_first_banstart_candidates(modaction_data)
         assert len(user_modactions) > 0
 
-    def test_find_second_banover_candidates(self, modaction_data, experiment_controller):
-        # NOTE: not using newcomer_modactions for extra clarity.
+
+    # NOTE: Ideally this test data should be in a fixture
+    @pytest.mark.parametrize(
+        "test_users,unban_actions,want",
+        [
+            (
+                [{
+                    "thing_id": "OlaminaEarthSeedXxX",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+                }],
+                [{
+                    "action": "unbanuser",
+                    "target_author": "OlaminaEarthSeedXxX",
+                }],
+                ["OlaminaEarthSeedXxX"],
+            ),            
+            (
+                [{
+                    "thing_id": "marieLVF",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_PENDING,
+                }],
+                [{
+                    "action": "unbanuser",
+                    "target_author": "marieLVF",
+                }],
+                [],
+            ),
+            (
+                [{
+                    "thing_id": "cgj75",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+                }],
+                [{
+                    "action": "banuser",
+                    "target_author": "cgj75",
+                }],
+                [],
+            ),            
+            (
+                [{
+                    "thing_id": "edwardsaid35",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+                },
+                {
+                    "thing_id": "abc123",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_PENDING,
+                }],
+                [{
+                    "action": "unbanuser",
+                    "target_author": "edwardsaid35",
+                },
+                {
+                    "action": "unbanuser",
+                    "target_author": "user_pending",
+                }],
+                ["edwardsaid35"],
+            ),
+        ],
+    )
+    def test_find_second_banover_candidates(self, test_users, unban_actions, want, modaction_data, experiment_controller):
         user_modactions = experiment_controller._find_second_banover_candidates(modaction_data)
-        assert len(user_modactions) > 0
+        assert len(user_modactions) == 0
+        
+        for user in test_users:
+            et = ExperimentThing(
+                id=user["thing_id"],
+                thing_id=user["thing_id"],
+                experiment_id=experiment_controller.experiment.id,
+                object_type=ThingType.USER.value,
+                query_index=user["query_index"],
+                metadata_json=json.dumps({"ban_type": "temporary"}),
+            )
+            experiment_controller.db_session.add(et)
+        experiment_controller.db_session.commit()
+
+        unban_actions = [DictObject(action) for action in unban_actions]
+        
+        user_modactions = experiment_controller._find_second_banover_candidates(unban_actions)
+        found_users = [m.target_author for m in user_modactions]
+        assert found_users == want
+
 
     # update temp ban duration
     @pytest.mark.skip(
@@ -406,7 +483,6 @@ class TestPrivateMethods:
             experiment_controller.db_session.add(et)
         experiment_controller.db_session.commit()
 
-#        user_modactions = experiment_controller._find_second_banover_candidates(test_users)
         test_user_objects = [DictObject(user) for user in test_users]
 
         experiment_controller._assign_second_banover_candidates(static_now, test_user_objects)
@@ -572,6 +648,7 @@ class TestPrivateMethods:
         )
         assert got == want
 
+    # NOTE: Ideally this test data should be in a fixture
     @pytest.mark.parametrize(
         "test_users,want",
         [
@@ -627,6 +704,7 @@ class TestPrivateMethods:
 
 
 
+    # NOTE: Ideally this test data should be in a fixture
     @pytest.mark.parametrize(
         "test_users,want",
         [
@@ -681,7 +759,7 @@ class TestPrivateMethods:
 
         assert len(users) == want
 
-
+    # NOTE: Ideally this test data should be in a fixture
     @pytest.mark.parametrize(
         "test_users,want",
         [
@@ -838,6 +916,7 @@ class TestPrivateMethods:
         assert got == want
 
 
+    # NOTE: Ideally this test data should be in a fixture
     @pytest.mark.parametrize(
         "thing_id,metadata_json,want_error,want_user_query_index,want_user_message_status",
         [
@@ -977,6 +1056,7 @@ class TestPrivateMethods:
             metadata_json=json.dumps(metadata_json),
         )
         experiment_controller.db_session.add(et)
+        #experiment_controller.db_session.commit()
 
         if want_error:
             with pytest.raises(Exception):
