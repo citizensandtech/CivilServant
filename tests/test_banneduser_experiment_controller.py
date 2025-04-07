@@ -435,7 +435,6 @@ class TestPrivateMethods:
 
         assert len(experiment_controller._previously_enrolled_user_ids()) > 1
 
-    ## TODO: This is failing! Figure out why
     @pytest.mark.parametrize(
         "test_users,want",
         [
