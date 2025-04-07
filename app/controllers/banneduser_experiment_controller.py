@@ -238,6 +238,16 @@ class BanneduserExperimentController(ModactionExperimentController):
             ):
                 second_banover_candidates[modaction.target_author] = modaction
 
+
+            # if an banuser happens immediately after an unbanuser is logged and before second_banover intervention happens..
+            if (
+                modaction.target_author in second_banover_candidates                
+                and self._is_tempban(modaction)
+            ):
+                #  ... treat this as a unban/reban,  and don't do second intervention
+                if(modaction.target_author in second_banover_candidates):
+                    del(second_banover_candidates[modaction.target_author])
+
         return list(second_banover_candidates.values())
 
     def _update_existing_participants(self, now_utc, modactions):

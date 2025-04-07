@@ -250,7 +250,7 @@ class TestPrivateMethods:
             (
                 [{
                     "thing_id": "marieLVF",
-                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_PENDING,
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_PENDING, 
                 }],
                 [{
                     "action": "unbanuser",
@@ -264,12 +264,40 @@ class TestPrivateMethods:
                     "query_index": BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
                 }],
                 [{
-                    "action": "banuser",
+                    "action": "banuser", 
                     "target_author": "cgj75",
                 }],
                 [],
+            ),
+            (
+                [{
+                    "thing_id": "yalomyalom31",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+                }],
+                [{
+                    "action": "unbanuser", 
+                    "target_author": "yalomyalom31",
+                },{
+                    "action": "unbanuser", 
+                    "target_author": "yalomyalom31", # duplicate unban
+                }],
+                ["yalomyalom31"],
             ),            
             (
+                [{
+                    "thing_id": "rogers123",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+                }],
+                [{
+                    "action": "unbanuser", 
+                    "target_author": "rogers123",
+                },{
+                    "action": "banuser", 
+                    "target_author": "rogers123", # ban after unban
+                    "details": "3 days",
+                }],
+                [],
+            ),                        (
                 [{
                     "thing_id": "edwardsaid35",
                     "query_index": BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
