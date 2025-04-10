@@ -46,7 +46,7 @@ This documentation assumes that civilservant is running in a production environm
 
 - `CS_ENV=production python set_up_auth.py`
   - Navigate to generated reddit URL in browser
-  - Enter code from redirect_url into python script --- don't include the trailing `#_`!
+  - Enter code from redirect_url into python script --- NOTE: don't include the trailing `#_`!
 - `config/access_information_production.pickle` should be created
 
 ## Services
