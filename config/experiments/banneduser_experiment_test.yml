@@ -125,8 +125,8 @@ production:
           pm_subject: Reminder about r/AmItheAsshole ban
           pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
   second_banover_message:
-    pm_subject: Reminder about r/AmItheAsshole ban
-    pm_text: Hello {username}, your ban is over.
+    pm_subject: Reminder about r/AmItheAsshole ban (UNBAN MSG SUBJECT HERE)
+    pm_text: Hello {username}, your ban is over. (UNBAN MSG TEXT HERE).
   controller: BanneduserExperimentController
   start_time: 07/02/2000 00:00:00 UTC
   end_time: 07/02/3000 23:59:59 UTC
