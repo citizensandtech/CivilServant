@@ -154,9 +154,9 @@ class BanneduserExperimentController(ModactionExperimentController):
         try:
             lock_id = f"{self.__class__.__name__}({self.experiment_name})::update_experiment"
             with self.db_session.cooplock(lock_id, self.experiment.id):
-                self.log.info("{self.log_prefix} Sending first_banstart intervention messages...")
+                self.log.info(f"{self.log_prefix} Sending first_banstart intervention messages...")
                 self._send_first_banstart_intervention_messages(first_banstart_accounts_needing_messages)
-                self.log.info("{self.log_prefix} Sending second_banover intervention messages...")
+                self.log.info(f"{self.log_prefix} Sending second_banover intervention messages...")
                 self._send_second_banover_intervention_messages(second_banover_accounts_needing_messages)
         except Exception as e:
             self.log.error(
