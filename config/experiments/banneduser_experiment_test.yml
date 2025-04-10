@@ -131,7 +131,7 @@ production:
   start_time: 07/02/2000 00:00:00 UTC
   end_time: 07/02/3000 23:59:59 UTC
   event_hooks:
-    test_after_comments:
+    banneduser_experiment_after_modaction_archive:
       is_active: True
       call_when: EventWhen.AFTER
       caller_controller: ModeratorController
@@ -272,7 +272,7 @@ test:
   start_time: 07/02/2000 00:00:00 UTC
   end_time: 07/02/3000 23:59:59 UTC
   event_hooks:
-    test_after_comments:
+    banneduser_experiment_after_modaction_archive:
       is_active: True
       call_when: EventWhen.AFTER
       caller_controller: ModeratorController
