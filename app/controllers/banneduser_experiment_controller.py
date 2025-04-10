@@ -141,9 +141,12 @@ class BanneduserExperimentController(ModactionExperimentController):
             self.db_session.rollback()
 
     def update_experiment(self):
-        """Update loop for the banned user experiment.
+        """Update for the banned user experiment.
 
-        Check for freshly enrolled accounts, and send messages to them.
+        Check for freshly enrolled accounts (ExperimentThings added to the database), and send messages to them.
+
+        NOTE: The reason why this isn't done right after finding eligible participants in _enroll_first_banstart_candidates_with_randomized_conditions or _assign_second_banover_candidates
+        is that update_experiment could potentially be called by a separate experiment job (via schedule_experiments.py).
         """
         first_banstart_accounts_needing_messages = self._get_accounts_needing_first_banstart_interventions()
         second_banover_accounts_needing_messages = self._get_accounts_needing_second_banover_interventions()
@@ -419,7 +422,7 @@ class BanneduserExperimentController(ModactionExperimentController):
 
     def _enroll_first_banstart_candidates_with_randomized_conditions(self, now_utc, newcomers):
         """Assign randomized conditions to newcomers.
-        Log an ExperimentAction with the assignments. (Messages will get sent later in update_experiment.)
+        Log an ExperimentThing with the assignments. (Messages will get sent later in update_experiment.)
         If there are no available randomizations, throw an error.
 
         Args:
@@ -486,7 +489,7 @@ class BanneduserExperimentController(ModactionExperimentController):
     def _assign_second_banover_candidates(self, now_utc, candidates):
         """Assign/update database for second_banover candidates.
         (If randomization is needed, it would happen here!)
-        Log an ExperimentAction with the assignments. (Messages will get sent later in update_experiment.)
+        Log an ExperimentThing with the assignments. (Messages will get sent later in update_experiment.)
         If there are no available randomizations, throw an error.
 
         Args:
@@ -794,7 +797,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             ## and do nothing, otherwise add to messages_to_send
             if message is None:
                 metadata = json.loads(experiment_thing.metadata_json)
-                metadata["message_status"] = "sent"
+                metadata["message_status"] = f"{intervention_type}_sent"
                 ea = ExperimentAction(
                     experiment_id=self.experiment.id,
                     action=action,
@@ -844,15 +847,15 @@ class BanneduserExperimentController(ModactionExperimentController):
                             invalid_username = True
 
                         if invalid_username:
-                            metadata["message_status"] = "nonexistent"
-                            metadata["survey_status"] = "nonexistent"
+                            metadata["message_status"] = f"{intervention_type}_nonexistent"
+                            metadata["survey_status"] = f"{intervention_type}_nonexistent"
                             experiment_thing.query_index = impossible_status
                             update_records = True
                 ## if there are no errors
                 ## add an ExperimentAction and
                 ## update the experiment_thing metadata
                 else:
-                    metadata["message_status"] = "sent"
+                    metadata["message_status"] = f"{intervention_type}_sent"
                     experiment_thing.query_index = complete_status
                     update_records = True
 
