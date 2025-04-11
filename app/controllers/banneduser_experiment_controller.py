@@ -164,7 +164,8 @@ class BanneduserExperimentController(ModactionExperimentController):
         except Exception as e:
             self.log.error(
                 self.log_prefix,
-                "Error in BannedUserExperimentController::update_experiment",
+                "Error in BannedUserExperimentController::update_experiment", 
+                e,
                 extra=sys.exc_info()[0],
             )
             self.db_session.rollback()
@@ -229,7 +230,6 @@ class BanneduserExperimentController(ModactionExperimentController):
         Returns:
             A filtered list of mod actions.
         """
-        previously_enrolled_user_ids = set(self._previously_enrolled_user_ids())
         first_banstart_complete_user_ids = set(self._get_first_banstart_complete_user_ids())
         second_banover_candidates = {}
         for modaction in modactions:
@@ -569,7 +569,7 @@ class BanneduserExperimentController(ModactionExperimentController):
 
         This is currently a rudimentary approach. Account age is typically a better indicator.
         """
-        return re.match(r".+bot$", modaction.target_author, re.IGNORECASE) != None
+        return re.match(r".+bot$", modaction.target_author, re.IGNORECASE) is not None
 
     def _is_deleted(self, modaction):
         """Return true if the target of a mod action is deleted."""
