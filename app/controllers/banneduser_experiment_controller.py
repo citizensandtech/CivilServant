@@ -728,13 +728,19 @@ class BanneduserExperimentController(ModactionExperimentController):
             message_subject = yml_cond["arms"][arm]["pm_subject"].format(**account_info)
             message_body = yml_cond["arms"][arm]["pm_text"].format(**account_info)
 
-        else:  # second_banover
+        elif(intervention_type == "second_banover"):
             if "second_banover_message" not in self.experiment_settings:
                 raise ExperimentConfigurationError(
                     f"In the experiment '{self.experiment_name}', the 'second_banover_message' entry fails to exist in the configuration"
                 )
             message_subject = self.experiment_settings["second_banover_message"]["pm_subject"].format(**account_info)
             message_body = self.experiment_settings["second_banover_message"]["pm_text"].format(**account_info)
+
+
+        else:
+            error_message = f"{self.log_prefix} Error: Wrong intervention_type in BanneduserExperimentController::_format_intervention_message"
+            self.log.error(error_message)
+            raise Exception(error_message)
 
         return {"subject": message_subject, "message": message_body}
 
