@@ -7,6 +7,8 @@ from conftest import DictObject
 # XXX: must come before app imports
 ENV = os.environ["CS_ENV"] = "test"
 
+from sqlalchemy import and_
+
 from app.controllers.banneduser_experiment_controller import (
     BanneduserExperimentController,
     BannedUserQueryIndex,
@@ -64,7 +66,7 @@ def static_now():
 
 @pytest.fixture
 def newcomer_modactions(experiment_controller, modaction_data):
-    return experiment_controller._find_eligible_newcomers(modaction_data)
+    return experiment_controller._find_first_banstart_candidates(modaction_data)
 
 
 class TestRedditMock:
@@ -163,7 +165,7 @@ class TestModactionExperimentController:
 
 
 class TestExperimentController:
-    def test_enroll_new_participants(
+    def test_find_intervention_targets(
         self, helpers, experiment_controller, mod_controller
     ):
         assert len(experiment_controller._previously_enrolled_user_ids()) == 0
@@ -224,10 +226,120 @@ class TestPrivateMethods:
         experiment_controller.db_session.commit()
         assert experiment_controller._previously_enrolled_user_ids() == want
 
-    def test_find_eligible_newcomers(self, modaction_data, experiment_controller):
+    def test_find_first_banstart_candidates(self, modaction_data, experiment_controller):
         # NOTE: not using newcomer_modactions for extra clarity.
-        user_modactions = experiment_controller._find_eligible_newcomers(modaction_data)
+        user_modactions = experiment_controller._find_first_banstart_candidates(modaction_data)
         assert len(user_modactions) > 0
+
+
+    # NOTE: Ideally this test data should be in a fixture
+    @pytest.mark.parametrize(
+        "test_users,unban_actions,want",
+        [
+            (
+                [{
+                    "thing_id": "OlaminaEarthSeedXxX",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+                }],
+                [{
+                    "action": "unbanuser",
+                    "target_author": "OlaminaEarthSeedXxX",
+                }],
+                ["OlaminaEarthSeedXxX"],
+            ),            
+            (
+                [{
+                    "thing_id": "marieLVF",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_PENDING, 
+                }],
+                [{
+                    "action": "unbanuser",
+                    "target_author": "marieLVF",
+                }],
+                [],
+            ),
+            (
+                [{
+                    "thing_id": "cgj75",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+                }],
+                [{
+                    "action": "banuser", 
+                    "target_author": "cgj75",
+                }],
+                [],
+            ),
+            (
+                [{
+                    "thing_id": "yalomyalom31",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+                }],
+                [{
+                    "action": "unbanuser", 
+                    "target_author": "yalomyalom31",
+                },{
+                    "action": "unbanuser", 
+                    "target_author": "yalomyalom31", # duplicate unban
+                }],
+                ["yalomyalom31"],
+            ),            
+            (
+                [{
+                    "thing_id": "rogers123",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+                }],
+                [{
+                    "action": "unbanuser", 
+                    "target_author": "rogers123",
+                },{
+                    "action": "banuser", 
+                    "target_author": "rogers123", # ban after unban
+                    "details": "3 days",
+                }],
+                [],
+            ),                        (
+                [{
+                    "thing_id": "edwardsaid35",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+                },
+                {
+                    "thing_id": "abc123",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_PENDING,
+                }],
+                [{
+                    "action": "unbanuser",
+                    "target_author": "edwardsaid35",
+                },
+                {
+                    "action": "unbanuser",
+                    "target_author": "user_pending",
+                }],
+                ["edwardsaid35"],
+            ),
+        ],
+    )
+    def test_find_second_banover_candidates(self, test_users, unban_actions, want, modaction_data, experiment_controller):
+        user_modactions = experiment_controller._find_second_banover_candidates(modaction_data)
+        assert len(user_modactions) == 0
+        
+        for user in test_users:
+            et = ExperimentThing(
+                id=user["thing_id"],
+                thing_id=user["thing_id"],
+                experiment_id=experiment_controller.experiment.id,
+                object_type=ThingType.USER.value,
+                query_index=user["query_index"],
+                metadata_json=json.dumps({"ban_type": "temporary"}),
+            )
+            experiment_controller.db_session.add(et)
+        experiment_controller.db_session.commit()
+
+        unban_actions = [DictObject(action) for action in unban_actions]
+        
+        user_modactions = experiment_controller._find_second_banover_candidates(unban_actions)
+        found_users = [m.target_author for m in user_modactions]
+        assert found_users == want
+
 
     # update temp ban duration
     @pytest.mark.skip(
@@ -240,7 +352,7 @@ class TestPrivateMethods:
                 "banuser",
                 "999 days",
                 999,
-                BannedUserQueryIndex.PENDING,
+                BannedUserQueryIndex.FIRST_BANSTART_PENDING,
                 "temporary",
                 None,
             ),
@@ -248,7 +360,7 @@ class TestPrivateMethods:
                 "banuser",
                 "permaban",
                 None,
-                BannedUserQueryIndex.IMPOSSIBLE,
+                BannedUserQueryIndex.FIRST_BANSTART_IMPOSSIBLE,
                 "permanent",
                 -1,
             ),
@@ -256,7 +368,7 @@ class TestPrivateMethods:
                 "unbanuser",
                 "whatever",
                 None,
-                BannedUserQueryIndex.IMPOSSIBLE,
+                BannedUserQueryIndex.FIRST_BANSTART_IMPOSSIBLE,
                 "unbanned",
                 "static_now_placeholder",  # placeholder, replaced in test code with value of static_now
             ),
@@ -319,6 +431,7 @@ class TestPrivateMethods:
             want_actual_ban_end_time = static_now
         assert meta["actual_ban_end_time"] == want_actual_ban_end_time
 
+
     @pytest.mark.parametrize(
         "details,want",
         [
@@ -340,15 +453,80 @@ class TestPrivateMethods:
         got = experiment_controller._get_activity_condition(DictObject({}), static_now)
         assert got == "lurker"
 
-    def test_assign_randomized_conditions(
+    def test_enroll_first_banstart_candidates_with_randomized_conditions(
         self, modaction_data, experiment_controller, static_now
     ):
         assert len(experiment_controller._previously_enrolled_user_ids()) == 0
 
-        user_modactions = experiment_controller._find_eligible_newcomers(modaction_data)
-        experiment_controller._assign_randomized_conditions(static_now, user_modactions)
+        user_modactions = experiment_controller._find_first_banstart_candidates(modaction_data)
+        experiment_controller._enroll_first_banstart_candidates_with_randomized_conditions(static_now, user_modactions)
 
         assert len(experiment_controller._previously_enrolled_user_ids()) > 1
+
+    @pytest.mark.parametrize(
+        "test_users,want",
+        [
+            (
+                [{
+                    "target_author": "OlaminaEarthSeedXxX",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+                }],
+                1
+            ),            
+            (
+                [{
+                    "target_author": "marieLVF",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_PENDING,
+                }],
+                0
+            ),            
+            (
+                [{
+                    "target_author": "edwardsaid35",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+                },
+                {
+                    "target_author": "user_pending",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_PENDING,
+                }],
+                1
+            ),
+        ])
+    def test_assign_second_banover_candidates(
+        self, test_users, want, experiment_controller, static_now
+    ):
+        assert self._count_second_banover_pending(experiment_controller) == 0
+
+        # first, insert experiment things into database
+        for user in test_users:
+            et = ExperimentThing(
+                id=user["target_author"],
+                thing_id=user["target_author"],
+                experiment_id=experiment_controller.experiment.id,
+                object_type=ThingType.USER.value,
+                query_index=user["query_index"],
+                metadata_json=json.dumps({"ban_type": "temporary"}),
+            )
+            experiment_controller.db_session.add(et)
+        experiment_controller.db_session.commit()
+
+        test_user_objects = [DictObject(user) for user in test_users]
+
+        experiment_controller._assign_second_banover_candidates(static_now, test_user_objects)
+
+
+        assert self._count_second_banover_pending(experiment_controller) == want
+
+
+    def _count_second_banover_pending(self, controller):
+        """Helper method to count users with SECOND_BANOVER_PENDING status"""
+        return controller.db_session.query(ExperimentThing).filter(
+            and_(
+                ExperimentThing.experiment_id == controller.experiment.id,
+                ExperimentThing.object_type == ThingType.USER.value,
+                ExperimentThing.query_index == BannedUserQueryIndex.SECOND_BANOVER_PENDING,
+            )
+        ).count()
 
     @pytest.mark.parametrize(
         "action,details,want",
@@ -443,6 +621,17 @@ class TestPrivateMethods:
         assert got == want
 
     @pytest.mark.parametrize(
+        "username,want",
+        [
+            ("innocent_user", False),
+            ("[deleted]", True),
+        ],
+    )
+    def test_is_deleted(self, username, want, experiment_controller):
+        got = experiment_controller._is_deleted(DictObject({"target_author": username}))
+        assert got == want
+
+    @pytest.mark.parametrize(
         "details,want",
         [
             (
@@ -486,17 +675,171 @@ class TestPrivateMethods:
         )
         assert got == want
 
-    @pytest.mark.skip(reason="interventions are automatic")
-    def test_get_accounts_needing_interventions(
-        self, helpers, experiment_controller, mod_controller
+    # NOTE: Ideally this test data should be in a fixture
+    @pytest.mark.parametrize(
+        "test_users,want",
+        [
+            (
+                [{
+                    "thing_id": "OlaminaEarthSeedXxX",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+                }],
+                ["OlaminaEarthSeedXxX"],
+            ),            
+            (
+                [{
+                    "thing_id": "marieLVF",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_PENDING,
+                }],
+                [],
+            ),            
+            (
+                [{
+                    "thing_id": "edwardsaid35",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+                },
+                {
+                    "thing_id": "user_pending",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_PENDING,
+                }],
+                ["edwardsaid35"],
+            ),
+        ],
+    )
+    def test_get_first_banstart_complete_user_ids(
+        self, test_users, want, helpers, experiment_controller, mod_controller
     ):
-        users = experiment_controller._get_accounts_needing_interventions()
+
+        user_ids = experiment_controller._get_first_banstart_complete_user_ids()
+        assert user_ids == []
+
+
+        for user in test_users:
+            et = ExperimentThing(
+                id=user["thing_id"],
+                thing_id=user["thing_id"],
+                experiment_id=experiment_controller.experiment.id,
+                object_type=ThingType.USER.value,
+                query_index=user["query_index"],
+                metadata_json=json.dumps({"ban_type": "temporary"}),
+            )
+            experiment_controller.db_session.add(et)
+        experiment_controller.db_session.commit()
+
+        user_ids = experiment_controller._get_first_banstart_complete_user_ids()
+        assert user_ids == want
+
+
+
+    # NOTE: Ideally this test data should be in a fixture
+    @pytest.mark.parametrize(
+        "test_users,want",
+        [
+            (
+                [{
+                    "thing_id": "user_pending",
+                    "query_index": BannedUserQueryIndex.SECOND_BANOVER_PENDING,
+                }],
+                0,
+            ),            
+            (
+                [{
+                    "thing_id": "user_pending",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_PENDING,
+                }],
+                1,
+            ),            
+            (
+                [{
+                    "thing_id": "user_complete",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+                },
+                {
+                    "thing_id": "user_pending",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_PENDING,
+                }],
+                1,
+            ),
+        ],
+    )
+    def test_get_accounts_needing_first_banstart_interventions(
+        self, test_users, want, helpers, experiment_controller, mod_controller
+    ):
+
+        users = experiment_controller._get_accounts_needing_first_banstart_interventions()
         assert users == []
 
-        helpers.load_mod_actions(mod_controller)
 
-        users = experiment_controller._get_accounts_needing_interventions()
-        assert len(users) > 0
+        for user in test_users:
+            et = ExperimentThing(
+                id=user["thing_id"],
+                thing_id=user["thing_id"],
+                experiment_id=experiment_controller.experiment.id,
+                object_type=ThingType.USER.value,
+                query_index=user["query_index"],
+                metadata_json=json.dumps({"ban_type": "temporary"}),
+            )
+            experiment_controller.db_session.add(et)
+        experiment_controller.db_session.commit()
+
+        users = experiment_controller._get_accounts_needing_first_banstart_interventions()
+
+        assert len(users) == want
+
+    # NOTE: Ideally this test data should be in a fixture
+    @pytest.mark.parametrize(
+        "test_users,want",
+        [
+            (
+                [{
+                    "thing_id": "user_pending",
+                    "query_index": BannedUserQueryIndex.SECOND_BANOVER_PENDING,
+                }],
+                1,
+            ),            
+            (
+                [{
+                    "thing_id": "user_pending",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_PENDING,
+                }],
+                0,
+            ),            
+            (
+                [{
+                    "thing_id": "user_complete",
+                    "query_index": BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+                },
+                {
+                    "thing_id": "user_pending",
+                    "query_index": BannedUserQueryIndex.SECOND_BANOVER_PENDING,
+                }],
+                1,
+            ),
+        ],
+    )
+    def test_get_accounts_needing_second_banover_interventions(
+        self, test_users, want, helpers, experiment_controller, mod_controller
+    ):
+
+        users = experiment_controller._get_accounts_needing_second_banover_interventions()
+        assert users == []
+
+
+        for user in test_users:
+            et = ExperimentThing(
+                id=user["thing_id"],
+                thing_id=user["thing_id"],
+                experiment_id=experiment_controller.experiment.id,
+                object_type=ThingType.USER.value,
+                query_index=user["query_index"],
+                metadata_json=json.dumps({"ban_type": "temporary"}),
+            )
+            experiment_controller.db_session.add(et)
+        experiment_controller.db_session.commit()
+
+        users = experiment_controller._get_accounts_needing_second_banover_interventions()
+
+        assert len(users) == want
 
     @pytest.mark.parametrize(
         "thing_id,metadata_json,want",
@@ -525,7 +868,7 @@ class TestPrivateMethods:
             ),
         ],
     )
-    def test_format_intervention_message(
+    def test_format_intervention_message__first_banstart(
         self, thing_id, metadata_json, want, experiment_controller
     ):
         et = ExperimentThing(
@@ -536,7 +879,7 @@ class TestPrivateMethods:
             metadata_json=json.dumps(metadata_json),
         )
 
-        got = experiment_controller._format_intervention_message(et)
+        got = experiment_controller._format_intervention_message(et, "first_banstart")
         assert got == want
 
     @pytest.mark.parametrize(
@@ -546,7 +889,7 @@ class TestPrivateMethods:
             {"condition": "invalid_condition", "arm": "arm_0"},
         ],
     )
-    def test_format_intervention_message_raises_error(
+    def test_format_intervention_message__first_banstart__raises_error(
         self, metadata_json, experiment_controller
     ):
         et = ExperimentThing(
@@ -558,8 +901,49 @@ class TestPrivateMethods:
         )
 
         with pytest.raises(ExperimentConfigurationError):
-            experiment_controller._format_intervention_message(et)
+            experiment_controller._format_intervention_message(et, "first_banstart")
 
+
+
+    @pytest.mark.parametrize(
+        "thing_id,metadata_json,want",
+        [
+            (
+                "12345",
+                {
+                },
+                {
+                    "subject": "PM Subject Line for 12345 (Banover)",
+                    "message": "Hello 12345, your ban is over.",
+                },
+            ),
+            (
+                "MarlKarx18",
+                {
+                },
+                {
+                    "subject": "PM Subject Line for MarlKarx18 (Banover)",
+                    "message": "Hello MarlKarx18, your ban is over.",
+                },
+            ),
+        ],
+    )
+    def test_format_intervention_message__second_banover(
+        self, thing_id, metadata_json, want, experiment_controller
+    ):
+        et = ExperimentThing(
+            id=12345,
+            thing_id=thing_id,
+            experiment_id=experiment_controller.experiment.id,
+            object_type=ThingType.USER.value,
+            metadata_json=json.dumps(metadata_json),
+        )
+
+        got = experiment_controller._format_intervention_message(et, "second_banover")
+        assert got == want
+
+
+    # NOTE: Ideally this test data should be in a fixture
     @pytest.mark.parametrize(
         "thing_id,metadata_json,want_error,want_user_query_index,want_user_message_status",
         [
@@ -570,8 +954,8 @@ class TestPrivateMethods:
                     "arm": "arm_1",
                 },
                 False,
-                BannedUserQueryIndex.COMPLETE,
-                "sent",
+                BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+                "first_banstart_sent",
             ),
             (
                 "LaLaLatour47",
@@ -580,8 +964,8 @@ class TestPrivateMethods:
                     "arm": "arm_0",
                 },
                 False,
-                BannedUserQueryIndex.COMPLETE,
-                "sent",
+                BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+                "first_banstart_sent",
             ),
             (
                 "ErrorWhoa99",
@@ -605,7 +989,7 @@ class TestPrivateMethods:
             ),
         ],
     )
-    def test_send_intervention_messages(
+    def test_send_first_banstart_intervention_messages(
         self,
         thing_id,
         metadata_json,
@@ -628,10 +1012,10 @@ class TestPrivateMethods:
 
         if want_error:
             with pytest.raises(Exception):
-                experiment_controller._send_intervention_messages([et])
+                experiment_controller._send_first_banstart_intervention_messages([et])
 
         else:
-            experiment_controller._send_intervention_messages([et])
+            experiment_controller._send_first_banstart_intervention_messages([et])
 
             ea = (
                 experiment_controller.db_session.query(ExperimentAction)
@@ -642,7 +1026,7 @@ class TestPrivateMethods:
 
             assert ea is not None
             meta = json.loads(ea.metadata_json)
-            assert meta["message_status"] == "sent"
+            assert meta["message_status"] == want_user_message_status
 
             user = (
                 experiment_controller.db_session.query(ExperimentThing)
@@ -652,4 +1036,79 @@ class TestPrivateMethods:
             assert user is not None
             assert user.query_index == want_user_query_index
             meta_u = json.loads(user.metadata_json)
-            assert meta_u["message_status"] == "sent"
+            assert meta_u["message_status"] == want_user_message_status
+
+
+
+    # TODO: are there any error cases to test here?
+
+    @pytest.mark.parametrize(
+        "thing_id,metadata_json,want_error,want_user_query_index,want_user_message_status",
+        [
+            (
+                "ThusSpoke44",
+                {
+                },
+                False,
+                BannedUserQueryIndex.SECOND_BANOVER_COMPLETE,
+                "second_banover_sent",
+            ),
+            (
+                "LaLaLatour47",
+                {
+                },
+                False,
+                BannedUserQueryIndex.SECOND_BANOVER_COMPLETE,
+                "second_banover_sent",
+            ),
+        ],
+    )
+    def test_send_second_banover_intervention_messages(
+        self,
+        thing_id,
+        metadata_json,
+        want_error,
+        want_user_query_index,
+        want_user_message_status,
+        experiment_controller,
+    ):
+        assert experiment_controller.db_session.query(ExperimentAction).count() == 0
+        assert experiment_controller.db_session.query(ExperimentThing).count() == 0
+
+        et = ExperimentThing(
+            id=thing_id,
+            thing_id=thing_id,
+            experiment_id=experiment_controller.experiment.id,
+            object_type=ThingType.USER.value,
+            metadata_json=json.dumps(metadata_json),
+        )
+        experiment_controller.db_session.add(et)
+        #experiment_controller.db_session.commit()
+
+        if want_error:
+            with pytest.raises(Exception):
+                experiment_controller._send_second_banover_intervention_messages([et])
+
+        else:
+            experiment_controller._send_second_banover_intervention_messages([et])
+
+            ea = (
+                experiment_controller.db_session.query(ExperimentAction)
+                .filter(ExperimentAction.action_object_id == thing_id)
+                .filter(ExperimentAction.action_object_type == ThingType.USER.value)
+                .one()
+            )
+
+            assert ea is not None
+            meta = json.loads(ea.metadata_json)
+            assert meta["message_status"] == want_user_message_status
+
+            user = (
+                experiment_controller.db_session.query(ExperimentThing)
+                .filter(ExperimentThing.thing_id == thing_id)
+                .one()
+            )
+            assert user is not None
+            assert user.query_index == want_user_query_index
+            meta_u = json.loads(user.metadata_json)
+            assert meta_u["message_status"] == want_user_message_status 

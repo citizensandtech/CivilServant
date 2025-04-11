@@ -46,7 +46,7 @@ This documentation assumes that civilservant is running in a production environm
 
 - `CS_ENV=production python set_up_auth.py`
   - Navigate to generated reddit URL in browser
-  - Enter code from redirect_url into python script
+  - Enter code from redirect_url into python script --- NOTE: don't include the trailing `#_`!
 - `config/access_information_production.pickle` should be created
 
 ## Services
@@ -103,7 +103,10 @@ See jobs in rq-dashboard web: `http://<SERVER_IP>:9181/`
 
 ## Schedule experiments
 
-- `CS_ENV=production python3 schedule_experiments.py banneduser_experiment_test conduct_banuser_experiment 300`
+- If scheduled
+  - `CS_ENV=production python3 schedule_experiments.py banneduser_experiment_test conduct_banuser_experiment 300`
+- If running once or triggered by event hooks:
+  - `CS_ENV=production python run_experiment.py banneduser_experiment_test`
 
 The experiment has started!
 

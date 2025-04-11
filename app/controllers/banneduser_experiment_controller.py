@@ -39,10 +39,12 @@ SIX_MONTHS_IN_SECONDS = 6 * 30 * 24 * 60 * 60
 class BannedUserQueryIndex(str, Enum):
     """Possible states of a banned user's query_index."""
 
-    PENDING = "Intervention Pending"
-    COMPLETE = "Intervention Complete"
-    IMPOSSIBLE = "Intervention Impossible"
-
+    FIRST_BANSTART_PENDING = "First Banstart Intervention Pending"
+    FIRST_BANSTART_COMPLETE= "First Banstart Intervention Complete"
+    FIRST_BANSTART_IMPOSSIBLE = "First Banstart Intervention Impossible"
+    SECOND_BANOVER_PENDING = "Second Banover Intervention Pending"
+    SECOND_BANOVER_COMPLETE  = "Second Banover Intervention Complete"
+    SECOND_BANOVER_IMPOSSIBLE  = "Second Banover Intervention Impossible"
 
 class BanneduserExperimentController(ModactionExperimentController):
     """Banned user experiment controller.
@@ -59,12 +61,12 @@ class BanneduserExperimentController(ModactionExperimentController):
         super().__init__(experiment_name, db_session, r, log, required_keys)
         self.log_prefix = f"{self.__class__.__name__} Experiment {experiment_name}:"
 
-    def enroll_new_participants(
+    def find_intervention_targets(
         self,
         instance,
         now_utc=int(datetime.utcnow().timestamp()),
     ):
-        """Enroll new participants in the experiment.
+        """Find intervention targets -- enroll new (banstart) participants in the experiment, assign banover intervention candidates.
 
         This is a callback that will be invoked declaratively.
         It is called by ModeratorController while running archive_mod_action_page, as noted in the experiment config YAML File.
@@ -75,37 +77,57 @@ class BanneduserExperimentController(ModactionExperimentController):
             now_utc (int): the current UNIX timestamp in seconds
         """
         if instance.fetched_subreddit_id != self.experiment_settings["subreddit_id"]:
-            # Callback enroll_new_participants called due to modactions fetched from subreddit
+            # Callback find_intervention_targets called due to modactions fetched from subreddit
             self.log.info(
-                f"{self.log_prefix} Callback enroll_new_participants called but not needed for subreddit {instance.fetched_subreddit_id}"
+                f"{self.log_prefix} Callback find_intervention_targets called but not needed for subreddit {instance.fetched_subreddit_id}"
             )
             return
 
         try:
-            lock_id = f"{self.__class__.__name__}({self.experiment_name})::enroll_new_participants"
+            lock_id = f"{self.__class__.__name__}({self.experiment_name})::find_intervention_targets"
             with self.db_session.cooplock(lock_id, self.experiment.id):
                 with self._new_modactions() as modactions:
+
+                    ### FIRST BANSTART INTERVENTION
+                    
                     self.log.info(
                         f"{self.log_prefix} Scanning {len(modactions)} modactions in subreddit {self.experiment_settings['subreddit_id']} to look for temporary bans"
                     )
 
-                    eligible_newcomers = self._find_eligible_newcomers(modactions)
+                    eligible_newcomers = self._find_first_banstart_candidates(modactions)
                     self.log.info(
-                        f"{self.log_prefix} Identified {len(eligible_newcomers)} eligible newcomers"
+                        f"{self.log_prefix} Identified {len(eligible_newcomers)} eligible newcomers / first_banstart candidates"
                     )
 
                     self.log.info(
-                        f"{self.log_prefix} Assigning randomized conditions to eligible newcomers"
+                        f"{self.log_prefix} Assigning randomized conditions to eligible newcomers / first_banstart candidates"
                     )
-                    self._assign_randomized_conditions(now_utc, eligible_newcomers)
+                    self._enroll_first_banstart_candidates_with_randomized_conditions(now_utc, eligible_newcomers)
+
+                    ### SECOND BANOVER INTERVENTION
 
                     self.log.info(
-                        f"{self.log_prefix} Updating the ban state of existing participants"
+                        f"{self.log_prefix} Scanning {len(modactions)} modactions in subreddit {self.experiment_settings['subreddit_id']} to look for unbans for second_banover candidates"
+                    )
+                    second_banover_candidates = self._find_second_banover_candidates(modactions)
+                    self.log.info(
+                        f"{self.log_prefix} Identified {len(second_banover_candidates)} second_banover candidates"
+                    )
+
+                    self.log.info(
+                        f"{self.log_prefix} Assigning/designating second_banover candidates as candidates"
+                    )
+                    self._assign_second_banover_candidates(now_utc, second_banover_candidates)
+
+                    ### UPDATE DATABASE OF PARTICIPANTS 
+
+                    self.log.info(
+                        f"{self.log_prefix} Updating the state of existing participants"
                     )
                     self._update_existing_participants(now_utc, modactions)
 
                     self.log.info(
-                        f"{self.log_prefix} Successfully Ran Event Hook to BanneduserExperimentController::enroll_new_participants. Caller: {instance}"
+                        f"{self.log_prefix} Successfully Ran Event Hook to BanneduserExperimentController::find_intervention_targets. Caller: {instance}"
                     )
 
             # To minimize latency, trigger interventions immediately after enrolling new participants.
@@ -113,35 +135,42 @@ class BanneduserExperimentController(ModactionExperimentController):
         except Exception as e:
             self.log.error(
                 self.log_prefix,
-                "Error in BanneduserExperimentController::enroll_new_participants",
+                "Error in BanneduserExperimentController::find_intervention_targets",
                 e,
             )
             self.db_session.rollback()
 
     def update_experiment(self):
-        """Update loop for the banned user experiment.
+        """Update for the banned user experiment.
 
-        Check for freshly enrolled accounts, and send messages to them.
+        Check for freshly enrolled accounts (ExperimentThings added to the database), and send messages to them.
+
+        NOTE: The reason why this isn't done right after finding eligible participants in _enroll_first_banstart_candidates_with_randomized_conditions or _assign_second_banover_candidates
+        is that update_experiment could potentially be called by a separate experiment job (via schedule_experiments.py).
         """
-        accounts_needing_messages = self._get_accounts_needing_interventions()
+        first_banstart_accounts_needing_messages = self._get_accounts_needing_first_banstart_interventions()
+        second_banover_accounts_needing_messages = self._get_accounts_needing_second_banover_interventions()
         self.log.info(
-            f"{self.log_prefix} Experiment {self.experiment.name}: identified {len(accounts_needing_messages)} accounts needing interventions. Sending messages now..."
+            f"{self.log_prefix} Experiment {self.experiment.name}: identified {len(first_banstart_accounts_needing_messages)} accounts needing first banstart interventions and {len(second_banover_accounts_needing_messages)} accounts needing second banover interventions."
         )
 
         try:
             lock_id = f"{self.__class__.__name__}({self.experiment_name})::update_experiment"
             with self.db_session.cooplock(lock_id, self.experiment.id):
-                self._send_intervention_messages(accounts_needing_messages)
+                self.log.info(f"{self.log_prefix} Sending first_banstart intervention messages...")
+                self._send_first_banstart_intervention_messages(first_banstart_accounts_needing_messages)
+                self.log.info(f"{self.log_prefix} Sending second_banover intervention messages...")
+                self._send_second_banover_intervention_messages(second_banover_accounts_needing_messages)
         except Exception as e:
             self.log.error(
                 self.log_prefix,
-                "Error in BannedUserExperimentController::update_experiment",
+                "Error in BannedUserExperimentController::update_experiment", 
+                e,
                 extra=sys.exc_info()[0],
             )
             self.db_session.rollback()
-            return []
 
-    def _find_eligible_newcomers(self, modactions):
+    def _find_first_banstart_candidates(self, modactions):
         """Filter a list of mod actions to find newcomers to the experiment.
         Starting with a list of arbitrary mod actions, select mod actions that:
         - are not for users already in the study,
@@ -171,6 +200,11 @@ class BanneduserExperimentController(ModactionExperimentController):
             ):
                 eligible_newcomers[modaction.target_author] = modaction
 
+            # NOTE: If there are multiple mod actions for the same user who isn't yet enrolled,
+            # we overwrite the previous action with the latest one.
+            # This assumes that they are processed in order.
+
+
             # if an unbanuser happens immediately after a banuser is logged and before user is enrolled...
             if (
                 not self._is_enrolled(modaction, previously_enrolled_user_ids)
@@ -180,14 +214,47 @@ class BanneduserExperimentController(ModactionExperimentController):
                 if(modaction.target_author in eligible_newcomers):
                     del(eligible_newcomers[modaction.target_author])
 
-            # NOTE: If there are multiple mod actions for the same user who isn't yet enrolled,
-            # we overwrite the previous action with the latest one.
-            # This assumes that they are processed in order.
 
         return list(eligible_newcomers.values())
 
+
+    def _find_second_banover_candidates(self, modactions):
+        """Filter a list of mod actions to find second_banover_candidates.
+        Starting with a list of arbitrary mod actions, select mod actions that:
+        - are for users already in the study,
+        - temporary bans are over
+
+        Args:
+            modactions: A list of mod actions.
+
+        Returns:
+            A filtered list of mod actions.
+        """
+        first_banstart_complete_user_ids = set(self._get_first_banstart_complete_user_ids())
+        second_banover_candidates = {}
+        for modaction in modactions:
+
+            if (
+                self._is_unban(modaction)
+                and modaction.target_author in first_banstart_complete_user_ids # first_banstart intervention is complete. 
+            ):
+                second_banover_candidates[modaction.target_author] = modaction
+
+
+            # if an banuser happens immediately after an unbanuser is logged and before second_banover intervention happens..
+            if (
+                modaction.target_author in second_banover_candidates                
+                and self._is_tempban(modaction)
+            ):
+                #  ... treat this as a unban/reban,  and don't do second intervention
+                if(modaction.target_author in second_banover_candidates):
+                    del(second_banover_candidates[modaction.target_author])
+
+        return list(second_banover_candidates.values())
+
     def _update_existing_participants(self, now_utc, modactions):
         """Find mod actions that update the state of any current participants.
+        This is for the sake of tracking participants in the database, not for performing interventions.
 
         Args:
             modactions: A list of mod actions.
@@ -250,14 +317,17 @@ class BanneduserExperimentController(ModactionExperimentController):
                 # Escalated to permaban.
                 user_metadata["ban_type"] = "permanent"
                 user_metadata["actual_ban_end_time"] = -1  # spec from study
-                if user.query_index == BannedUserQueryIndex.PENDING:
-                    user.query_index = BannedUserQueryIndex.IMPOSSIBLE
+                if user.query_index == BannedUserQueryIndex.FIRST_BANSTART_PENDING:
+                    user.query_index = BannedUserQueryIndex.FIRST_BANSTART_IMPOSSIBLE
+                if user.query_index == BannedUserQueryIndex.SECOND_BANOVER_PENDING:
+                    user.query_index = BannedUserQueryIndex.SECOND_BANOVER_IMPOSSIBLE
             elif modaction.action == "unbanuser":
                 # User was unbanned.
                 user_metadata["ban_type"] = "unbanned"
                 user_metadata["actual_ban_end_time"] = int(now_utc)
-                if user.query_index == BannedUserQueryIndex.PENDING:
-                    user.query_index = BannedUserQueryIndex.IMPOSSIBLE
+                if user.query_index == BannedUserQueryIndex.FIRST_BANSTART_PENDING:
+                    user.query_index = BannedUserQueryIndex.FIRST_BANSTART_IMPOSSIBLE
+                # NOTE: upon an unban, _assign_second_banover_candidates will set query_index to SECOND_BANOVER_PENDING. So do not alter SECOND_BANOVER_PENDING values, otherwise banover interventions will not trigger.
 
             user.metadata_json = json.dumps(user_metadata)
 
@@ -349,9 +419,9 @@ class BanneduserExperimentController(ModactionExperimentController):
         else:
             return "highremoval"
 
-    def _assign_randomized_conditions(self, now_utc, newcomers):
+    def _enroll_first_banstart_candidates_with_randomized_conditions(self, now_utc, newcomers):
         """Assign randomized conditions to newcomers.
-        Log an ExperimentAction with the assignments.
+        Log an ExperimentThing with the assignments. (Messages will get sent later in update_experiment.)
         If there are no available randomizations, throw an error.
 
         Args:
@@ -396,7 +466,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                 "thing_id": newcomer.target_author,
                 "experiment_id": self.experiment.id,
                 "object_type": ThingType.USER.value,
-                "query_index": BannedUserQueryIndex.PENDING,
+                "query_index": BannedUserQueryIndex.FIRST_BANSTART_PENDING,
                 "metadata_json": json.dumps(user_metadata),
             }
 
@@ -415,6 +485,52 @@ class BanneduserExperimentController(ModactionExperimentController):
             f"{self.log_prefix} Assigned randomizations to {len(newcomer_ets)} banned users: [{','.join([x['thing_id'] for x in newcomer_ets])}]"
         )
 
+    def _assign_second_banover_candidates(self, now_utc, candidates):
+        """Assign/update database for second_banover candidates.
+        (If randomization is needed, it would happen here!)
+        Log an ExperimentThing with the assignments. (Messages will get sent later in update_experiment.)
+        If there are no available randomizations, throw an error.
+
+        Args:
+            now_utc (int): the current datetime in UTC.
+            candidates: a list of tuples of `(mod action, redditor info)`.
+        """
+
+        candidate_ets = []
+        for candidate in candidates:
+
+            # get experiment_thing of candidate
+            candidate_et = self.db_session.query(ExperimentThing).filter(
+                and_(
+                    ExperimentThing.experiment_id == self.experiment.id,
+                    ExperimentThing.object_type == ThingType.USER.value,
+                    ExperimentThing.thing_id == candidate.target_author,
+                    ExperimentThing.query_index == BannedUserQueryIndex.FIRST_BANSTART_COMPLETE, # this is redundant but we do it anyways
+                )
+            ).first()
+
+            if not candidate_et:
+                self.log.error(
+                    "Mismatch between _find_second_banover_candidates and _assign_second_banover_candidates. This shouldn't happen. This means that, somehow between querying  in _find_second_banover_candidates and this query, there's a difference. Maybe you're testing incorrectly?"
+                )
+                continue
+
+            # update query_index of ExperimentThing to SECOND_BANOVER_PENDING
+            candidate_et.query_index = BannedUserQueryIndex.SECOND_BANOVER_PENDING
+
+            # update database with new ExperimentThing, but don't commit yet since we're in a loop
+            self.db_session.add_retryable(candidate_et, commit=False)
+
+            candidate_ets.append(candidate_et)
+
+        self.db_session.commit()
+
+        self.log.info(
+            f"{self.log_prefix} Assigned second_banover pending status to {len(candidate_ets)} unbanned users: [{','.join([x.thing_id for x in candidate_ets])}]"
+        )
+
+
+
     def _is_tempban(self, modaction):
         """Return true if an admin action is a temporary ban.
 
@@ -429,6 +545,7 @@ class BanneduserExperimentController(ModactionExperimentController):
         Unbanuser messages are sent BOTH upon automatic ban expire as well as manual ban end.
         """
         return modaction.action == "unbanuser"
+    
 
     def _is_tempban_edit(self, modaction):
         """Return true if an admin action is a temporary ban edit.
@@ -452,11 +569,12 @@ class BanneduserExperimentController(ModactionExperimentController):
 
         This is currently a rudimentary approach. Account age is typically a better indicator.
         """
-        return re.match(r".+bot$", modaction.target_author, re.IGNORECASE) != None
+        return re.match(r".+bot$", modaction.target_author, re.IGNORECASE) is not None
 
     def _is_deleted(self, modaction):
         """Return true if the target of a mod action is deleted."""
         return modaction.target_author == "[deleted]"
+
 
     def _parse_temp_ban(self, modaction):
         """Get details about the ban.
@@ -512,9 +630,24 @@ class BanneduserExperimentController(ModactionExperimentController):
         m = re.search(r"(\d+) days", modaction.details, re.IGNORECASE)
         return int(m.group(1)) if m else None
 
-    def _get_accounts_needing_interventions(self):
-        """Gets accounts that need interventions
-        details about the ban.
+    
+    def _get_first_banstart_complete_user_ids(self):
+        """Get user IDs that have their first intervention complete.
+
+        Returns:
+            A list of user IDs.
+        """
+        user_ids = self.db_session.query(ExperimentThing.thing_id).filter(
+            and_(
+                ExperimentThing.experiment_id == self.experiment.id,
+                ExperimentThing.object_type == ThingType.USER.value,
+                ExperimentThing.query_index == BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+            )
+        )
+        return [u[0] for u in user_ids]
+
+    def _get_accounts_needing_first_banstart_interventions(self):
+        """Gets accounts that need first_banstart interventions.
 
         Returns:
             A list of users that are enrolled in the study, that have not had messages sent yet.
@@ -526,19 +659,41 @@ class BanneduserExperimentController(ModactionExperimentController):
                 and_(
                     ExperimentThing.object_type == ThingType.USER.value,
                     ExperimentThing.experiment_id == self.experiment.id,
-                    ExperimentThing.query_index == BannedUserQueryIndex.PENDING,
+                    ExperimentThing.query_index == BannedUserQueryIndex.FIRST_BANSTART_PENDING,
                 )
             )
             .order_by(ExperimentThing.created_at)
             .all()
         )
 
-    ## TODO: this is the same as format_message in NewcomerMessagingExperimentController in messaging_experiment_controller.. should this be abstracted out into the parent class? Should this be abstracted out? or not touch working code?
-    def _format_intervention_message(self, experiment_thing):
+    def _get_accounts_needing_second_banover_interventions(self):
+        """Gets accounts that need second_banover interventions.
+
+        Returns:
+            A list of users that are enrolled in the study, that were recently unbanned and need a banover message sent.
+        """
+
+        return (
+            self.db_session.query(ExperimentThing)
+            .filter(
+                and_(
+                    ExperimentThing.object_type == ThingType.USER.value,
+                    ExperimentThing.experiment_id == self.experiment.id,
+                    ExperimentThing.query_index == BannedUserQueryIndex.SECOND_BANOVER_PENDING,
+                )
+            )
+            .order_by(ExperimentThing.created_at)
+            .all()
+        )
+
+
+
+    def _format_intervention_message(self, experiment_thing, intervention_type):
         """Format intervention message for an thing, given the arm that it is in. This reads from the experiment_settings (the YAML file in /config/experiments/.
 
         Args:
             experiment_thing: The ExperimentThing for a tempbanned user.
+            intervention_type: String indicating type of intervention. Either 'first_banstart' or 'second_banover'.
 
         Returns:
             A dict with message subject and body.
@@ -552,30 +707,80 @@ class BanneduserExperimentController(ModactionExperimentController):
         metadata_json = json.loads(experiment_thing.metadata_json)
         account_info = {"username": experiment_thing.thing_id}
 
-        condition = metadata_json["condition"]
-        arm = metadata_json["arm"]
+        if(intervention_type == "first_banstart"):
 
-        if condition not in self.experiment_settings["conditions"]:
-            raise ExperimentConfigurationError(
-                f"In the experiment '{self.experiment_name}', the '{condition}' condition fails to exist in the configuration"
-            )
+            condition = metadata_json["condition"]
+            arm = metadata_json["arm"]
 
-        yml_cond = self.experiment_settings["conditions"][condition]
-        if arm not in yml_cond["arms"]:
-            raise ExperimentConfigurationError(
-                f"In the experiment '{self.experiment_name}', the '{condition}' condition fails to include information about the '{arm}' arm, despite having randomizations assigned to it"
-            )
-        if yml_cond["arms"][arm] is None:
-            return None
-        message_subject = yml_cond["arms"][arm]["pm_subject"].format(**account_info)
-        message_body = yml_cond["arms"][arm]["pm_text"].format(**account_info)
+            if condition not in self.experiment_settings["conditions"]:
+                raise ExperimentConfigurationError(
+                    f"In the experiment '{self.experiment_name}', the '{condition}' condition fails to exist in the configuration"
+                )
+
+            yml_cond = self.experiment_settings["conditions"][condition]
+            if arm not in yml_cond["arms"]:
+                raise ExperimentConfigurationError(
+                    f"In the experiment '{self.experiment_name}', the '{condition}' condition fails to include information about the '{arm}' arm, despite having randomizations assigned to it"
+                )
+            if yml_cond["arms"][arm] is None:
+                return None
+            message_subject = yml_cond["arms"][arm]["pm_subject"].format(**account_info)
+            message_body = yml_cond["arms"][arm]["pm_text"].format(**account_info)
+
+        elif(intervention_type == "second_banover"):
+            if "second_banover_message" not in self.experiment_settings:
+                raise ExperimentConfigurationError(
+                    f"In the experiment '{self.experiment_name}', the 'second_banover_message' entry fails to exist in the configuration"
+                )
+            message_subject = self.experiment_settings["second_banover_message"]["pm_subject"].format(**account_info)
+            message_body = self.experiment_settings["second_banover_message"]["pm_text"].format(**account_info)
+
+
+        else:
+            error_message = f"{self.log_prefix} Error: Wrong intervention_type in BanneduserExperimentController::_format_intervention_message"
+            self.log.error(error_message)
+            raise Exception(error_message)
+
         return {"subject": message_subject, "message": message_body}
 
-    def _send_intervention_messages(self, experiment_things):
+
+    def _send_first_banstart_intervention_messages(self, experiment_things):
+        """Sends first banstart intervention messages.
+        This is for users who have just been banned.
+
+        Args:
+            experiment_things: A list of ExperimentThings for users needing first_banstart interventions.
+        """
+        return self._send_intervention_messages(
+            experiment_things,
+            complete_status=BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
+            impossible_status=BannedUserQueryIndex.FIRST_BANSTART_IMPOSSIBLE,
+            intervention_type="first_banstart"
+        )
+
+    def _send_second_banover_intervention_messages(self, experiment_things):
+        """Sends second banover intervention messages.
+        This is for users whose ban has just ended.
+
+        Args:
+            experiment_things: A list of ExperimentThings for users needing second_banover interventions.
+        """
+        return self._send_intervention_messages(
+            experiment_things,
+            complete_status=BannedUserQueryIndex.SECOND_BANOVER_COMPLETE,
+            impossible_status=BannedUserQueryIndex.SECOND_BANOVER_IMPOSSIBLE,
+            intervention_type="second_banover"
+        )
+    
+
+    def _send_intervention_messages(self, experiment_things, complete_status, impossible_status, intervention_type):
         """Sends appropriate intervention messages for a list of experiment things.
 
         Args:
             experiment_things: A list of ExperimentThings representing tempbanned users.
+            complete_status: The BannedUserQueryIndex to use when message is sent successfully
+            impossible_status: The BannedUserQueryIndex to use when message cannot be sent
+            intervention_type: String indicating type of intervention. Either 'first_banstart' or 'second_banover'.
 
         Returns:
             A dict with server response from praw's send_message,
@@ -592,12 +797,12 @@ class BanneduserExperimentController(ModactionExperimentController):
         action = "SendMessage"
         messages_to_send = []
         for experiment_thing in experiment_things:
-            message = self._format_intervention_message(experiment_thing)
+            message = self._format_intervention_message(experiment_thing, intervention_type)
             ## if it's a control group, log inaction
             ## and do nothing, otherwise add to messages_to_send
             if message is None:
                 metadata = json.loads(experiment_thing.metadata_json)
-                metadata["message_status"] = "sent"
+                metadata["message_status"] = f"{intervention_type}_sent"
                 ea = ExperimentAction(
                     experiment_id=self.experiment.id,
                     action=action,
@@ -605,7 +810,7 @@ class BanneduserExperimentController(ModactionExperimentController):
                     action_object_id=experiment_thing.id,
                     metadata_json=json.dumps(metadata),
                 )
-                experiment_thing.query_index = BannedUserQueryIndex.COMPLETE
+                experiment_thing.query_index = complete_status
                 experiment_thing.metadata_json = json.dumps(metadata)
                 self.db_session.add_retryable(ea)
             else:
@@ -613,12 +818,12 @@ class BanneduserExperimentController(ModactionExperimentController):
                 messages_to_send.append(message)
 
         self.log.info(
-            f"{self.log_prefix} Sending messages to {len(messages_to_send)} users: [{','.join([x['account'] for x in messages_to_send])}]"
+            f"{self.log_prefix} Sending {intervention_type} messages to {len(messages_to_send)} users: [{','.join([x['account'] for x in messages_to_send])}]"
         )
         # send messages_to_send
         message_results = mc.send_messages(
             messages_to_send,
-            f"BannedUserMessagingExperiment({self.experiment_name})::_send_intervention_messages",
+            f"BannedUserMessagingExperiment({self.experiment_name})::_send_{intervention_type}_intervention_messages",
         )
 
         # iterate through message_result, linked with experiment_things
@@ -647,18 +852,16 @@ class BanneduserExperimentController(ModactionExperimentController):
                             invalid_username = True
 
                         if invalid_username:
-                            metadata["message_status"] = "nonexistent"
-                            metadata["survey_status"] = "nonexistent"
-                            experiment_thing.query_index = (
-                                BannedUserQueryIndex.IMPOSSIBLE
-                            )
+                            metadata["message_status"] = f"{intervention_type}_nonexistent"
+                            metadata["survey_status"] = f"{intervention_type}_nonexistent"
+                            experiment_thing.query_index = impossible_status
                             update_records = True
                 ## if there are no errors
                 ## add an ExperimentAction and
                 ## update the experiment_thing metadata
                 else:
-                    metadata["message_status"] = "sent"
-                    experiment_thing.query_index = BannedUserQueryIndex.COMPLETE
+                    metadata["message_status"] = f"{intervention_type}_sent"
+                    experiment_thing.query_index = complete_status
                     update_records = True
 
                 if update_records:

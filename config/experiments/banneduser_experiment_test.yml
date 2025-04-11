@@ -9,133 +9,136 @@ production:
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line for {username} (Threedays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the lurker_threedays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
         arm_1:
-          pm_subject: PM Subject Line for {username} (Threedays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the lurker_threedays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
     lurker_sevendays:
       randomizations: banneduser_experiment_newcomer7_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line for {username} (Sevendays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the lurker_sevendays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
         arm_1:
-          pm_subject: PM Subject Line for {username} (Sevendays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the lurker_sevendays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
     lurker_fourteendays:
       randomizations: banneduser_experiment_newcomer14_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line for {username} (Fourteendays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the lurker_fourteendays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
         arm_1:
-          pm_subject: PM Subject Line for {username} (Fourteendays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the lurker_fourteendays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
     lurker_thirtydays:
       randomizations: banneduser_experiment_newcomer30_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line for {username} (Thirtydays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the lurker_thirtydays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
         arm_1:
-          pm_subject: PM Subject Line for {username} (Thirtydays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the lurker_thirtydays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
     lowremoval_threedays:
       randomizations: banneduser_experiment_low3_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line for {username} (Threedays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the lowremoval_threedays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
         arm_1:
-          pm_subject: PM Subject Line for {username} (Threedays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the lowremoval_threedays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
     lowremoval_sevendays:
       randomizations: banneduser_experiment_low7_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line for {username} (Sevendays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the lowremoval_sevendays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
         arm_1:
-          pm_subject: PM Subject Line for {username} (Sevendays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the lowremoval_sevendays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
     lowremoval_fourteendays:
       randomizations: banneduser_experiment_low14_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line for {username} (Fourteendays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the lowremoval_fourteendays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
         arm_1:
-          pm_subject: PM Subject Line for {username} (Fourteendays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the lowremoval_fourteendays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
     lowremoval_thirtydays:
       randomizations: banneduser_experiment_low30_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line for {username} (Thirtydays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the lowremoval_thirtydays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
         arm_1:
-          pm_subject: PM Subject Line for {username} (Thirtydays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the lowremoval_thirtydays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
     highremoval_threedays:
       randomizations: banneduser_experiment_high3_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line for {username} (Threedays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the highremoval_threedays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
         arm_1:
-          pm_subject: PM Subject Line for {username} (Threedays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the highremoval_threedays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
     highremoval_sevendays:
       randomizations: banneduser_experiment_high7_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line for {username} (Sevendays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the highremoval_sevendays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
         arm_1:
-          pm_subject: PM Subject Line for {username} (Sevendays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the highremoval_sevendays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
     highremoval_fourteendays:
       randomizations: banneduser_experiment_high14_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line for {username} (Fourteendays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the highremoval_fourteendays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
         arm_1:
-          pm_subject: PM Subject Line for {username} (Fourteendays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the highremoval_fourteendays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
     highremoval_thirtydays:
       randomizations: banneduser_experiment_high30_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line for {username} (Thirtydays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the highremoval_thirtydays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
         arm_1:
-          pm_subject: PM Subject Line for {username} (Thirtydays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the highremoval_thirtydays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+  second_banover_message:
+    pm_subject: Reminder about r/AmItheAsshole ban (UNBAN MSG SUBJECT HERE)
+    pm_text: Hello {username}, your ban is over. (UNBAN MSG TEXT HERE).
   controller: BanneduserExperimentController
   start_time: 07/02/2000 00:00:00 UTC
   end_time: 07/02/3000 23:59:59 UTC
   event_hooks:
-    test_after_comments:
+    banneduser_experiment_after_modaction_archive:
       is_active: True
       call_when: EventWhen.AFTER
       caller_controller: ModeratorController
       caller_method: archive_mod_action_page
       callee_module: app.controllers.banneduser_experiment_controller
       callee_controller: BanneduserExperimentController
-      callee_method: enroll_new_participants
+      callee_method: find_intervention_targets
 test:
   subreddit: catlabreddit_testbu1
   subreddit_id: TEST_ONLY
@@ -147,130 +150,133 @@ test:
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line for {username} (Threedays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the lurker_threedays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
         arm_1:
-          pm_subject: PM Subject Line for {username} (Threedays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the lurker_threedays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
     lurker_sevendays:
       randomizations: banneduser_experiment_newcomer7_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line for {username} (Sevendays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the lurker_sevendays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
         arm_1:
-          pm_subject: PM Subject Line for {username} (Sevendays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the lurker_sevendays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
     lurker_fourteendays:
       randomizations: banneduser_experiment_newcomer14_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line for {username} (Fourteendays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the lurker_fourteendays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
         arm_1:
-          pm_subject: PM Subject Line for {username} (Fourteendays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the lurker_fourteendays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
     lurker_thirtydays:
       randomizations: banneduser_experiment_newcomer30_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line for {username} (Thirtydays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the lurker_thirtydays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
         arm_1:
-          pm_subject: PM Subject Line for {username} (Thirtydays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the lurker_thirtydays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
     lowremoval_threedays:
       randomizations: banneduser_experiment_low3_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line for {username} (Threedays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the lowremoval_threedays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
         arm_1:
-          pm_subject: PM Subject Line for {username} (Threedays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the lowremoval_threedays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
     lowremoval_sevendays:
       randomizations: banneduser_experiment_low7_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line for {username} (Sevendays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the lowremoval_sevendays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
         arm_1:
-          pm_subject: PM Subject Line for {username} (Sevendays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the lowremoval_sevendays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
     lowremoval_fourteendays:
       randomizations: banneduser_experiment_low14_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line for {username} (Fourteendays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the lowremoval_fourteendays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
         arm_1:
-          pm_subject: PM Subject Line for {username} (Fourteendays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the lowremoval_fourteendays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
     lowremoval_thirtydays:
       randomizations: banneduser_experiment_low30_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line for {username} (Thirtydays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the lowremoval_thirtydays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
         arm_1:
-          pm_subject: PM Subject Line for {username} (Thirtydays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the lowremoval_thirtydays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
     highremoval_threedays:
       randomizations: banneduser_experiment_high3_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line for {username} (Threedays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the highremoval_threedays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
         arm_1:
-          pm_subject: PM Subject Line for {username} (Threedays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the highremoval_threedays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
     highremoval_sevendays:
       randomizations: banneduser_experiment_high7_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line for {username} (Sevendays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the highremoval_sevendays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
         arm_1:
-          pm_subject: PM Subject Line for {username} (Sevendays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the highremoval_sevendays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
     highremoval_fourteendays:
       randomizations: banneduser_experiment_high14_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line for {username} (Fourteendays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the highremoval_fourteendays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
         arm_1:
-          pm_subject: PM Subject Line for {username} (Fourteendays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the highremoval_fourteendays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
     highremoval_thirtydays:
       randomizations: banneduser_experiment_high30_messaging_randomizations-AITA-12.16.2024.csv
       next_randomization: 0
       arms:
         arm_0:
-          pm_subject: PM Subject Line for {username} (Thirtydays Arm 0)
-          pm_text: Hello {username}, this is the message for arm 0 of the highremoval_thirtydays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
         arm_1:
-          pm_subject: PM Subject Line for {username} (Thirtydays Arm 1)
-          pm_text: Hello {username}, this is the message for arm 1 of the highremoval_thirtydays condition.
+          pm_subject: Reminder about r/AmItheAsshole ban
+          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+  second_banover_message:
+    pm_subject: Reminder about r/AmItheAsshole ban
+    pm_text: Hello {username}, your ban is over.
   controller: BanneduserExperimentController
   start_time: 07/02/2000 00:00:00 UTC
   end_time: 07/02/3000 23:59:59 UTC
   event_hooks:
-    test_after_comments:
+    banneduser_experiment_after_modaction_archive:
       is_active: True
       call_when: EventWhen.AFTER
       caller_controller: ModeratorController
       caller_method: archive_mod_action_page
       callee_module: app.controllers.banneduser_experiment_controller
       callee_controller: BanneduserExperimentController
-      callee_method: enroll_new_participants
+      callee_method: find_intervention_targets

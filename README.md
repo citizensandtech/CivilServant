@@ -10,4 +10,4 @@ The CivilServant software is available under the MIT License, a permissive open 
 
 ### Setup 
 
-Further documentation is at [SETUP.md](SETUP.md).
+Further documentation is at [SETUP.md](SETUP.md) and [JOBS_AND_EXPERIMENTS.md](JOBS_AND_EXPERIMENTS.md).
