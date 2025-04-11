@@ -168,7 +168,6 @@ class BanneduserExperimentController(ModactionExperimentController):
                 extra=sys.exc_info()[0],
             )
             self.db_session.rollback()
-            return []
 
     def _find_first_banstart_candidates(self, modactions):
         """Filter a list of mod actions to find newcomers to the experiment.
