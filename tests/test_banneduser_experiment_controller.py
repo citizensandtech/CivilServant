@@ -955,7 +955,7 @@ class TestPrivateMethods:
                 },
                 False,
                 BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
-                "sent",
+                "first_banstart_sent",
             ),
             (
                 "LaLaLatour47",
@@ -965,7 +965,7 @@ class TestPrivateMethods:
                 },
                 False,
                 BannedUserQueryIndex.FIRST_BANSTART_COMPLETE,
-                "sent",
+                "first_banstart_sent",
             ),
             (
                 "ErrorWhoa99",
@@ -1026,7 +1026,7 @@ class TestPrivateMethods:
 
             assert ea is not None
             meta = json.loads(ea.metadata_json)
-            assert meta["message_status"] == "sent"
+            assert meta["message_status"] == want_user_message_status
 
             user = (
                 experiment_controller.db_session.query(ExperimentThing)
@@ -1036,7 +1036,7 @@ class TestPrivateMethods:
             assert user is not None
             assert user.query_index == want_user_query_index
             meta_u = json.loads(user.metadata_json)
-            assert meta_u["message_status"] == "sent"
+            assert meta_u["message_status"] == want_user_message_status
 
 
 
@@ -1051,7 +1051,7 @@ class TestPrivateMethods:
                 },
                 False,
                 BannedUserQueryIndex.SECOND_BANOVER_COMPLETE,
-                "sent",
+                "second_banover_sent",
             ),
             (
                 "LaLaLatour47",
@@ -1059,7 +1059,7 @@ class TestPrivateMethods:
                 },
                 False,
                 BannedUserQueryIndex.SECOND_BANOVER_COMPLETE,
-                "sent",
+                "second_banover_sent",
             ),
         ],
     )
@@ -1101,7 +1101,7 @@ class TestPrivateMethods:
 
             assert ea is not None
             meta = json.loads(ea.metadata_json)
-            assert meta["message_status"] == "sent"
+            assert meta["message_status"] == want_user_message_status
 
             user = (
                 experiment_controller.db_session.query(ExperimentThing)
@@ -1111,4 +1111,4 @@ class TestPrivateMethods:
             assert user is not None
             assert user.query_index == want_user_query_index
             meta_u = json.loads(user.metadata_json)
-            assert meta_u["message_status"] == "sent"
+            assert meta_u["message_status"] == want_user_message_status 
