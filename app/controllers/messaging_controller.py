@@ -67,11 +67,12 @@ class MessagingController:
         try:
             self.log.info("Sending a message to user %s with subject %s" % (username, str(subject)))
             # NOTE: THIS CODE WAS ADJUSTED TO PREVENT ACTUAL MESSAGE SENDING
-            # NOTE: FOR THE PURPOSE OF TESTING THE r/feminism experiment
-            # WARNING: DO NOT COMMIT THIS LINE UNCOMMENTED
-            # response = {"errors":[]}
+            # NOTE: FOR THE PURPOSE OF TESTING THE r/feminism experiment, and later the r/amitheasshole experiment
+            # WARNING: DO NOT COMMIT THIS LINE UNCOMMENTED UNLESS YOU KNOW WHAT YOU ARE DOING
+            response = {"errors":[]}
             # NOTE: END ALTERED CODE COMPONENT
-            response = self.r.send_message(username, subject, body, raise_captcha_exception=True)
+            # response = self.r.send_message(username, subject, body, raise_captcha_exception=True)
+            self.log.info("(disable-message-sending): message is NOT being sent")
  
             if response["errors"] and len(response['errors'])>0:
                 self.log.error("Error in response when sending a message to reddit account %s: %s" % (username, str(response)))
