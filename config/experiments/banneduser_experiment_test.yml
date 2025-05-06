@@ -289,7 +289,7 @@ test:
       arms:
         arm_0:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text:|
+          pm_text: |
             This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. 
 
             Please note that this bot is not a moderator of the subreddit and cannot change the ban.
