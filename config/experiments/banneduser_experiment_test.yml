@@ -5,128 +5,203 @@ production:
   participant_activity_condition_removal_ratio_threshold: 0.3
   conditions:
     lurker_threedays:
-      randomizations: banneduser_experiment_newcomer3_messaging_randomizations-AITA-12.16.2024.csv
+      randomizations: banneduser_experiment_newcomer3_messaging_randomizations-AITA-05.01.2025.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
         arm_1:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
     lurker_sevendays:
-      randomizations: banneduser_experiment_newcomer7_messaging_randomizations-AITA-12.16.2024.csv
+      randomizations: banneduser_experiment_newcomer7_messaging_randomizations-AITA-05.01.2025.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
         arm_1:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
     lurker_fourteendays:
-      randomizations: banneduser_experiment_newcomer14_messaging_randomizations-AITA-12.16.2024.csv
+      randomizations: banneduser_experiment_newcomer14_messaging_randomizations-AITA-05.01.2025.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
         arm_1:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
     lurker_thirtydays:
-      randomizations: banneduser_experiment_newcomer30_messaging_randomizations-AITA-12.16.2024.csv
+      randomizations: banneduser_experiment_newcomer30_messaging_randomizations-AITA-05.01.2025.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
         arm_1:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
     lowremoval_threedays:
-      randomizations: banneduser_experiment_low3_messaging_randomizations-AITA-12.16.2024.csv
+      randomizations: banneduser_experiment_low3_messaging_randomizations-AITA-05.01.2025.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
         arm_1:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
     lowremoval_sevendays:
-      randomizations: banneduser_experiment_low7_messaging_randomizations-AITA-12.16.2024.csv
+      randomizations: banneduser_experiment_low7_messaging_randomizations-AITA-05.01.2025.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
         arm_1:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
     lowremoval_fourteendays:
-      randomizations: banneduser_experiment_low14_messaging_randomizations-AITA-12.16.2024.csv
+      randomizations: banneduser_experiment_low14_messaging_randomizations-AITA-05.01.2025.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
         arm_1:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
     lowremoval_thirtydays:
-      randomizations: banneduser_experiment_low30_messaging_randomizations-AITA-12.16.2024.csv
+      randomizations: banneduser_experiment_low30_messaging_randomizations-AITA-05.01.2025.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
         arm_1:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
     highremoval_threedays:
-      randomizations: banneduser_experiment_high3_messaging_randomizations-AITA-12.16.2024.csv
+      randomizations: banneduser_experiment_high3_messaging_randomizations-AITA-05.01.2025.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
         arm_1:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
     highremoval_sevendays:
-      randomizations: banneduser_experiment_high7_messaging_randomizations-AITA-12.16.2024.csv
+      randomizations: banneduser_experiment_high7_messaging_randomizations-AITA-05.01.2025.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
         arm_1:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
     highremoval_fourteendays:
-      randomizations: banneduser_experiment_high14_messaging_randomizations-AITA-12.16.2024.csv
+      randomizations: banneduser_experiment_high14_messaging_randomizations-AITA-05.01.2025.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
         arm_1:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
     highremoval_thirtydays:
-      randomizations: banneduser_experiment_high30_messaging_randomizations-AITA-12.16.2024.csv
+      randomizations: banneduser_experiment_high30_messaging_randomizations-AITA-05.01.2025.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
         arm_1:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
   second_banover_message:
-    pm_subject: Reminder about r/AmItheAsshole ban (UNBAN MSG SUBJECT HERE)
-    pm_text: Hello {username}, your ban is over. (UNBAN MSG TEXT HERE).
+    pm_subject: Reminder about r/AmItheAsshole ban
+    pm_text: |
+      Hello. Your temporary ban in r/AmItheAsshole has ended.
+
+      Please note that this bot is not a moderator of the subreddit and cannot change the ban.
   controller: BanneduserExperimentController
   start_time: 07/02/2000 00:00:00 UTC
   end_time: 07/02/3000 23:59:59 UTC
@@ -146,128 +221,201 @@ test:
   participant_activity_condition_removal_ratio_threshold: 0.3
   conditions:
     lurker_threedays:
-      randomizations: banneduser_experiment_newcomer3_messaging_randomizations-AITA-12.16.2024.csv
+      randomizations: banneduser_experiment_newcomer3_messaging_randomizations-AITA-05.01.2025.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. 
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
         arm_1:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
     lurker_sevendays:
-      randomizations: banneduser_experiment_newcomer7_messaging_randomizations-AITA-12.16.2024.csv
+      randomizations: banneduser_experiment_newcomer7_messaging_randomizations-AITA-05.01.2025.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
         arm_1:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
     lurker_fourteendays:
-      randomizations: banneduser_experiment_newcomer14_messaging_randomizations-AITA-12.16.2024.csv
+      randomizations: banneduser_experiment_newcomer14_messaging_randomizations-AITA-05.01.2025.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
         arm_1:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
     lurker_thirtydays:
-      randomizations: banneduser_experiment_newcomer30_messaging_randomizations-AITA-12.16.2024.csv
+      randomizations: banneduser_experiment_newcomer30_messaging_randomizations-AITA-05.01.2025.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
         arm_1:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
     lowremoval_threedays:
-      randomizations: banneduser_experiment_low3_messaging_randomizations-AITA-12.16.2024.csv
+      randomizations: banneduser_experiment_low3_messaging_randomizations-AITA-05.01.2025.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
         arm_1:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
     lowremoval_sevendays:
-      randomizations: banneduser_experiment_low7_messaging_randomizations-AITA-12.16.2024.csv
+      randomizations: banneduser_experiment_low7_messaging_randomizations-AITA-05.01.2025.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
         arm_1:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
     lowremoval_fourteendays:
-      randomizations: banneduser_experiment_low14_messaging_randomizations-AITA-12.16.2024.csv
+      randomizations: banneduser_experiment_low14_messaging_randomizations-AITA-05.01.2025.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
         arm_1:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
     lowremoval_thirtydays:
-      randomizations: banneduser_experiment_low30_messaging_randomizations-AITA-12.16.2024.csv
+      randomizations: banneduser_experiment_low30_messaging_randomizations-AITA-05.01.2025.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
         arm_1:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
     highremoval_threedays:
-      randomizations: banneduser_experiment_high3_messaging_randomizations-AITA-12.16.2024.csv
+      randomizations: banneduser_experiment_high3_messaging_randomizations-AITA-05.01.2025.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
         arm_1:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for three days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
     highremoval_sevendays:
-      randomizations: banneduser_experiment_high7_messaging_randomizations-AITA-12.16.2024.csv
+      randomizations: banneduser_experiment_high7_messaging_randomizations-AITA-05.01.2025.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
         arm_1:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for seven days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
     highremoval_fourteendays:
-      randomizations: banneduser_experiment_high14_messaging_randomizations-AITA-12.16.2024.csv
+      randomizations: banneduser_experiment_high14_messaging_randomizations-AITA-05.01.2025.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
         arm_1:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for fourteen days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
     highremoval_thirtydays:
-      randomizations: banneduser_experiment_high30_messaging_randomizations-AITA-12.16.2024.csv
+      randomizations: banneduser_experiment_high30_messaging_randomizations-AITA-05.01.2025.csv
       next_randomization: 0
       arms:
         arm_0:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. 
+
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
         arm_1:
           pm_subject: Reminder about r/AmItheAsshole ban
-          pm_text: This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values? \n Please note that we are not the moderators of the subreddit and cannot change the ban.
+          pm_text: |
+            This is a reminder that you have been temporarily banned from r/AmItheAsshole for thirty days. We encourage you to think about the qualities of this community that keep you coming back. What makes it a valuable resource for people who share their stories? How has your past behavior aligned or not aligned with those values?
+            Please note that this bot is not a moderator of the subreddit and cannot change the ban.
   second_banover_message:
     pm_subject: Reminder about r/AmItheAsshole ban
-    pm_text: Hello {username}, your ban is over.
+    pm_text: |
+      Hello. Your temporary ban in r/AmItheAsshole has ended.
+
+      Please note that this bot is not a moderator of the subreddit and cannot change the ban.
   controller: BanneduserExperimentController
   start_time: 07/02/2000 00:00:00 UTC
   end_time: 07/02/3000 23:59:59 UTC
