@@ -18,7 +18,7 @@ def main():
                         help="The experiment")
 
     parser.add_argument("job",
-                         choices=["sticky_comment_intervene", "tidy", "archive_submissions", "send_newcomer_messages"],
+                         choices=["sticky_comment_intervene", "tidy", "archive_submissions", "send_newcomer_messages", "conduct_banuser_experiment"],
                          help="The job associated with the experiment")
 
     parser.add_argument("interval",
@@ -94,6 +94,17 @@ def main():
                 repeat=None,
                 timeout = timeout_seconds,
                 result_ttl = ttl)
+    # NOTE: experiment is run via callbacks from mod archiving.
+    # elif(args.job == "conduct_banuser_experiment"):
+    #     scheduler.schedule(
+    #             scheduled_time=datetime.utcnow(),
+    #             func=app.controller.conduct_banuser_experiment,
+    #             args=[args.experiment],
+    #             kwargs={'_profile': args.profile},
+    #             interval=int(args.interval),
+    #             repeat=None,
+    #             timeout = timeout_seconds,
+    #             result_ttl = ttl)
 
 if __name__ == '__main__':
     main()

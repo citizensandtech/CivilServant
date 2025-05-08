@@ -1,0 +1,31 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    environment:
+      CS_ENV: development
+    volumes:
+      - .:/civilservant
+      - ./docker/alembic.ini:/civilservant/alembic.ini:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.4.0
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      MYSQL_ROOT_PASSWORD: ""
+    volumes:
+      - mysql-data:/var/data/mysql
+      - ./docker/create_databases.sql:/docker-entrypoint-initdb.d/create_databases.sql
+    healthcheck:
+      test:
+        ["CMD", "/bin/sh", "-c", "mysql -u root -e 'USE civilservant_development;' && echo 'ok'"]
+      start_period: 5s
+      interval: 5s
+      retries: 10
+
+volumes:
+  mysql-data:
