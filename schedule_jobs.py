@@ -22,7 +22,7 @@ def main():
                         default = 120, # default 2 minutes
                         help="Interval between tasks in seconds (default 2 minutes)")
     parser.add_argument("-e", '--env',
-                        choices=['development', 'test', 'production', 'CivilServantBot2'],
+                        choices=['development', 'test', 'production', 'CivilServantBot2', 'serialized'],
                         required = False,
                         help="Run within a specific environment. Otherwise run under the environment defined in the environment variable CS_ENV")
     parser.add_argument("-p", "--profile",
