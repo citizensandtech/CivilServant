@@ -5,6 +5,7 @@ import json
 import os
 import re
 import sys
+from pytz import UTC
 
 import uuid
 from sqlalchemy import and_, func
@@ -375,13 +376,17 @@ class BanneduserExperimentController(ModactionExperimentController):
             - `highremoval` has had comments removed by mods
         """
 
-        # Calculate the timestamp for six months ago.
-        six_months_ago_timestamp = int(now_utc - SIX_MONTHS_IN_SECONDS)
+        # Calculate the datetime for six months ago.
+        # A datetime is used instead of an integer to ensure consistency in sqlqlchemy
+        # The use of localize() and utcfromtimestamp() is a pattern we have found
+        # works consistently in previous projects.
+        six_months_ago_dt = UTC.localize(datetime.utcfromtimestamp(
+            int(now_utc) - SIX_MONTHS_IN_SECONDS))
 
         number_of_comments_query = self.db_session.query(func.count(Comment.id)).filter(
             Comment.subreddit_id == self.experiment_settings["subreddit_id"],
             Comment.user_id == newcomer.target_author,
-            Comment.created_utc >= six_months_ago_timestamp,
+            Comment.created_utc >= six_months_ago_dt,
         )
 
         number_of_comments = number_of_comments_query.scalar()
@@ -393,7 +398,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             .filter(
                 ModAction.subreddit_id == self.experiment_settings["subreddit_id"],
                 ModAction.target_author == newcomer.target_author,
-                ModAction.created_utc >= six_months_ago_timestamp,
+                ModAction.created_utc >= six_months_ago_dt,
             )
             .order_by(ModAction.created_utc)
         )
