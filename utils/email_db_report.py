@@ -49,11 +49,16 @@ def str_to_date(date_str, by_day=True):
     return datetime.datetime.strptime(date_str, date_format)
 
 def run_query_for_days(query_str, today, days=7):
-    today_str = date_to_str(today, by_day=False)
-    last_week = today - datetime.timedelta(days=days)
-    last_week_str = date_to_str(last_week, by_day=False)
-
-    result = db_session.execute(query_str, {"from_date": last_week_str, "to_date": today_str}).fetchall()
+    result = []
+    # Some queries (mod_actions) can cause mysql to run out of memory
+    # Querying a day at a time reduces the memory usage
+    for day in range(days):
+        days_ago = days - day
+        from_dt = today - datetime.timedelta(days=days_ago)
+        from_str = date_to_str(from_dt, by_day=False)
+        to_dt = from_dt + datetime.timedelta(days=1)
+        to_str = date_to_str(to_dt, by_day=False)
+        result += list(db_session.execute(query_str, {"from_date": from_str, "to_date": to_str}).fetchall())
     return result
 
 def transform_result_to_dict(result):
