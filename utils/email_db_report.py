@@ -49,6 +49,10 @@ def str_to_date(date_str, by_day=True):
     return datetime.datetime.strptime(date_str, date_format)
 
 def run_query_for_days(query_str, today, days=7):
+    today_str = date_to_str(today, by_day=False)
+    last_week = today - datetime.timedelta(days=days)
+    last_week_str = date_to_str(last_week, by_day=False)
+
     result = []
     # Some queries (mod_actions) can cause mysql to run out of memory
     # Querying a day at a time reduces the memory usage
@@ -184,7 +188,7 @@ def generate_reddit_subreddit_page(today=datetime.datetime.utcnow(), days=7, htm
 
 def generate_reddit_subreddit(today=datetime.datetime.utcnow(), days=7, html=True):
     query_str = """
-        SELECT '{0}', YEAR(created_at), MONTH(created_at), DAY(created_at), count(*) 
+        SELECT '{0}', YEAR(created_at), MONTH(created_at), DAY(created_at), count(*)
         FROM subreddits WHERE created_at <= :to_date and created_at >= :from_date 
         GROUP BY YEAR(created_at), MONTH(created_at), DAY(created_at)""".format(TOTAL_LABEL)
     result = run_query_for_days(query_str, today, days=days)
@@ -236,12 +240,21 @@ def generate_reddit_user(today=datetime.datetime.utcnow(), days=7, html=True):
                                "New User count")  # to make everything 00:00:00     
 
 def generate_reddit_mod_action(today=datetime.datetime.utcnow(), days=7, html=True):
+    # Using subquery to find counts before joining with subreddits table
     query_str = """
-        SELECT sr.name, YEAR(ma.created_at), MONTH(ma.created_at), DAY(ma.created_at), count(*) 
-        FROM mod_actions ma
-        JOIN subreddits sr ON sr.id = ma.subreddit_id
-        WHERE ma.created_at <= :to_date and ma.created_at >= :from_date 
-        GROUP BY sr.name, YEAR(ma.created_at), MONTH(ma.created_at), DAY(ma.created_at)"""
+        SELECT sr.name, ma.mod_year, ma.mod_month, ma.mod_day, ma.mod_count
+        FROM
+        (
+            SELECT subreddit_id,
+                YEAR(created_at) as mod_year,
+                MONTH(created_at) as mod_month,
+                DAY(created_at) as mod_day,
+                count(*) as mod_count
+            FROM mod_actions
+            WHERE created_at <= :to_date and created_at >= :from_date 
+            GROUP BY subreddit_id, YEAR(created_at), MONTH(created_at), DAY(created_at)
+        ) as ma
+        JOIN subreddits sr ON sr.id = ma.subreddit_id"""
     result = run_query_for_days(query_str, today, days=days)
     if not html:
         return result
