@@ -1174,13 +1174,11 @@ class TestBanneduserMessageSending:
 
     @pytest.fixture
     def experiment_thing_factory(self, db_session):
-        def _create_experiment_thing(
-            experiment_controller, thing_id, metadata=None, arm="arm_1"
-        ):
+        def _create_experiment_thing(experiment_controller, thing_id, metadata=None):
             if metadata is None:
                 metadata = {
                     "condition": "lurker_fourteendays",
-                    "arm": arm,
+                    "arm": "arm_1",
                     "randomization_time": "2023-01-01T00:00:00Z",
                 }
             et = ExperimentThing(
@@ -1285,20 +1283,20 @@ class TestBanneduserMessageSending:
             # Test single attempt for various error types (should record retry, not set impossible)
             ("first_banstart", "invalid username", 1, False),
             ("second_banover", "invalid username", 1, False),
-            ("first_banstart", "captcha required", 1, False),
-            ("second_banover", "captcha required", 1, False),
-            ("first_banstart", "rate limit exceeded", 1, False),
-            ("second_banover", "server error", 1, False),
+            ("first_banstart", "invalid captcha", 1, False),
+            ("second_banover", "invalid captcha", 1, False),
+            ("first_banstart", "general exception", 1, False),
+            ("second_banover", "general exception", 1, False),
             # Test two attempts (should increment retry counter, still not set impossible)
-            ("first_banstart", "captcha required", 2, False),
-            ("second_banover", "captcha required", 2, False),
+            ("first_banstart", "invalid captcha", 2, False),
+            ("second_banover", "invalid captcha", 2, False),
             # Test three attempts for various error types (should set impossible status)
             ("first_banstart", "invalid username", 3, True),
             ("second_banover", "invalid username", 3, True),
-            ("first_banstart", "captcha required", 3, True),
-            ("second_banover", "captcha required", 3, True),
-            ("first_banstart", "rate limit exceeded", 3, True),
-            ("second_banover", "server error", 3, True),
+            ("first_banstart", "invalid captcha", 3, True),
+            ("second_banover", "invalid captcha", 3, True),
+            ("first_banstart", "general exception", 3, True),
+            ("second_banover", "general exception", 3, True),
         ],
     )
     def test_send_intervention_messages_with_errors(
@@ -1326,8 +1324,7 @@ class TestBanneduserMessageSending:
             else experiment_controller._send_second_banover_intervention_messages
         )
 
-        # Execute the specified number of attempts
-        for attempt in range(attempts_to_run):
+        for _ in range(attempts_to_run):
             send_method([et])
             et = (
                 experiment_controller.db_session.query(ExperimentThing)
@@ -1335,7 +1332,6 @@ class TestBanneduserMessageSending:
                 .one()
             )
 
-        # Verify query_index behavior
         if expects_impossible:
             expected_impossible_index = (
                 BannedUserQueryIndex.FIRST_BANSTART_IMPOSSIBLE
@@ -1360,7 +1356,6 @@ class TestBanneduserMessageSending:
                 f"Should not change query_index on first attempt with '{error_type}'"
             )
 
-        # Verify retry count and error details
         metadata = json.loads(et.metadata_json)
         assert metadata["message_retry_count"] == attempts_to_run, (
             f"Should have retry count = {attempts_to_run} for '{error_type}'"
@@ -1369,7 +1364,6 @@ class TestBanneduserMessageSending:
             f"Should store error details for '{error_type}'"
         )
 
-        # Verify ExperimentActions created
         ea_count = (
             experiment_controller.db_session.query(ExperimentAction)
             .filter(ExperimentAction.action_object_id == thing_id)
@@ -1388,7 +1382,7 @@ class TestBanneduserMessageSending:
                 "errors": [{"username": "invalid_user", "error": "invalid username"}]
             },
             "captcha_user": {
-                "errors": [{"username": "captcha_user", "error": "captcha required"}]
+                "errors": [{"username": "captcha_user", "error": "invalid captcha"}]
             },
         }
 
@@ -1418,7 +1412,6 @@ class TestBanneduserMessageSending:
             .filter(ExperimentThing.thing_id == "invalid_user")
             .one()
         )
-        # Invalid username should not set impossible on first attempt (requires 3 attempts)
         assert invalid_et_updated.query_index == invalid_et.query_index, (
             "Invalid username should not change query_index on first attempt"
         )
@@ -1496,8 +1489,7 @@ class TestBanneduserMessageSending:
             else experiment_controller._send_second_banover_intervention_messages
         )
 
-        # Execute the specified number of attempts
-        for attempt in range(attempt_count):
+        for _ in range(attempt_count):
             send_method([et])
             et = (
                 experiment_controller.db_session.query(ExperimentThing)
@@ -1505,14 +1497,11 @@ class TestBanneduserMessageSending:
                 .one()
             )
 
-        # Verify behavior based on attempt count
         if attempt_count < 3:
-            # First two attempts should NOT set impossible status
             assert et.query_index == original_query_index, (
                 f"Attempt {attempt_count} should not set impossible status for '{error_type}'"
             )
         else:
-            # Third attempt should set impossible status
             expected_impossible = (
                 BannedUserQueryIndex.FIRST_BANSTART_IMPOSSIBLE
                 if message_type == "first_banstart"
@@ -1522,7 +1511,6 @@ class TestBanneduserMessageSending:
                 f"Third attempt should set impossible status for '{error_type}'"
             )
 
-        # Verify retry count and error details
         metadata = json.loads(et.metadata_json)
         assert metadata.get("message_retry_count") == attempt_count, (
             f"Should have retry count = {attempt_count} for '{error_type}'"
@@ -1531,7 +1519,6 @@ class TestBanneduserMessageSending:
             f"Should store error details for '{error_type}'"
         )
 
-        # Verify ExperimentActions created
         ea_count = (
             experiment_controller.db_session.query(ExperimentAction)
             .filter(ExperimentAction.action_object_id == thing_id)
@@ -1542,9 +1529,12 @@ class TestBanneduserMessageSending:
         )
 
     def test_send_first_banstart_intervention_message(
-        self, experiment_controller, mock_messaging_controller, experiment_thing_factory
+        self,
+        experiment_controller,
+        mock_messaging_controller,
+        experiment_thing_factory,
+        db_queries,
     ):
-        # Test successful first banstart intervention message sending
         mock_messaging_controller.send_messages.return_value = {
             "test_user": {"errors": []}
         }
@@ -1577,6 +1567,4 @@ class TestBanneduserMessageSending:
         )
 
         # Verify experiment action was created
-        experiment_controller.db_session.query(ExperimentAction).filter(
-            ExperimentAction.action_object_id == thing_id
-        ).one()
+        db_queries.get_experiment_action(thing_id)
