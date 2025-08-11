@@ -1455,20 +1455,21 @@ class TestBanneduserMessageSending:
         assert captcha_ea is not None, "Should create action for captcha error retry"
 
     @pytest.mark.parametrize(
-        "message_type,attempt_count",
+        "message_type,attempt_count,should_retry",
         [
-            ("first_banstart", 1),
-            ("first_banstart", 2),
-            ("first_banstart", 3),
-            ("second_banover", 1),
-            ("second_banover", 2),
-            ("second_banover", 3),
+            ("first_banstart", 1, True),
+            ("first_banstart", 2, True),
+            ("first_banstart", 3, False),
+            ("second_banover", 1, True),
+            ("second_banover", 2, True),
+            ("second_banover", 3, False),
         ],
     )
     def test_message_error_retry_progression(
         self,
         message_type,
         attempt_count,
+        should_retry,
         experiment_controller,
         mock_messaging_controller,
         experiment_thing_factory,
@@ -1497,7 +1498,7 @@ class TestBanneduserMessageSending:
                 .one()
             )
 
-        if attempt_count < 3:
+        if should_retry:
             assert et.query_index == original_query_index, (
                 f"Attempt {attempt_count} should not set impossible status for '{error_type}'"
             )
