@@ -194,6 +194,7 @@ class BanneduserExperimentController(ModactionExperimentController):
             self.db_session.rollback()
 
     def _find_first_banstart_candidates(self, modactions):
+        return [] ########## Added to conclude experiment; this will stop new enrollments but continue sending banover messages to existing enrollments
         """Filter a list of mod actions to find newcomers to the experiment.
         Starting with a list of arbitrary mod actions, select mod actions that:
         - are not for users already in the study,
