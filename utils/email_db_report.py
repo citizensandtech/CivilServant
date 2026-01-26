@@ -320,9 +320,10 @@ def generate_experiment_new(today=datetime.datetime.utcnow(), days=7, html=True)
 
 def generate_experiment_active(today=datetime.datetime.utcnow(), days=7, html=True):
     query_str = """
-        SELECT id, start_time, end_time 
+        SELECT id, start_time, end_time
         FROM experiments WHERE start_time <= :to_date and end_time >= :from_date"""
-    result = run_query_for_days(query_str, today, days=days)
+    # Deduplicate by experiment ID: run_query_for_days can return the same experiment multiple times
+    result = list({row[0]: row for row in run_query_for_days(query_str, today, days=days)}.values())
     type_to_date_to_val = {}
     type_to_date_to_val[TOTAL_LABEL] = {}
     days_str = [date_to_str(today - datetime.timedelta(days=i)) for i in range(0,7)]
