@@ -1,4 +1,5 @@
 import praw
+from praw.errors import HTTPException
 from praw.handlers import MultiprocessHandler
 import pickle
 import os, inspect
@@ -40,23 +41,41 @@ class Connect:
   def connect(self, controller="Main"):
     r = None #Praw Connection Object
     handler = MultiprocessHandler()
+    r = praw.Reddit(
+      user_agent="Test version of CivilServant by u/natematias",
+      handler=handler)
 
     # Check the Database for a Stored Praw Key
     db_praw_id = PrawKey.get_praw_id(self.env, controller)
     pk = self.db_session.query(PrawKey).filter_by(id=db_praw_id).first()
-    r = praw.Reddit(user_agent="Test version of CivilServant by u/natematias", handler=handler)
     
     access_information = {}
+    key_expired = False
     
-    if(pk is None):
-      with open(os.path.join(self.base_dir, "config","access_information_{environment}.pickle".format(environment=self.env)), "rb") as fp:
-          access_information = pickle.load(fp)
-    else:
+    if pk is not None:
       access_information['access_token'] = pk.access_token
       access_information['refresh_token'] = pk.refresh_token
       access_information['scope'] = json.loads(pk.scope)
-    
-    r.set_access_credentials(**access_information)
+      try:
+        r.set_access_credentials(**access_information)
+      except HTTPException:
+        # Key exists but is likely expired
+        try:
+          r.refresh_access_information(pk.refresh_token)
+          # Mark key as invalid so new one gets saved
+          key_expired = True
+        except HTTPException:
+          # Problem with refresh token, try to use pickle instead
+          key_expired = True
+
+    if pk is None or key_expired:
+      with open(
+        os.path.join(self.base_dir,
+          "config","access_information_{environment}.pickle".format(
+            environment=self.env)), "rb" 
+      ) as fp:
+          access_information = pickle.load(fp)
+      r.refresh_access_information(access_information['refresh_token'])
 
     new_access_information = {}
     update_praw_key = False
@@ -76,6 +95,6 @@ class Connect:
        pk.access_token = r.access_token
        pk.refresh_token = r.refresh_token
        pk.scope = json.dumps(list(r._authentication))
-      
+
     self.db_session.commit()
     return r
