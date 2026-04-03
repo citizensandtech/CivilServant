@@ -32,15 +32,22 @@ class FrontPageController:
       posts = []
       fetched = []
 
+      # Changed to access listings on reddit object rather than "all sub"
+      # due to the latter api endpoint being deprecated
+      # -ELP 2026-04-03
       try:
         if pg_type==PageType.TOP:
-            fetched = self.all_sub.get_top(limit=limit)
+            #fetched = self.all_sub.get_top(limit=limit)
+            fetched = self.r.get_top(limit=limit)
         elif pg_type==PageType.CONTR:
-            fetched = self.all_sub.get_controversial(limit=limit)
+            #fetched = self.all_sub.get_controversial(limit=limit)
+            fetched = self.r.get_controversial(limit=limit)
         elif pg_type==PageType.NEW:
-            fetched = self.all_sub.get_new(limit=limit)
+            #fetched = self.all_sub.get_new(limit=limit)
+            fetched = self.r.get_new(limit=limit)
         elif pg_type==PageType.HOT:
-            fetched = self.all_sub.get_hot(limit=limit)            
+            #fetched = self.all_sub.get_hot(limit=limit)            
+            fetched = self.r.get_hot(limit=limit)            
       except:
         self.log.error("Error querying reddit {0} page".format(pg_type.name), extra=sys.exc_info()[0] )
         print(sys.exc.info()[0])
