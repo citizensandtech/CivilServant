@@ -4,8 +4,6 @@ import simplejson as json
 import datetime, yaml, time, csv
 import uuid
 import reddit.connection
-import reddit.praw_utils as praw_utils
-import reddit.queries
 import sqlalchemy
 from dateutil import parser
 from utils.common import *
@@ -201,7 +199,8 @@ class StickyCommentExperimentController:
                         all_experiment_messages.append(self.experiment_settings[sticky_text_key])
 
         # Avoid Acting if an identical sticky comment already exists
-        comments = getattr(submission, "comments", []) # needed for testing the StickyCommentMessagingExperimentController
+        # Submissions expose a CommentForest and test doubles may have no comments at all.
+        comments = getattr(submission, "comments", None) or []
         for comment in comments:
             if(hasattr(comment, "stickied") and comment.stickied and (comment.body in all_experiment_messages)):
                 self.log.info("{0}: Experiment {1} post {2} already has a sticky comment {2}".format(
@@ -283,8 +282,12 @@ class StickyCommentExperimentController:
             comment = _dry_run_add_comment()
             distinguish_results = "DRY RUN DISTINGUISH: Assume successful" 
         else:
-            comment = submission.add_comment(comment_text)
-            distinguish_results = comment.distinguish(sticky=True)
+            comment = submission.reply(comment_text)
+            if comment is None:
+                self.log.error("{0}: Experiment {1} could not comment on submission {2} (locked/quarantined); skipped.".format(
+                    self.__class__.__name__, self.experiment_name, submission.id))
+                return None
+            distinguish_results = comment.mod.distinguish(sticky=True)
 
         self.log.info("{0}: Experiment {1} applied arm {2} to post {3} (condition = {4}). Result: {5}".format(
             self.__class__.__name__,            
@@ -373,7 +376,7 @@ class StickyCommentExperimentController:
                     self.min_eligibility_age))
                 continue
             
-            if require_flair and not obj.json_dict["link_flair_css_class"]:
+            if require_flair and not json_dict(obj)["link_flair_css_class"]:
                 self.log.info("{0}: {1} {2} does not have any flair applied. Waiting to Add to the Experiment".format(
                     self.__class__.__name__,
                     thing_type.name.title(),
@@ -498,7 +501,7 @@ class StickyCommentExperimentController:
         replies_for_removal = []
         for comment_object in comment_objects:
             comment_object.refresh()
-            replies_for_removal = replies_for_removal + praw.helpers.flatten_tree(comment_object.replies)
+            replies_for_removal = replies_for_removal + comment_object.replies.list()
         return replies_for_removal
 
     def get_all_experiment_comments(self):
@@ -528,7 +531,7 @@ class StickyCommentExperimentController:
         reply_ids = ["t1_" + x.id for x in experiment_comment_replies]
         comments = []
         if(len(reply_ids)>0):
-            comments = self.r.get_info(thing_id = reply_ids)
+            comments = self.r.info(fullnames = reply_ids)
         return comments
 
     def remove_replies_to_treatments(self):
@@ -539,7 +542,7 @@ class StickyCommentExperimentController:
         parent_submission_ids = set()
         for comment in comments:
             if(comment.banned_by is None):
-                comment.remove()
+                comment.mod.remove()
                 removed_comment_ids.append(comment.id)
                 parent_submission_ids.add(comment.link_id)
 
@@ -592,7 +595,7 @@ class StickyCommentExperimentController:
             return []
 
         snapshots = []
-        for submission in self.r.get_info(thing_id = submission_ids):
+        for submission in self.r.info(fullnames = submission_ids):
             snapshot = {"score":submission.score,
                         "num_reports":submission.num_reports,
                         "user_reports":len(submission.user_reports),
@@ -638,8 +641,9 @@ class AMAStickyCommentExperimentController(StickyCommentExperimentController):
 
     def is_ama(self, submission):
         flair = []
-        if submission.json_dict['link_flair_css_class']:
-            flair = submission.json_dict['link_flair_css_class'].split()
+        css_class = json_dict(submission)['link_flair_css_class']
+        if css_class:
+            flair = css_class.split()
         ama = False
         if "ama" in flair:
             ama = True
@@ -674,7 +678,7 @@ class AMAStickyCommentExperimentController(StickyCommentExperimentController):
 class AMA2020StickyCommentExperimentController(AMAStickyCommentExperimentController):
     def is_ama(self, submission):
         self_domain = "self.%s" % self.subreddit
-        ama = submission.json_dict["domain"] == self_domain
+        ama = json_dict(submission)["domain"] == self_domain
         return ama
 
     def get_eligible_objects(self, objs, thing_type):
@@ -728,7 +732,7 @@ class FrontPageStickyCommentExperimentController(StickyCommentExperimentControll
             
         new_posts = []
         for post in to_archive_posts:
-            post_info = post.json_dict if("json_dict" in dir(post)) else post['data'] ### TO HANDLE TEST FIXTURES
+            post_info = json_dict(post)
             new_post = Post(
                     id = post_info['id'],
                     subreddit_id = post_info['subreddit_id'].strip("t5_"), # janky
@@ -956,7 +960,7 @@ class StickyCommentMessagingExperimentController(StickyCommentExperimentControll
         return user_thing
     
     def extract_post_id(self, mod_action):
-        link_segments = mod_action.json_dict['target_permalink'].split('/')
+        link_segments = json_dict(mod_action)['target_permalink'].split('/')
         return link_segments[4]
     
     def fetch_incomplete_interventions(self):
@@ -991,7 +995,7 @@ class StickyCommentMessagingExperimentController(StickyCommentExperimentControll
     def get_randomization(self, obj, thing_type, label):
         if thing_type is not ThingType.MODACTION:
             return super().get_randomization(obj, thing_type, label)
-        target_author = obj.json_dict['target_author']
+        target_author = json_dict(obj)['target_author']
         user_thing = self.user_things[target_author]
         user_thing_metadata = json.loads(user_thing.metadata_json)
         post_id = self.extract_post_id(obj)
@@ -1010,7 +1014,7 @@ class StickyCommentMessagingExperimentController(StickyCommentExperimentControll
     # needs to be an opposing function to get_randomization() that handles situations where
     # randomizable==False. This function is serving that purpose for now.
     def get_randomization_for_mod_action_default_arm(self, mod_action_thing, mod_action):
-        target_author = mod_action.json_dict['target_author']
+        target_author = json_dict(mod_action)['target_author']
         user_thing = self.user_things[target_author]
         user_thing_metadata = json.loads(user_thing.metadata_json)
         post_id = self.extract_post_id(mod_action)
@@ -1041,15 +1045,16 @@ class StickyCommentMessagingExperimentController(StickyCommentExperimentControll
 
     def identify_ama_post(self, submission):
         # This is accurate for r/iama as of 2020-05
-        if 'selftext' not in submission.json_dict:
+        post_data = json_dict(submission)
+        if 'selftext' not in post_data:
             return False
-        locked = submission.json_dict.get('locked')
-        author_flair_text = submission.json_dict.get('author_flair_text') or ''
+        locked = post_data.get('locked')
+        author_flair_text = post_data.get('author_flair_text') or ''
         return not locked and 'crown_modgreen' not in author_flair_text
 
     def identify_ama_nonquestion_mod_action(self, mod_action):
         # This is accurate for r/iama as of 2020-05
-        if 'mod' not in mod_action.json_dict:
+        if 'mod' not in json_dict(mod_action):
             return False
         if not self.is_automod_comment_removal(mod_action):
             return False
@@ -1082,11 +1087,12 @@ class StickyCommentMessagingExperimentController(StickyCommentExperimentControll
     
     def is_automod_comment_removal(self, mod_action):
         # This is accurate for r/iama as of 2020-05
-        if 'mod' not in mod_action.json_dict:
+        mod_data = json_dict(mod_action)
+        if 'mod' not in mod_data:
             return False
-        mod = mod_action.json_dict['mod']
-        action = mod_action.json_dict['action']
-        target_author = mod_action.json_dict['target_author']
+        mod = mod_data['mod']
+        action = mod_data['action']
+        target_author = mod_data['target_author']
         return (
             mod == 'AutoModerator'
             and action == 'removecomment'
