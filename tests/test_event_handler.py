@@ -130,7 +130,7 @@ EXPERIMENT_NAME = "sticky_comment_event_handler_test"
 
 
 # initialize experiment, load hooks
-@patch('praw.Reddit', autospec=True)
+@patch('praw.Reddit')
 def test_initialize_experiment(mock_reddit):
     r = mock_reddit.return_value
     patch('praw.')
@@ -154,7 +154,7 @@ def test_initialize_experiment(mock_reddit):
     assert(len(after_events) == 2)
 
 # test that event handler runs the callbacks correctly
-@patch('praw.Reddit', autospec=True)
+@patch('praw.Reddit')
 def test_event_handler(mock_reddit):
     r = mock_reddit.return_value
     patch('praw.')

@@ -7,7 +7,7 @@ TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 BASE_DIR  = os.path.join(TEST_DIR, "../")
 ENV = os.environ['CS_ENV'] = "test"
 
-from mock import Mock, patch
+from mock import Mock, patch, MagicMock
 import unittest.mock
 import simplejson as json
 import sqlalchemy
@@ -22,7 +22,7 @@ from app.controllers.subreddit_controller import SubredditPageController
 
 from utils.common import *
 from dateutil import parser
-import praw, praw.objects
+import praw
 import csv, random, string
 from collections import Counter
 
@@ -59,7 +59,7 @@ def teardown_function(function):
 
 
 ### TODO: REFACTOR THIS INTO A SUPERCLASS FOR EXPERIMENTS
-@patch('praw.Reddit', autospec=True)
+@patch('praw.Reddit')
 def test_initialize_experiment(mock_reddit):
     r = mock_reddit.return_value
     patch('praw.')
@@ -109,10 +109,10 @@ def test_initialize_experiment(mock_reddit):
 
 # calls set_eligible_objects, which for FrontPageStickyCommentExperimentController has a different signature
 # (is a callback function), so we don't test FrontPageStickyCommentExperimentController here
-@patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Subreddit', autospec=True)
-def test_get_eligible_objects(mock_subreddit, mock_reddit):
+@patch('praw.Reddit')
+def test_get_eligible_objects(mock_reddit):
     r = mock_reddit.return_value
+    mock_subreddit = MagicMock()
 
     experiment_name_to_controller = {
         "sticky_comment_0": AMAStickyCommentExperimentController,
@@ -133,11 +133,11 @@ def test_get_eligible_objects(mock_subreddit, mock_reddit):
                 postobj = json2obj(json_dump, now=True, offset=-1*min_age)
                 sub_data.append(postobj)
 
-        mock_subreddit.get_new.return_value = sub_data
+        mock_subreddit.new.return_value = sub_data
         mock_subreddit.display_name = experiment_settings['subreddit']
         mock_subreddit.name = experiment_settings['subreddit']
         mock_subreddit.id = experiment_settings['subreddit_id']
-        r.get_subreddit.return_value = mock_subreddit
+        r.subreddit.return_value = mock_subreddit
         patch('praw.')
 
         assert(len(db_session.query(Experiment).all()) == 0)
@@ -162,7 +162,7 @@ def test_get_eligible_objects(mock_subreddit, mock_reddit):
         elif controller_instance.__class__ is AMA2020StickyCommentExperimentController:
             objs = controller_instance.set_eligible_objects()
             for obj in objs[::10]:
-                obj.json_dict["link_flair_css_class"] = ""
+                obj["link_flair_css_class"] = ""
         eligible_objects = controller_instance.get_eligible_objects(objs, ThingType.SUBMISSION)
         if controller_instance.__class__ is AMA2020StickyCommentExperimentController:
             expected_eligible_count = 90
@@ -204,10 +204,10 @@ def test_get_eligible_objects(mock_subreddit, mock_reddit):
         assert len(eligible_objects) == expected_eligible_count
         clear_all_tables()    
 
-@patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Subreddit', autospec=True)
-def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
+@patch('praw.Reddit')
+def test_assign_randomized_conditions(mock_reddit):
     r = mock_reddit.return_value
+    mock_subreddit = MagicMock()
 
     experiment_name_to_controller = {
         "sticky_comment_0": AMAStickyCommentExperimentController,
@@ -226,11 +226,11 @@ def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
                 json_dump = json.dumps(post)
                 postobj = json2obj(json_dump, now=True, offset=-1*min_age)
                 sub_data.append(postobj)
-        mock_subreddit.get_new.return_value = sub_data
+        mock_subreddit.new.return_value = sub_data
         mock_subreddit.display_name = experiment_settings['subreddit']
         mock_subreddit.name = experiment_settings['subreddit']
         mock_subreddit.id = experiment_settings['subreddit_id']
-        r.get_subreddit.return_value = mock_subreddit
+        r.subreddit.return_value = mock_subreddit
         patch('praw.')
 
         controller = experiment_name_to_controller[experiment_name]
@@ -298,7 +298,7 @@ def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
         ## which would otherwise be duplicates
         new_posts = []
         for post in posts:
-            post = post.json_dict
+            post = dict(post)
             post['id'] = ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(7))
             new_posts.append(json2obj(json.dumps(post)))
 
@@ -320,8 +320,7 @@ def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
         clear_all_tables()
 
 
-@patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Subreddit', autospec=True)
+@patch('praw.Reddit')
 @patch.object(FrontPageStickyCommentExperimentController, "intervene_frontpage_post_arm_0")
 @patch.object(FrontPageStickyCommentExperimentController, "intervene_frontpage_post_arm_1")
 @patch.object(AMAStickyCommentExperimentController, "intervene_nonama_arm_0")
@@ -331,8 +330,9 @@ def test_assign_randomized_conditions(mock_subreddit, mock_reddit):
 def test_update_experiment(intervene_ama_arm_1, intervene_ama_arm_0, 
                             intervene_nonama_arm_1, intervene_nonama_arm_0, 
                             intervene_frontpage_post_arm_1, intervene_frontpage_post_arm_0,
-                            mock_subreddit, mock_reddit):
+                            mock_reddit):
     r = mock_reddit.return_value
+    mock_subreddit = MagicMock()
 
     experiment_name_to_controller = {
         "sticky_comment_0": AMAStickyCommentExperimentController,
@@ -352,11 +352,11 @@ def test_update_experiment(intervene_ama_arm_1, intervene_ama_arm_0,
                 json_dump = json.dumps(post)
                 postobj = json2obj(json_dump, now=True, offset=-1*min_age)
                 sub_data.append(postobj)
-        mock_subreddit.get_new.return_value = sub_data
+        mock_subreddit.new.return_value = sub_data
         mock_subreddit.display_name = experiment_settings['subreddit']
         mock_subreddit.name = experiment_settings['subreddit']
         mock_subreddit.id = experiment_settings['subreddit_id']
-        r.get_subreddit.return_value = mock_subreddit
+        r.subreddit.return_value = mock_subreddit
         patch('praw.')
 
         controller = experiment_name_to_controller[experiment_name]
@@ -414,11 +414,11 @@ def test_update_experiment(intervene_ama_arm_1, intervene_ama_arm_0,
         clear_all_tables()
 
 
-@patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Submission', autospec=True)
-@patch('praw.objects.Comment', autospec=True)
-def test_submission_acceptable(mock_comment, mock_submission, mock_reddit):
+@patch('praw.Reddit')
+def test_submission_acceptable(mock_reddit):
     r = mock_reddit.return_value
+    mock_submission = MagicMock()
+    mock_comment = MagicMock()
 
 
     with open("{script_dir}/fixture_data/submission_0.json".format(script_dir=TEST_DIR)) as f:
@@ -426,7 +426,6 @@ def test_submission_acceptable(mock_comment, mock_submission, mock_reddit):
         ## setting the submission time to be recent enough
         submission = json2obj(json.dumps(submission_json), now=True)
         mock_submission.id = submission.id
-        mock_submission.json_dict = submission.json_dict
 
     with open("{script_dir}/fixture_data/submission_0_comments.json".format(script_dir=TEST_DIR)) as f:
         comments = json2obj(f.read())
@@ -440,11 +439,11 @@ def test_submission_acceptable(mock_comment, mock_submission, mock_reddit):
         stickied_treatment = json2obj(json.dumps(treatment_dict))
         mock_comment.id = treatment.id
         mock_comment.created_utc = treatment.created_utc
-        mock_submission.add_comment.return_value = mock_comment
+        mock_submission.reply.return_value = mock_comment
 
     with open("{script_dir}/fixture_data/submission_0_treatment_distinguish.json".format(script_dir=TEST_DIR)) as f:
         distinguish = json.loads(f.read())
-        mock_comment.distinguish.return_value = distinguish
+        mock_comment.mod.distinguish.return_value = distinguish
     
     patch('praw.')
 
@@ -506,18 +505,17 @@ def test_submission_acceptable(mock_comment, mock_submission, mock_reddit):
         clear_all_tables()
 
 
-@patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Submission', autospec=True)
-@patch('praw.objects.Comment', autospec=True)
-def test_make_sticky_post(mock_comment, mock_submission, mock_reddit):
+@patch('praw.Reddit')
+def test_make_sticky_post(mock_reddit):
     r = mock_reddit.return_value
+    mock_submission = MagicMock()
+    mock_comment = MagicMock()
 
     with open("{script_dir}/fixture_data/submission_0.json".format(script_dir=TEST_DIR)) as f:
         submission_json = json.loads(f.read())
         ## setting the submission time to be recent enough
         submission = json2obj(json.dumps(submission_json))
         mock_submission.id = submission.id
-        mock_submission.json_dict = submission.json_dict
     
     with open("{script_dir}/fixture_data/submission_0_comments.json".format(script_dir=TEST_DIR)) as f:
         comments = json2obj(f.read())
@@ -525,7 +523,7 @@ def test_make_sticky_post(mock_comment, mock_submission, mock_reddit):
 
     with open("{script_dir}/fixture_data/submission_0_treatment_distinguish.json".format(script_dir=TEST_DIR)) as f:
         distinguish = json.loads(f.read())
-        mock_comment.distinguish.return_value = distinguish
+        mock_comment.mod.distinguish.return_value = distinguish
 
     patch('praw.')
 
@@ -550,7 +548,7 @@ def test_make_sticky_post(mock_comment, mock_submission, mock_reddit):
             treatment = json2obj(f.read())
             mock_comment.id = treatment.id
             mock_comment.created_utc = treatment.created_utc
-            mock_submission.add_comment.return_value = mock_comment
+            mock_submission.reply.return_value = mock_comment
 
         if controller_instance.__class__ is FrontPageStickyCommentExperimentController:
             block_name = "frontpage_post"
@@ -580,11 +578,10 @@ def test_make_sticky_post(mock_comment, mock_submission, mock_reddit):
 
         clear_all_tables()
 
-@patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Submission', autospec=True)
-@patch('praw.objects.Comment', autospec=True)
-def test_make_control_nonaction(mock_comment, mock_submission, mock_reddit):
+@patch('praw.Reddit')
+def test_make_control_nonaction(mock_reddit):
     r = mock_reddit.return_value
+    mock_submission = MagicMock()
 
     with open("{script_dir}/fixture_data/submission_0.json".format(script_dir=TEST_DIR)) as f:
         submission_json = json.loads(f.read())
@@ -640,7 +637,7 @@ def test_make_control_nonaction(mock_comment, mock_submission, mock_reddit):
         assert sticky_result is None
         clear_all_tables()
 
-@patch('praw.Reddit', autospec=True)
+@patch('praw.Reddit')
 def test_find_treatment_replies(mock_reddit):
     fixture_dir = os.path.join(TEST_DIR, "fixture_data")
 
@@ -745,8 +742,15 @@ def test_find_treatment_replies(mock_reddit):
         ## NOW SET UP THE MOCK RETURN FROM: 
         ## get_comment_objects_for_experiment_comment_replies
         assert len(acre) == sum([x[2] for x in treatment_comments])
-        return_comments = [json2obj(json.dumps(x.data)) for x in acre]
-        r.get_info.return_value = return_comments
+        return_comments = []
+        for x in acre:
+            data = x.data
+            comment_mock = MagicMock()
+            comment_mock.banned_by = data.get("banned_by")
+            comment_mock.id = data["id"]
+            comment_mock.link_id = data["link_id"]
+            return_comments.append(comment_mock)
+        r.info.return_value = return_comments
         
         ## NOW TEST THE REMOVAL OF THE COMMENTS
         assert db_session.query(ExperimentAction).filter(ExperimentAction.action=="RemoveRepliesToTreatment").count() == 0
@@ -763,17 +767,17 @@ def test_find_treatment_replies(mock_reddit):
 
         
         ## NOW TEST THE REMOVAL OF COMMENTS WHEN THERE ARE NO COMMENTS TO REMOVE
-        r.get_info.return_value = []
+        r.info.return_value = []
         removed_count = controller_instance.remove_replies_to_treatments()
         assert removed_count == 0
         
         clear_all_tables()        
 
 
-@patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Subreddit', autospec=True)
-def test_identify_condition(mock_subreddit, mock_reddit):
+@patch('praw.Reddit')
+def test_identify_condition(mock_reddit):
     r = mock_reddit.return_value
+    mock_subreddit = MagicMock()
 
     experiment_name_to_controller = {
         "sticky_comment_0": AMAStickyCommentExperimentController,
@@ -794,11 +798,11 @@ def test_identify_condition(mock_subreddit, mock_reddit):
                 json_dump = json.dumps(post)
                 postobj = json2obj(json_dump, now=True, offset=-1*min_age)
                 sub_data.append(postobj)
-        mock_subreddit.get_new.return_value = sub_data
+        mock_subreddit.new.return_value = sub_data
         mock_subreddit.display_name = experiment_settings['subreddit']
         mock_subreddit.name = experiment_settings['subreddit']
         mock_subreddit.id = experiment_settings['subreddit_id']
-        r.get_subreddit.return_value = mock_subreddit
+        r.subreddit.return_value = mock_subreddit
         patch('praw.')
 
         ## TEST THE BASE CASE OF RANDOMIZATION
@@ -837,7 +841,7 @@ def test_identify_condition(mock_subreddit, mock_reddit):
 
         clear_all_tables()
 
-@patch('praw.Reddit', autospec=True)
+@patch('praw.Reddit')
 def test_frontpage_get_eligible_objects(mock_reddit):
     r = mock_reddit.return_value
     controller = FrontPageStickyCommentExperimentController
@@ -857,11 +861,11 @@ def test_frontpage_get_eligible_objects(mock_reddit):
     for obj in eligible_objects:
         assert "t5_" + controller_instance.subreddit_id == obj.subreddit_id
 
-@patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Submission', autospec=True)
-@patch('praw.objects.Comment', autospec=True)
-def test_archive_experiment_submission_metadata(mock_comment, mock_submission, mock_reddit):
+@patch('praw.Reddit')
+def test_archive_experiment_submission_metadata(mock_reddit):
     r = mock_reddit.return_value
+    mock_submission = MagicMock()
+    mock_comment = MagicMock()
 
     experiment_name_to_controller = {
         "sticky_comment_0": AMAStickyCommentExperimentController,
@@ -879,7 +883,6 @@ def test_archive_experiment_submission_metadata(mock_comment, mock_submission, m
             ## setting the submission time to be recent enough
             submission = json2obj(json.dumps(submission_json))
             mock_submission.id = submission.id
-            mock_submission.json_dict = submission.json_dict
         
         with open("{script_dir}/fixture_data/submission_0_comments.json".format(script_dir=TEST_DIR)) as f:
             comments = json2obj(f.read())
@@ -893,12 +896,12 @@ def test_archive_experiment_submission_metadata(mock_comment, mock_submission, m
             treatment = json2obj(f.read())
             mock_comment.id = treatment.id
             mock_comment.created_utc = treatment.created_utc
-            mock_submission.add_comment.return_value = mock_comment
+            mock_submission.reply.return_value = mock_comment
 
         # don't have to customize???
         with open("{script_dir}/fixture_data/submission_0_treatment_distinguish.json".format(script_dir=TEST_DIR)) as f:
             distinguish = json.loads(f.read())
-            mock_comment.distinguish.return_value = distinguish
+            mock_comment.mod.distinguish.return_value = distinguish
 
         patch('praw.')
 
@@ -927,7 +930,7 @@ def test_archive_experiment_submission_metadata(mock_comment, mock_submission, m
         assert sticky_result is not None
 
         ## TEST archive_experiment_submission_metadata
-        r.get_info.return_value = [submission]
+        r.info.return_value = [submission]
         snapshots = controller_instance.archive_experiment_submission_metadata()
         assert len(snapshots) == 1
         assert db_session.query(ExperimentThingSnapshot).count()
@@ -945,10 +948,8 @@ def test_archive_experiment_submission_metadata(mock_comment, mock_submission, m
         clear_all_tables()
 
 
-@patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Submission', autospec=True)
-@patch('praw.objects.ModAction', autospec=True)
-def test_sticky_comment_messaging_controller(mock_mod_action, mock_submission, mock_reddit):
+@patch('praw.Reddit')
+def test_sticky_comment_messaging_controller(mock_reddit):
     controller_class = StickyCommentMessagingExperimentController
     experiment_name = 'sticky_comment_messaging_experiment_test'
     experiment_configs_path = Path(BASE_DIR, 'config', 'experiments')
@@ -971,8 +972,7 @@ def test_sticky_comment_messaging_controller(mock_mod_action, mock_submission, m
     
     # Force one submission to be over the max age allowed. This will allow testing the
     # sending of control messages for mod actions on posts not included in the study
-    submissions[0] = submissions[0]._replace(created_utc=0)
-    submissions[0].json_dict['created_utc'] = 0
+    submissions[0]['created_utc'] = 0
 
     expected_fresh_post_count = 9
     max_age = experiment_settings['max_eligibility_age']

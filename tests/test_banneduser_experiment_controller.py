@@ -75,14 +75,14 @@ class TestRedditMock:
     """NOTE: The reddit mock is part of a higher level test structure, beyond the banned user experiment."""
 
     def test_fake_mod_log_first_page(self, mock_reddit):
-        page = mock_reddit.get_mod_log("fake_subreddit")
+        page = mock_reddit.subreddit("fake_subreddit").mod.log()
         assert len(page) == 100
 
     def test_fake_mod_log_all_pages(self, mock_reddit):
-        page = mock_reddit.get_mod_log("fake_subreddit")
+        page = mock_reddit.subreddit("fake_subreddit").mod.log()
         while page:
             assert len(page) > 1
-            page = mock_reddit.get_mod_log("fake_subreddit")
+            page = mock_reddit.subreddit("fake_subreddit").mod.log()
         assert len(page) == 0
 
 

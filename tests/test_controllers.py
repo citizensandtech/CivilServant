@@ -1,6 +1,7 @@
 import pytest
 import os
 from mock import Mock, patch
+from unittest.mock import MagicMock
 #import simplejson as json
 import json
 import sqlalchemy
@@ -43,9 +44,9 @@ def setup_function(function):
 def teardown_function(function):
     clear_all_tables()
 
-@patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Subreddit', autospec=True)    
-def test_archive_reddit_front_page(mock_subreddit, mock_reddit):
+@patch('praw.Reddit')
+def test_archive_reddit_front_page(mock_reddit):
+    mock_subreddit = MagicMock()
     ### TEST THE MOCK SETUP AND MAKE SURE IT WORKS
     ## TODO: I should not be mocking SQLAlchemy
     ## I should just be mocking the reddit API
@@ -55,13 +56,13 @@ def test_archive_reddit_front_page(mock_subreddit, mock_reddit):
 
     with open("{script_dir}/fixture_data/subreddit_posts_0.json".format(script_dir=TEST_DIR)) as f:
         sub_data = json.loads(f.read())['data']['children']
-    mock_subreddit.get_top.return_value = sub_data
-    mock_subreddit.get_controversial.return_value = sub_data
-    mock_subreddit.get_new.return_value = sub_data
-    mock_subreddit.get_hot.return_value = sub_data  
+    mock_subreddit.top.return_value = [c['data'] for c in sub_data]
+    mock_subreddit.controversial.return_value = [c['data'] for c in sub_data]
+    mock_subreddit.new.return_value = [c['data'] for c in sub_data]
+    mock_subreddit.hot.return_value = [c['data'] for c in sub_data]
     patch('praw.')
 
-    r.get_subreddit.return_value = mock_subreddit   
+    r.subreddit.return_value = mock_subreddit   
 
     
     assert len(db_session.query(FrontPage).all()) == 0
@@ -94,9 +95,9 @@ def test_archive_reddit_front_page(mock_subreddit, mock_reddit):
   basic test for method archive_subreddit_page to insert timestamped pages to subreddit_pages table.
   analogous to test_archive_reddit_front_page.
 """
-@patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Subreddit', autospec=True)    
-def test_archive_subreddit_page(mock_subreddit, mock_reddit):
+@patch('praw.Reddit')
+def test_archive_subreddit_page(mock_reddit):
+    mock_subreddit = MagicMock()
     ### TODO: TEST THE MOCK SETUP WITH AN ACTUAL QUERY
 
     test_subreddit_name = "science"
@@ -116,15 +117,15 @@ def test_archive_subreddit_page(mock_subreddit, mock_reddit):
             postobj = json2obj(json_dump)
             sub_data.append(postobj)
 
-    mock_subreddit.get_top.return_value = sub_data
-    mock_subreddit.get_controversial.return_value = sub_data
-    mock_subreddit.get_new.return_value = sub_data
-    mock_subreddit.get_hot.return_value = sub_data  
+    mock_subreddit.top.return_value = sub_data
+    mock_subreddit.controversial.return_value = sub_data
+    mock_subreddit.new.return_value = sub_data
+    mock_subreddit.hot.return_value = sub_data  
     patch('praw.')
 
     mock_subreddit.display_name = test_subreddit_name
     mock_subreddit.id = test_subreddit_id  
-    r.get_subreddit.return_value = mock_subreddit    
+    r.subreddit.return_value = mock_subreddit    
 
     assert len(db_session.query(SubredditPage).all()) == 0
     sp = app.controllers.subreddit_controller.SubredditPageController(test_subreddit_name, db_session, r, log)  
@@ -153,9 +154,9 @@ def test_archive_subreddit_page(mock_subreddit, mock_reddit):
     assert hot_pages_count == 1
 
 
-@patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Subreddit', autospec=True)    
-def test_archive_subreddit(mock_subreddit, mock_reddit):
+@patch('praw.Reddit')
+def test_archive_subreddit(mock_reddit):
+    mock_subreddit = MagicMock()
     test_subreddit_name = "science"
     test_subreddit_id = "mouw"
 
@@ -182,7 +183,7 @@ def test_archive_subreddit(mock_subreddit, mock_reddit):
     all_subs = db_session.query(Subreddit).all()
     assert len(all_subs) == 1
 
-@patch('praw.Reddit', autospec=True)
+@patch('praw.Reddit')
 def test_archive_post(mock_reddit):
 
     # dummy post just to pass the test. 
@@ -217,18 +218,18 @@ def test_archive_post(mock_reddit):
     all_posts = db_session.query(Post).all()
     assert len(all_posts) == 1
 
-@patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Submission', autospec=True)    
-def test_fetch_post_comments(mock_submission, mock_reddit):
+@patch('praw.Reddit')
+def test_fetch_post_comments(mock_reddit):
+    mock_submission = MagicMock()
     with open("{script_dir}/fixture_data/post2.json".format(script_dir=TEST_DIR)) as f:
         post = json.loads(f.read())
     with open("{script_dir}/fixture_data/post2_comments.json".format(script_dir=TEST_DIR)) as f:
         post_comments = json.loads(f.read())
     
     r = mock_reddit.return_value
-    mock_submission.comments = post_comments
+    mock_submission.comments.list.return_value = post_comments
     mock_submission.num_comments = len(post_comments)
-    r.get_submission.return_value = mock_submission
+    r.submission.return_value = mock_submission
     log = app.cs_logger.get_logger(ENV, BASE_DIR)
     patch('praw.')
 
@@ -256,9 +257,9 @@ def test_fetch_post_comments(mock_submission, mock_reddit):
     assert dbpost.comments_queried_at != None
 
 
-@patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Submission', autospec=True)    
-def test_archive_all_missing_subreddit_post_comments(mock_submission, mock_reddit):
+@patch('praw.Reddit')
+def test_archive_all_missing_subreddit_post_comments(mock_reddit):
+    mock_submission = MagicMock()
 
     ## SET UP MOCKS 
     r = mock_reddit.return_value
@@ -284,7 +285,7 @@ def test_archive_all_missing_subreddit_post_comments(mock_submission, mock_reddi
         if(i == test_post_index):
             with open("{script_dir}/fixture_data/{file}".format(script_dir=TEST_DIR, file=post_comment_fixture_name)) as f:
                 post_comments = json.loads(f.read())
-                mock_submission.comments = post_comments
+                mock_submission.comments.list.return_value = post_comments
                 mock_submission.num_comments = len(post_comments)
             test_post_subreddit = post['subreddit_id']
             post_fixture_comments.append(post_comments)
@@ -295,7 +296,7 @@ def test_archive_all_missing_subreddit_post_comments(mock_submission, mock_reddi
         sp.archive_post(post)
     db_session.commit()
 
-    r.get_submission.return_value = mock_submission
+    r.submission.return_value = mock_submission
     patch('praw.')
 
     ## NOW RUN THE TEST
@@ -318,7 +319,7 @@ def test_archive_all_missing_subreddit_post_comments(mock_submission, mock_reddi
     assert dbpost.comment_data == None
     assert dbpost.comments_queried_at == None
 
-@patch('praw.Reddit', autospec=True)
+@patch('praw.Reddit')
 def test_archive_mod_action_page(mock_reddit):
     r = mock_reddit.return_value
     log = app.cs_logger.get_logger(ENV, BASE_DIR)
@@ -332,7 +333,7 @@ def test_archive_mod_action_page(mock_reddit):
 
     subreddit = mod_action_fixtures[0][0]['sr_id36']
 
-    r.get_mod_log.return_value = mod_action_fixtures[0]
+    r.subreddit.return_value.mod.log.return_value = mod_action_fixtures[0]
     patch('praw.')
 
     mac = app.controllers.moderator_controller.ModeratorController(
@@ -370,25 +371,25 @@ def test_archive_mod_action_page(mock_reddit):
     assert db_count_after_dupes + unique_action_count_after_dupes == len(mod_action_fixtures[0])
 
     # NOW ADD A NEW PAGE
-    r.get_mod_log.return_value = mod_action_fixtures[1]
+    r.subreddit.return_value.mod.log.return_value = mod_action_fixtures[1]
     patch('praw.')
     last_action_id, unique_action_count_2 = mac.archive_mod_action_page(after_id = mod_action_fixtures[0][-1]['id'])
     assert db_session.query(ModAction).count() == len(mod_action_fixtures[0]) + len(mod_action_fixtures[1])
     assert unique_action_count_1 + unique_action_count_2 == len(mod_action_fixtures[0]) + len(mod_action_fixtures[1])
     assert last_action_id == mod_action_fixtures[1][-1]['id']
 
-@patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Submission', autospec=True)    
-def test_fetch_post_comments(mock_submission, mock_reddit):
+@patch('praw.Reddit')
+def test_fetch_post_comments(mock_reddit):
+    mock_submission = MagicMock()
     with open("{script_dir}/fixture_data/post2.json".format(script_dir=TEST_DIR)) as f:
         post = json.loads(f.read())
     with open("{script_dir}/fixture_data/post2_comments.json".format(script_dir=TEST_DIR)) as f:
         post_comments = json.loads(f.read())
     
     r = mock_reddit.return_value
-    mock_submission.comments = post_comments
+    mock_submission.comments.list.return_value = post_comments
     mock_submission.num_comments = len(post_comments)
-    r.get_submission.return_value = mock_submission
+    r.submission.return_value = mock_submission
     log = app.cs_logger.get_logger(ENV, BASE_DIR)
     patch('praw.')
 
@@ -415,9 +416,9 @@ def test_fetch_post_comments(mock_submission, mock_reddit):
     assert dbpost.comments_queried_at != None
 
 
-@patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Submission', autospec=True)    
-def test_archive_all_missing_subreddit_post_comments(mock_submission, mock_reddit):
+@patch('praw.Reddit')
+def test_archive_all_missing_subreddit_post_comments(mock_reddit):
+    mock_submission = MagicMock()
 
     ## SET UP MOCKS 
     r = mock_reddit.return_value
@@ -443,7 +444,7 @@ def test_archive_all_missing_subreddit_post_comments(mock_submission, mock_reddi
         if(i == test_post_index):
             with open("{script_dir}/fixture_data/{file}".format(script_dir=TEST_DIR, file=post_comment_fixture_name)) as f:
                 post_comments = json.loads(f.read())
-                mock_submission.comments = post_comments
+                mock_submission.comments.list.return_value = post_comments
                 mock_submission.num_comments = len(post_comments)
             test_post_subreddit = post['subreddit_id']
             post_fixture_comments.append(post_comments)
@@ -454,7 +455,7 @@ def test_archive_all_missing_subreddit_post_comments(mock_submission, mock_reddi
         sp.archive_post(post)
     db_session.commit()
 
-    r.get_submission.return_value = mock_submission
+    r.submission.return_value = mock_submission
     patch('praw.')
 
     ## NOW RUN THE TEST
@@ -477,7 +478,7 @@ def test_archive_all_missing_subreddit_post_comments(mock_submission, mock_reddi
     assert dbpost.comment_data == None
     assert dbpost.comments_queried_at == None
 
-@patch('praw.Reddit', autospec=True)
+@patch('praw.Reddit')
 def test_archive_user(mock_reddit):
 
   username = "merrymou"
@@ -509,7 +510,7 @@ def test_archive_user(mock_reddit):
   new_last_seen = user.last_seen
   assert(old_last_seen <= new_last_seen)
 
-@patch('praw.Reddit', autospec=True)
+@patch('praw.Reddit')
 def test_archive_last_thousand_comments(mock_reddit):
     r = mock_reddit.return_value
     log = app.cs_logger.get_logger(ENV, BASE_DIR)
@@ -539,7 +540,7 @@ def test_archive_last_thousand_comments(mock_reddit):
                      comment_fixtures[0][900:], 
                      []]
 
-    r.get_comments = m
+    r.subreddit.return_value.comments = m
     patch('praw.')
 
     ## add science subreddit
@@ -578,13 +579,13 @@ def test_archive_last_thousand_comments(mock_reddit):
                      comment_fixtures[1][800:900],
                      comment_fixtures[1][900:],
                      []]
-    r.get_comments = m
+    r.subreddit.return_value.comments = m
     patch('praw.')
     cc.archive_last_thousand_comments(subreddit_name)
     db_session.commit()
     assert db_session.query(Comment).count() == len(first_ids) + len(second_ids)
 
-@patch('praw.Reddit', autospec=True)
+@patch('praw.Reddit')
 def test_archive_mod_action_page(mock_reddit):
     r = mock_reddit.return_value
     log = app.cs_logger.get_logger(ENV, BASE_DIR)
@@ -598,7 +599,7 @@ def test_archive_mod_action_page(mock_reddit):
 
     subreddit = mod_action_fixtures[0][0]['sr_id36']
 
-    r.get_mod_log.return_value = mod_action_fixtures[0]
+    r.subreddit.return_value.mod.log.return_value = mod_action_fixtures[0]
     patch('praw.')
 
     mac = app.controllers.moderator_controller.ModeratorController(
@@ -636,7 +637,7 @@ def test_archive_mod_action_page(mock_reddit):
     assert db_count_after_dupes + unique_action_count_after_dupes == len(mod_action_fixtures[0])
 
     # NOW ADD A NEW PAGE
-    r.get_mod_log.return_value = mod_action_fixtures[1]
+    r.subreddit.return_value.mod.log.return_value = mod_action_fixtures[1]
     patch('praw.')
     last_action_id, unique_action_count_2 = mac.archive_mod_action_page(after_id = mod_action_fixtures[0][-1]['id'])
     assert db_session.query(ModAction).count() == len(mod_action_fixtures[0]) + len(mod_action_fixtures[1])
