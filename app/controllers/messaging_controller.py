@@ -4,8 +4,6 @@ import simplejson as json
 import datetime
 import os
 import reddit.connection
-import reddit.praw_utils as praw_utils
-import reddit.queries
 from pathlib import Path
 from app.models import Base, ExperimentAction, MessageLog
 import app.event_handler
@@ -71,24 +69,13 @@ class MessagingController:
             # WARNING: DO NOT COMMIT THIS LINE UNCOMMENTED
             # response = {"errors":[]}
             # NOTE: END ALTERED CODE COMPONENT
-            response = self.r.send_message(username, subject, body, raise_captcha_exception=True)
- 
-            if response["errors"] and len(response['errors'])>0:
-                self.log.error("Error in response when sending a message to reddit account %s: %s" % (username, str(response)))
-                message_sent = False
-            else:
-                self.log.info("Message successfully sent to reddit account %s" % username)
-                message_sent = True
-        except praw.errors.InvalidUser as e:
-            self.log.exception("Failed to send message to reddit account %s because user doesn't exist" % username)
-            self.log.error(e.response)
+            self.r.redditor(username).message(subject=subject, message=body)
+            self.log.info("Message successfully sent to reddit account %s" % username)
+            message_sent = True
+        except praw.exceptions.RedditAPIException as e:
+            self.log.exception("Failed to send reddit message to %s" % username)
             message_sent = False
-            response["errors"].append({"username":username, "error": "invalid username"})
-        except praw.errors.InvalidCaptcha as e:
-            self.log.exception("Message sending on reddit requires a captcha")
-            self.log.error(e.response)
-            message_sent = False
-            response["errors"].append({"username":username, "error": "invalid captcha"})
+            response["errors"].append({"username": username, "error": e.items[0].error_type})
         except Exception as e:
             self.log.exception("Failed to send reddit message to %s" % username)
             message_sent = False
