@@ -3,8 +3,6 @@ import inspect, os, sys # set the BASE_DIR
 import simplejson as json
 import datetime, yaml, time, csv, pytz
 import reddit.connection
-import reddit.praw_utils as praw_utils
-import reddit.queries
 import sqlalchemy
 from collections import defaultdict
 from dateutil import parser
@@ -180,10 +178,10 @@ class StylesheetExperimentController:
 
         found_code = False
 
-        stylesheet_data = self.r.get_stylesheet(self.subreddit)
-        if "stylesheet" in stylesheet_data.keys():
+        stylesheet = self.r.subreddit(self.subreddit).stylesheet()
+        if stylesheet.stylesheet:
             line_list = []
-            for line in stylesheet_data['stylesheet'].split("\n"):
+            for line in stylesheet.stylesheet.split("\n"):
                 ## IF A LINE FROM THE STUDY IS FOUND,
                 ## REPLACE IT WITH THE INTERVENTION
                 if line in arms.values():
@@ -200,8 +198,13 @@ class StylesheetExperimentController:
 
             
         
-        result = self.r.set_stylesheet(self.subreddit, new_stylesheet)
-        if('errors' in result.keys() and len(result['errors'])==0):
+        try:
+            self.r.subreddit(self.subreddit).stylesheet.update(new_stylesheet, reason="CivilServant experiment intervention")
+            stylesheet_updated = True
+        except praw.exceptions.RedditAPIException as e:
+            stylesheet_updated = False
+            stylesheet_errors = e
+        if stylesheet_updated:
 
             self.log.info("{0}: Experiment {1}: Applied Arm {3} of Condition {4} in {2}".format(
                     self.__class__.__name__,
@@ -225,7 +228,7 @@ class StylesheetExperimentController:
                     self.__class__.__name__,
                     self.experiment.id,
                     self.subreddit, 
-                    arm,condition, ", ".join(result['errors'])))
+                    arm,condition, str(stylesheet_errors)))
 #            experiment_action = ExperimentAction(
 #                experiment_id = self.experiment.id,
 #                praw_key_id = PrawKey.get_praw_id(ENV, self.experiment_name),
@@ -405,7 +408,7 @@ class StylesheetExperimentController:
                     len(reddit_comment_ids),
                     self.subreddit))
             return
-        for comment in self.r.get_info(thing_id = reddit_comment_ids):
+        for comment in self.r.info(fullnames = reddit_comment_ids):
             snapshot = {"score":comment.score,
                         "num_reports":comment.num_reports,
                         "user_reports":len(comment.user_reports),
