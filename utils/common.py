@@ -108,33 +108,44 @@ class DbEngine:
 		db_session = DBSession()
 		return db_session
 
-def _index_or_none(l, obj):
-    try:
-        return l.index(obj)
-    except ValueError:
-        return None
+class DictObject(dict):
+    """A dict whose keys are also attributes, with a forgiving getter."""
+    __getattr__ = dict.get
+    __setattr__ = dict.__setitem__
+    __delattr__ = dict.__delitem__
 
 def _json_object_hook(dobj, now=False, offset=0):
-    dobj['json_dict'] = dobj.copy()
-    keys = list(dobj.keys())
-    values = list(dobj.values())
     if now:
         from datetime import datetime
-        created_utc = int(datetime.now().timestamp()) + offset
-        created_utc_idx = _index_or_none(keys, 'created_utc')
-        if created_utc_idx:
-            values[created_utc_idx] = created_utc
-        else:
-            keys.append('created_utc')
-            values.append(created_utc)
-        dobj['json_dict']['created_utc'] = created_utc
-    cls = namedtuple('HydratedTestObject', keys, rename=True)
-    cls.remove = lambda x: None
-    return cls(*values)
+        dobj['created_utc'] = int(datetime.now().timestamp()) + offset
+    return DictObject(dobj)
 
 def json2obj(data, now=False, offset=0):
+    """Parse JSON into DictObjects (key- and attribute-accessible) for use as test doubles."""
     object_hook = lambda dobj: _json_object_hook(dobj, now, offset)
     return json.loads(data, object_hook=object_hook)
+
+# PRAW 7 Submission adds these attrs.
+_PRAW_MACHINERY = {"comment_limit", "comment_sort"}
+
+def json_dict(obj):
+    """A praw-3.5 raw json_dict, reconstructed from a praw-7 object (dicts pass through)."""
+    if isinstance(obj, dict):
+        # Test fixtures + already-raw inputs
+        return dict(obj)
+    raw = vars(obj)
+    d = {k: v for k, v in raw.items() if not k.startswith("_") and k not in _PRAW_MACHINERY}
+    if "_mod" in raw:
+        # Only ModAction shadows mod as _mod
+        d["mod"] = str(obj.mod) if obj.mod is not None else None
+    for key in ("author", "subreddit"):
+        # Flatten nested objects to strings
+        v = d.get(key)
+        if v is not None and not isinstance(v, str):
+            d[key] = v.name if key == "author" else str(v)
+    if "author" in d and d["author"] is None:  # praw-7 deleted author -> None; 3.5 had "[deleted]"
+        d["author"] = "[deleted]"
+    return d
 
 class CommentNode:
 	def __init__(self, id, data, link_id = None, toplevel = False, parent=None):
