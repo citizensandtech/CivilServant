@@ -10,7 +10,6 @@ from sqlalchemy.orm import relationship
 from sqlalchemy import create_engine
 import sqlalchemy
 import datetime
-import socket
 
 Base = declarative_base()
 
@@ -123,13 +122,10 @@ class User(Base):
 
 class PrawKey(Base):
     __tablename__       = 'praw_keys'
-    # IDs will be a string based on the assumption
-    # that each device will only have one process
-    # at a time handling a particular controller
-    # in the format:  
-    #   HOST:ENV:CONTROLLER
+    # IDs will be a string in the format:
+    #   ENV:CONTROLLER
     # For example:
-    #   hannahmore:development:FrontPageController
+    #   development:FrontPageController
     id                  = Column(String(256), primary_key = True)
     created_at          = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     access_token        = Column(String(2048))
@@ -140,8 +136,7 @@ class PrawKey(Base):
 
     @classmethod
     def get_praw_id(cls, env, controller):
-        host = socket.gethostname()
-        return "{0}:{1}:{2}".format(host,env,controller)
+        return "{0}:{1}".format(env,controller)
 
 class Experiment(Base):
     __tablename__       = 'experiments'
