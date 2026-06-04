@@ -45,7 +45,8 @@ def main(controller="Main"):
 
     me = reddit.user.me()
     praw_id = PrawKey.get_praw_id(ENV, controller)
-    scope_json = json.dumps(list(reddit.auth.scopes()))
+    scopes = list(reddit.auth.scopes())
+    scope_json = json.dumps(scopes)
 
     existing = db_session.query(PrawKey).filter_by(id=praw_id).first()
     if existing:
@@ -69,6 +70,21 @@ def main(controller="Main"):
             praw_id, me.name
         )
     )
+
+    # Save `config/<env>_auth.json` as a fallback/backup file.
+    auth_path = os.path.join(base_dir, "config", "{env}_auth.json".format(env=ENV))
+    with open(auth_path, "w") as auth_file:
+        json.dump(
+            {
+                "refresh_token": refresh_token,
+                "scope": scopes,
+                "authorized_username": me.name,
+                "authorized_user_id": me.id,
+            },
+            auth_file,
+            indent=2,
+        )
+    print("Wrote auth file '{0}'.".format(auth_path))
 
 
 if __name__ == "__main__":
