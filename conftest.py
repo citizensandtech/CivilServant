@@ -10,23 +10,11 @@ ENV = os.environ["CS_ENV"] = "test"
 
 import app.cs_logger
 from app.models import *
-from utils.common import DbEngine
+from utils.common import DbEngine, DictObject
 
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 TEST_DIR = os.path.join(BASE_DIR, "tests")
 TEST_ONLY_SUBREDDIT_ID = "TEST_ONLY"
-
-
-class DictObject(dict):
-    __getattr__ = dict.get
-    __setattr__ = dict.__setitem__
-    __delattr__ = dict.__delitem__
-
-
-class MockRedditData(DictObject):
-    def __init__(self, *args, **kw):
-        self.json_dict = args[0]
-        super().__init__(*args, **kw)
 
 
 @pytest.fixture
@@ -46,7 +34,7 @@ def modaction_data():
     actions = []
     for filename in sorted(glob.glob(f"{TEST_DIR}/fixture_data/mod_actions*")):
         with open(filename, "r") as f:
-            actions += [MockRedditData(r) for r in json.load(f)]
+            actions += [DictObject(r) for r in json.load(f)]
     return actions
 
 
@@ -91,10 +79,11 @@ class Helpers:
 
         for page in mod_log_pages:
             for m in page:
-                m["json_dict"]["sr_id36"] = TEST_ONLY_SUBREDDIT_ID
+                m["sr_id36"] = TEST_ONLY_SUBREDDIT_ID
 
-        with patch("praw.Reddit", autospec=True, spec_set=True) as reddit:
-            reddit.get_mod_log = MagicMock(side_effect=mod_log_pages)
+        with patch("praw.Reddit") as reddit:
+            # praw 7 surface: reddit.subreddit(name).mod.log(...) yields each page in turn.
+            reddit.subreddit.return_value.mod.log = MagicMock(side_effect=mod_log_pages)
             yield reddit
 
     @staticmethod

@@ -8,6 +8,7 @@ ENV = os.environ['CS_ENV'] = "test"
 
 from mock import Mock, patch
 import unittest.mock
+from unittest.mock import MagicMock
 import simplejson as json
 import sqlalchemy
 from sqlalchemy import create_engine
@@ -49,7 +50,7 @@ def setup_function(function):
 def teardown_function(function):
     clear_all_tables()
 
-@patch('praw.Reddit', autospec=True)
+@patch('praw.Reddit')
 def test_initialize_experiment(mock_reddit):
     r = mock_reddit.return_value
     patch('praw.')
@@ -85,7 +86,7 @@ def test_initialize_experiment(mock_reddit):
         assert len(settings['conditions'][condition_name]['randomizations']) == len(conditions)
         assert settings['conditions'][condition_name]['next_randomization']  == 0
 
-@patch('praw.Reddit', autospec=True)    
+@patch('praw.Reddit')    
 def test_determine_intervention_eligible(mock_reddit):
     r = mock_reddit.return_value
     patch('praw.')
@@ -126,7 +127,7 @@ def test_determine_intervention_eligible(mock_reddit):
     assert controller.determine_intervention_eligible() == False
     
 
-@patch('praw.Reddit', autospec=True)    
+@patch('praw.Reddit')    
 def test_select_condition(mock_reddit):
     r = mock_reddit.return_value
     patch('praw.')
@@ -140,13 +141,12 @@ def test_select_condition(mock_reddit):
     assert controller.select_condition(current_time = parser.parse("07/20/2017 00:00:00")) == "normal"
 
 
-@patch('praw.Reddit', autospec=True)
+@patch('praw.Reddit')
 def test_set_stylesheet(mock_reddit):
     r = mock_reddit.return_value
     with open(os.path.join(BASE_DIR,"tests", "fixture_data", "stylesheet_0" + ".json"), "r") as f:
         stylesheet = json.loads(f.read())
-    r.get_stylesheet.return_value = stylesheet
-    r.set_stylesheet.return_value = {"errors":[]}
+    r.subreddit.return_value.stylesheet.return_value = MagicMock(stylesheet=stylesheet['stylesheet'])
     patch('praw.')
 
     experiment_name = "stylesheet_experiment_test"
@@ -276,7 +276,7 @@ def setup_comment_monitoring(r, yesterday_posts, today_posts):
     assert db_session.query(Comment).count() == comment_counter
     return controller, today_post_list, comment_counter
 
-@patch('praw.Reddit', autospec=True)
+@patch('praw.Reddit')
 def test_post_snapshotting(mock_reddit):
     r = mock_reddit.return_value
     patch('praw.')
@@ -311,7 +311,7 @@ def test_post_snapshotting(mock_reddit):
            ExperimentThing, Post.id == ExperimentThing.id).filter(
            Post.id.in_([x.id for x in posts])).count() == len(posts)
 
-@patch('praw.Reddit', autospec=True)
+@patch('praw.Reddit')
 def test_observe_comment_snapshots(mock_reddit):
     r = mock_reddit.return_value
     patch('praw.')
@@ -340,12 +340,12 @@ def test_observe_comment_snapshots(mock_reddit):
     f.close()
     
     #MOCK RETURN VALUE OF GET_INFO
-    r.get_info.return_value = [json2obj(json.dumps(x)) for x in comment_fixtures[0:len(comments) - math.floor(len(comments)/2)]]
+    r.info.return_value = [json2obj(json.dumps(x)) for x in comment_fixtures[0:len(comments) - math.floor(len(comments)/2)]]
 
     controller.observe_comment_snapshots(comments)
     assert db_session.query(ExperimentThingSnapshot).count() == len(comments) - math.floor(len(comments)/2)
 
-@patch('praw.Reddit', autospec=True)
+@patch('praw.Reddit')
 def test_sample_comments(mock_reddit):
     r = mock_reddit.return_value
     patch('praw.')

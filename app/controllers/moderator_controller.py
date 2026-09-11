@@ -3,11 +3,9 @@ import inspect, os, sys  # set the BASE_DIR
 import simplejson as json
 import datetime
 import reddit.connection
-import reddit.praw_utils as praw_utils
-import reddit.queries
 import sqlalchemy
 import app.event_handler
-from utils.common import PageType
+from utils.common import PageType, json_dict
 from app.models import Base, SubredditPage, Subreddit, Post, ModAction
 from sqlalchemy import and_
 
@@ -38,17 +36,14 @@ class ModeratorController:
             )
 
         self.fetched_mod_actions = list(
-            self.r.get_mod_log(self.subreddit, limit=500, params={"after": after_id})
+            self.r.subreddit(self.subreddit).mod.log(limit=500, params={"after": after_id})
         )
         if self.fetched_mod_actions:
-            first_ma = self.fetched_mod_actions[0]
-            src_dict = getattr(first_ma, "json_dict", first_ma)
-            self.fetched_subreddit_id = src_dict["sr_id36"]
+            self.fetched_subreddit_id = json_dict(self.fetched_mod_actions[0])["sr_id36"]
 
         action_dicts = []
         for action in self.fetched_mod_actions:
-            if "json_dict" in dir(action):
-                action = action.json_dict  # to handle test fixtures
+            action = json_dict(action)
             action_dicts.append(
                 dict(
                     id=action["id"],

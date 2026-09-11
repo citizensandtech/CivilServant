@@ -13,6 +13,4 @@ COPY ./docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 COPY . .
 
-RUN CS_ENV=all PYTHONPATH=. python3 reddit/praw_patch.py --apply
-
 CMD ["./docker/entrypoint.sh"]

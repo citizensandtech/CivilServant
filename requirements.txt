@@ -1,4 +1,4 @@
-praw==3.5.0
+praw==7.8.1
 pytest
 mock
 simplejson
@@ -16,8 +16,3 @@ pytz
 numpy
 pathlib
 psutil
-
-#if you have trouble with mysqlclient on OSX High Sierra
-# run:
-# xcode-select --install
-# LDFLAGS=-L/usr/local/opt/openssl/lib pip install mysqlclient

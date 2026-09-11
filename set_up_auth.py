@@ -1,29 +1,92 @@
-## THIS SCRIPT GATHERS ACCESS INFORMATION
-## INCLUDING A REFRESH KEY FROM REDDIT
+"""
+Perform OAuth code flow and store the refresh token.
 
-# DOCUMENTATION FROM:
-# http://praw.readthedocs.io/en/stable/pages/oauth.html
+Usage: CS_ENV=<env> PYTHONPATH=. python3 set_up_auth.py [controller]
+"""
 
-import praw
-import webbrowser
-import pickle
-import sys
-import simplejson as json
 import os
+import sys
+import praw
+import simplejson as json
 
-env =  os.environ['CS_ENV']
+from app.models import PrawKey
+from utils.common import DbEngine
 
-r = praw.Reddit(user_agent="Test version of CivilServant by u/natematias")
+ENV = os.environ["CS_ENV"]
 
-url = r.get_authorize_url('uniqueKey', 'identity read modlog modposts submit modconfig flair privatemessages', True)
-print(url)
-print("After you accept permission, please enter the code from the redirect_url")
-code = input("Enter the text after 'code='\n")
-access_information = r.get_access_information(code)
-pickle.dump(access_information, open("config/access_information_{environment}.pickle".format(environment=env), "wb"))
-#r.set_access_credentials(**access_information)
-#print code
-#print access_information
+SCOPES = [
+    "identity",
+    "read",
+    "modlog",
+    "modposts",
+    "submit",
+    "modconfig",
+    "flair",
+    "privatemessages",
+]
 
-print( "config/access_information_{environment}.pickle created".format(environment=env) )
-print
+
+def main(controller="Main"):
+    base_dir = os.path.dirname(os.path.realpath(__file__))
+    db_session = DbEngine(
+        os.path.join(base_dir, "config", "{env}.json".format(env=ENV))
+    ).new_session()
+
+    reddit = praw.Reddit()
+
+    url = reddit.auth.url(scopes=SCOPES, state="uniqueKey", duration="permanent")
+    print(
+        "Visit this URL, grant access, then copy the 'code' parameter from the redirect URL:"
+    )
+    print(url)
+    code = input("Enter the text after 'code='\n").strip()
+
+    refresh_token = reddit.auth.authorize(code)
+
+    me = reddit.user.me()
+    praw_id = PrawKey.get_praw_id(ENV, controller)
+    scopes = list(reddit.auth.scopes())
+    scope_json = json.dumps(scopes)
+
+    existing = db_session.query(PrawKey).filter_by(id=praw_id).first()
+    if existing:
+        existing.refresh_token = refresh_token
+        existing.scope = scope_json
+        existing.authorized_username = me.name
+        existing.authorized_user_id = me.id
+    else:
+        db_session.add(
+            PrawKey(
+                id=praw_id,
+                refresh_token=refresh_token,
+                scope=scope_json,
+                authorized_username=me.name,
+                authorized_user_id=me.id,
+            )
+        )
+    db_session.commit()
+    print(
+        "Stored refresh token in PrawKey row '{0}' (authorized as u/{1}).".format(
+            praw_id, me.name
+        )
+    )
+
+    # Save `config/<env>_auth.json` as a fallback/backup file.
+    auth_path = os.path.join(base_dir, "config", "{env}_auth.json".format(env=ENV))
+    with open(auth_path, "w") as auth_file:
+        json.dump(
+            {
+                "refresh_token": refresh_token,
+                "scope": scopes,
+                "authorized_username": me.name,
+                "authorized_user_id": me.id,
+            },
+            auth_file,
+            indent=2,
+        )
+    print("Wrote auth file '{0}'.".format(auth_path))
+
+
+if __name__ == "__main__":
+    requested_controller = sys.argv[1] if len(sys.argv) > 1 else "Main"
+    main(requested_controller)

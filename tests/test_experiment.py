@@ -21,6 +21,7 @@ from app.controllers.front_page_controller import FrontPageController
 from utils.common import *
 from dateutil import parser
 import praw, csv, random, string
+from unittest.mock import MagicMock
 from collections import Counter
 
 ### LOAD THE CLASSES TO TEST
@@ -51,7 +52,7 @@ def setup_function(function):
 def teardown_function(function):
     clear_all_tables()
 
-@patch('praw.Reddit', autospec=True)
+@patch('praw.Reddit')
 def test_initialize_experiment(mock_reddit):
     r = mock_reddit.return_value
     patch('praw.')
@@ -96,9 +97,9 @@ def test_initialize_experiment(mock_reddit):
 
         clear_all_tables()
 
-@patch('praw.Reddit', autospec=True)
-@patch('praw.objects.Subreddit', autospec=True)
-def test_identify_condition(mock_subreddit, mock_reddit):
+@patch('praw.Reddit')
+def test_identify_condition(mock_reddit):
+    mock_subreddit = MagicMock()
     r = mock_reddit.return_value
 
     experiment_name_to_controller = {
@@ -121,12 +122,12 @@ def test_identify_condition(mock_subreddit, mock_reddit):
                 json_dump = json.dumps(post)
                 postobj = json2obj(json_dump, now=True, offset=-1*min_age)
                 sub_data.append(postobj)
-        mock_subreddit.get_new.return_value = sub_data
+        mock_subreddit.new.return_value = sub_data
 
         mock_subreddit.display_name = experiment_settings['subreddit']
         mock_subreddit.name = experiment_settings['subreddit']
         mock_subreddit.id = experiment_settings['subreddit_id']
-        r.get_subreddit.return_value = mock_subreddit
+        r.subreddit.return_value = mock_subreddit
         patch('praw.')
 
 

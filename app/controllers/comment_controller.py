@@ -3,9 +3,7 @@ import inspect, os, sys # set the BASE_DIR
 import simplejson as json
 import datetime
 import reddit.connection
-import reddit.praw_utils as praw_utils
-import reddit.queries
-from utils.common import PageType
+from utils.common import PageType, json_dict
 from utils.retry import retryable
 from app.models import Base, SubredditPage, Subreddit, Post, Comment
 import app.event_handler
@@ -25,18 +23,15 @@ class CommentController:
     def archive_missing_post_comments(self, post_id):
         post = self.db_session.query(Post).filter(Post.id == post_id).first()
         query_time = datetime.datetime.utcnow()
-        submission = self.r.get_submission(submission_id=post_id)
+        submission = self.r.submission(id=post_id)
         self.log.info("Querying Missing Comments for {post_id}. Total comments to archive: {num_comments}".format(
             post_id = post_id,
             num_comments = submission.num_comments
         ))
-        submission.replace_more_comments(limit=None, threshold=0)
+        submission.comments.replace_more(limit=None, threshold=0)
         comments = []
         
-        if(os.environ['CS_ENV'] =='test'):
-            flattened_comments = submission.comments # already a JSON dict
-        else:
-            flattened_comments = [x.json_dict for x in praw.helpers.flatten_tree(submission.comments)]
+        flattened_comments = [json_dict(x) for x in submission.comments.list()]
 
         for comment in flattened_comments:
             if 'replies' in comment.keys():
@@ -89,7 +84,7 @@ class CommentController:
 
             iterations = 0
             while(limit_found == False):
-                comment_result = self.r.get_comments(subreddit = subreddit_name, params={"after":after_id}, limit=100)
+                comment_result = self.r.subreddit(subreddit_name).comments(limit=100, params={"after":after_id})
 
                 ## sometimes the above line takes a long time to run
                 ## so we expire the session before continuing
@@ -98,8 +93,7 @@ class CommentController:
                 comments_returned = 0
                 for comment in comment_result:
                     comments_returned += 1
-                    if(os.environ['CS_ENV'] !='test'):
-                        comment = comment.json_dict
+                    comment = json_dict(comment)
                     comments.append(comment)
                     after_id = "t1_" + comment['id']
                 if(comment_result is None or comments_returned == 0 ):
@@ -148,7 +142,7 @@ class CommentController:
 #                    self.log.info("Exception saving {0} comments to database. Successfully saved after rollback: {1}".format(len(db_comments),str(e)))
                     
 
-        except praw.errors.APIException:
+        except praw.exceptions.APIException:
             self.log.error("Error querying latest {subreddit_name} comments from reddit API. Immediate attention needed.".format(subreddit_name=subreddit_name))
             sys.exit(1)
         self.last_queried_comments += comments

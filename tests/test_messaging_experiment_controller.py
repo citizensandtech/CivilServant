@@ -51,7 +51,7 @@ def setup_function(function):
 def teardown_function(function):
     clear_all_tables()
 
-@patch('praw.Reddit', autospec=True)
+@patch('praw.Reddit')
 def test_initialize_experiment(mock_reddit):
     r = mock_reddit.return_value
 
@@ -90,7 +90,7 @@ def test_initialize_experiment(mock_reddit):
                      comment_fixtures[0][900:], 
                      []]
 
-    r.get_comments = m
+    r.subreddit.return_value.comments = m
     patch('praw.')
     ##### END SETUP
 
@@ -123,7 +123,7 @@ def test_initialize_experiment(mock_reddit):
 
 #### TEST MessagingExperimentController::identify_newcomers
 #### TEST MessagingExperimentController::previously_enrolled
-@patch('praw.Reddit', autospec=True)
+@patch('praw.Reddit')
 def test_newcomer_messaging_eligibility(mock_reddit):
     random.seed(26062490)
     r = mock_reddit.return_value
@@ -264,7 +264,7 @@ def test_newcomer_messaging_eligibility(mock_reddit):
 
 
 #### TEST MessagingExperimentController::get_accounts_needing_interventions
-@patch('praw.Reddit', autospec=True)
+@patch('praw.Reddit')
 def test_interventions(mock_reddit):
     r = mock_reddit.return_value
 
@@ -318,21 +318,17 @@ def test_interventions(mock_reddit):
 
     ## TEST the result from sending messages
     m = Mock()
-    message_return_vals = []
 
     ## SET UP accounts_to_test return values from message sending
+    ## successes return None; failures raise RedditAPIException whose
+    ## items[0].error_type carries the old error string
     ## the final account in the set will be an invalid username error
-    #for i in range(accounts_to_test-1):
-    #    message_return_vals.append({"errors":[]})
-    message_return_vals.append({"errors":[]})
-    message_return_vals.append({"errors":[{"username":newcomer_authors[accounts_to_test -2],
-                                "error": "nondescript error"}]})    
-    message_return_vals.append(
-        {"errors":[{"username":newcomer_authors[accounts_to_test-1], 
-        "error":"invalid username"}]})
-
-    m.side_effect = message_return_vals
-    r.send_message = m
+    m.side_effect = [
+        None,
+        praw.exceptions.RedditAPIException([["nondescript error", "msg", None]]),
+        praw.exceptions.RedditAPIException([["invalid username", "msg", None]]),
+    ]
+    r.redditor.return_value.message = m
     patch('praw.')
 
     experiment_things = accounts_needing_intervention[0:accounts_to_test]

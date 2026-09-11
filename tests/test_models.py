@@ -14,7 +14,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import glob, datetime
 from utils.common import PageType, DbEngine
-import socket
 
 ### LOAD THE CLASSES TO TEST
 from app.models import *
@@ -63,8 +62,7 @@ def test_16dbde_utc_migration(populate_front_pages):
         assert page.is_utc == True
     
 def test_get_praw_id():
-    hostname = socket.gethostname()
-    assert PrawKey.get_praw_id(ENV, "DummyController") == "{0}:test:DummyController".format(hostname)    
+    assert PrawKey.get_praw_id(ENV, "DummyController") == "test:DummyController"
 
 ## test Comment.get_comment_tree(filter)
 def test_comment_get_comment_tree():

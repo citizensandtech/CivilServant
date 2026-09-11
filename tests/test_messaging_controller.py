@@ -9,6 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import and_, or_
 import glob, datetime
 from app.controllers.messaging_controller import *
+import praw
 from utils.common import PageType, DbEngine, json2obj
 
 ### LOAD THE CLASSES TO TEST
@@ -33,7 +34,7 @@ def setup_function(function):
 def teardown_function(function):
     clear_all_tables()
 
-@patch('praw.Reddit', autospec=True)
+@patch('praw.Reddit')
 def test_send_message(mock_reddit):
     r = mock_reddit.return_value
     log = app.cs_logger.get_logger(ENV, BASE_DIR)
@@ -41,7 +42,7 @@ def test_send_message(mock_reddit):
     mock_test_message_recipient = "CivilServantBot"
 
     ## TEST THE BASE CASE:
-    r.send_message.return_value = {"errors":[]}
+    r.redditor.return_value.message.side_effect = None
     patch('praw.')
     mc = MessagingController(db_session, r, log)
     result = mc.send_message(mock_test_message_recipient, "test message body", "test subject", "test message", '{}')
@@ -54,14 +55,14 @@ def test_send_message(mock_reddit):
     assert ml.message_task_id == "test message"
 
     ## TEST ERROR HANDLING
-    r.send_message.return_value = {"errors":[{"username":mock_test_message_recipient, "error":"simulating an error"}]}
+    r.redditor.return_value.message.side_effect = praw.exceptions.RedditAPIException([['simulating an error', 'msg', None]])
     patch('praw.')
     mc = MessagingController(db_session, r, log)
     result = mc.send_message(mock_test_message_recipient, "test message", "test subject", "test messages")
     assert len(result['errors']) == 1
     assert db_session.query(MessageLog).count() == 2
 
-@patch('praw.Reddit', autospec=True)
+@patch('praw.Reddit')
 def test_send_messages(mock_reddit):
     r = mock_reddit.return_value
     log = app.cs_logger.get_logger(ENV, BASE_DIR)
@@ -69,10 +70,7 @@ def test_send_messages(mock_reddit):
     mock_test_message_recipient = "CivilServantBot2"
 
     ## Mock receiving a series of responses, no errors
-    r.send_message.side_effect = [
-        {"errors":[]},
-        {"errors":[]},
-        {"errors":[]} ]
+    r.redditor.return_value.message.side_effect = [None, None, None]
     patch('praw.')
 
     messages = [
@@ -88,10 +86,7 @@ def test_send_messages(mock_reddit):
     message_log_count = len(messages)
 
     ## Mock the case where duplicate account names are sent as messages 
-    r.send_message.side_effect = [
-        {"errors":[]},
-        {"errors":[]},
-        {"errors":[]} ]
+    r.redditor.return_value.message.side_effect = [None, None, None]
     patch('praw.')
     messages = [
         {"account":"natematias", "subject":"natematias subject", "message": "natematias message"},
@@ -108,13 +103,7 @@ def test_send_messages(mock_reddit):
 
     ## Mock the case where at least one attempt to send a message results in an error
     error_message = "simulating an error"
-    r.send_message.side_effect = [
-        {"errors":[]},
-        {"errors":[]},
-        {"errors": [
-            {"username":mock_test_message_recipient, "error":error_message}
-        ]}
-    ]
+    r.redditor.return_value.message.side_effect = [None, None, praw.exceptions.RedditAPIException([[error_message, 'msg', None]])]
     patch('praw.')
 
     messages = [

@@ -3,6 +3,7 @@ BASEDIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../")
 sys.path.append(BASEDIR)
 import simplejson as json
 import reddit.connection
+from utils.common import json_dict
 
 # GENERATES FOUR PAGES PAGE OF ANONYMIZED FIXTURE DATA 
 # FROM THE ACTUAL MODERATION LOG OF A SUBREDDIT
@@ -17,9 +18,9 @@ def randstring(n):
 conn = reddit.connection.Connect()
 r = conn.connect(controller="ModLog")
 
-actions =  [x.json_dict for x in r.get_mod_log(subreddit, limit=500)]
+actions =  [json_dict(x) for x in r.subreddit(subreddit).mod.log(limit=500)]
 for i in range(0,pages-1):
-  actions += [x.json_dict for x in r.get_mod_log(subreddit, limit=500, params={"after":actions[-1]['id']})]
+  actions += [json_dict(x) for x in r.subreddit(subreddit).mod.log(limit=500, params={"after":actions[-1]['id']})]
 
 print("Fetched {0} moderator actions from {1}".format(len(actions), subreddit))
 
